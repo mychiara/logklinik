@@ -3770,14 +3770,12 @@ async function settingsAdminView(area) {
   document.getElementById("form-settings").onsubmit = async (e) => {
     e.preventDefault();
     const payload = {
-      settings: {
-        batas_lulus: document.getElementById("set-batas-lulus").value,
-        w_prak: document.getElementById("set-w-prak").value,
-        w_askep: document.getElementById("set-w-askep").value,
-        w_sikap: document.getElementById("set-w-sikap").value,
-        w_klinik: document.getElementById("set-w-klinik").value,
-        w_akademik: document.getElementById("set-w-akademik").value,
-      },
+      batas_lulus: document.getElementById("set-batas-lulus").value,
+      w_prak: document.getElementById("set-w-prak").value,
+      w_askep: document.getElementById("set-w-askep").value,
+      w_sikap: document.getElementById("set-w-sikap").value,
+      w_klinik: document.getElementById("set-w-klinik").value,
+      w_akademik: document.getElementById("set-w-akademik").value,
     };
     const saveRes = await postAPI("saveSettings", payload);
     if (saveRes.success) {
