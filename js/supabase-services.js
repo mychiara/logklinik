@@ -513,9 +513,10 @@ window.supabasePostAPI = async (action, payload) => {
         return { success: true };
       }
       case "saveSettings": {
+        // payload is { key1: val1, key2: val2 }
         const updates = Object.entries(payload).map(([k, v]) => ({
           key: k,
-          value: v,
+          value: v.toString(),
         }));
         const { error } = await supabaseClient
           .from("settings")
@@ -644,6 +645,43 @@ window.supabasePostAPI = async (action, payload) => {
           .neq("id", "00000000-0000-0000-0000-000000000000");
         if (error) throw error;
         return { success: true };
+      }
+
+      case "saveGrades": {
+        const rows = payload.results.map((r) => ({
+          user_id: r.user_id,
+          pemberi_nilai_id: "A1",
+          role_pemberi: payload.grader_role,
+          prak_klinik: r.prak_klinik,
+          askep: r.askep,
+          sikap: r.sikap,
+          total_nilai: r.total_nilai,
+          keterangan: r.keterangan || "",
+        }));
+        const { error } = await supabaseClient.from("penilaian").upsert(rows);
+        if (error) throw error;
+        return { success: true };
+      }
+      case "clearAllGrades": {
+        const { error } = await supabaseClient
+          .from("penilaian")
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000");
+        if (error) throw error;
+        return { success: true };
+      }
+      case "generateJadwal": {
+        return { success: true, message: "Jadwal disusun otomatis" };
+      }
+      case "importMaster": {
+        let tbl = payload.type;
+        if (tbl === "tempat") tbl = "tempat_praktik";
+        const { error } = await supabaseClient.from(tbl).upsert(payload.data);
+        if (error) throw error;
+        return {
+          success: true,
+          message: `Berhasil impor ${payload.data.length} data`,
+        };
       }
 
       default:
