@@ -3513,6 +3513,12 @@ window.handleImportCSV = (e, roleFilter) => {
           u[headers[j]] = cols[j].replace(/(^"|"$)/g, "").trim();
         }
       }
+
+      // Pastikan ID terisi (Gunakan NIM/Username sebagai ID jika kolom id kosong)
+      if (!u.id && u.username) {
+        u.id = u.username;
+      }
+
       mappedUsers.push(u);
     }
 
