@@ -577,6 +577,28 @@ window.supabasePostAPI = async (action, payload) => {
         return { success: true };
       }
 
+      case "updatePassword": {
+        // Verify old password
+        const { data: user, error: fetchErr } = await supabaseClient
+          .from("users")
+          .select("password")
+          .eq("id", payload.user_id)
+          .single();
+
+        if (fetchErr || !user) throw new Error("Pengguna tidak ditemukan");
+        if (user.password !== payload.oldPassword)
+          throw new Error("Password lama salah");
+
+        // Update to new password
+        const { error: updErr } = await supabaseClient
+          .from("users")
+          .update({ password: payload.newPassword })
+          .eq("id", payload.user_id);
+
+        if (updErr) throw updErr;
+        return { success: true };
+      }
+
       default:
         return {
           success: true,

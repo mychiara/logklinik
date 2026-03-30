@@ -282,6 +282,12 @@ function initDashboard() {
         text: "Pengaturan",
         view: "settingsAdminView",
       },
+      {
+        id: "nav-password",
+        icon: "fa-key",
+        text: "Ubah Password",
+        view: "changePasswordView",
+      },
     ],
   };
 
@@ -304,6 +310,16 @@ function initDashboard() {
     text: "Laporan Kejadian",
     view: "adminLaporanView",
   });
+
+  // Add Change Password to all roles (except already added in Admin above)
+  if (currentUser.role !== "admin") {
+    menus[currentUser.role].push({
+      id: "nav-password",
+      icon: "fa-key",
+      text: "Ubah Password",
+      view: "changePasswordView",
+    });
+  }
 
   const roleMenus = menus[currentUser.role] || [];
 
@@ -4519,6 +4535,71 @@ document.getElementById("logout-btn").addEventListener("click", () => {
   checkAuth();
   showToast("Sesi Diakhiri", "Anda telah di-logout dengan aman", "info");
 });
+
+function changePasswordView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card" style="max-width: 500px; margin: 0 auto;">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-key text-primary"></i> Ubah Password Akun</h3>
+                </div>
+                <div class="card-body">
+                    <form id="form-change-password">
+                        <div class="form-group">
+                            <label>Password Lama</label>
+                            <input type="password" id="old-pass" required class="form-control" placeholder="••••••••">
+                        </div>
+                        <div class="form-group">
+                            <label>Password Baru</label>
+                            <input type="password" id="new-pass" required class="form-control" placeholder="••••••••">
+                        </div>
+                        <div class="form-group">
+                            <label>Konfirmasi Password Baru</label>
+                            <input type="password" id="confirm-pass" required class="form-control" placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fa-solid fa-save"></i> Perbarui Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+
+  document.getElementById("form-change-password").onsubmit = async (e) => {
+    e.preventDefault();
+    const oldPass = document.getElementById("old-pass").value;
+    const newPass = document.getElementById("new-pass").value;
+    const confirmPass = document.getElementById("confirm-pass").value;
+
+    if (newPass !== confirmPass) {
+      return showToast(
+        "Gagal",
+        "Konfirmasi password baru tidak cocok!",
+        "error",
+      );
+    }
+
+    const res = await postAPI("updatePassword", {
+      user_id: currentUser.id,
+      oldPassword: oldPass,
+      newPassword: newPass,
+    });
+
+    if (res.success) {
+      showToast(
+        "Berhasil",
+        "Password Anda telah diperbarui. Silakan login kembali.",
+        "success",
+      );
+      setTimeout(() => {
+        document.getElementById("logout-btn").click();
+      }, 2000);
+    } else {
+      showToast("Gagal", res.message || "Gagal memperbarui password", "error");
+    }
+  };
+}
 
 // ADMIN: GENERATE JADWAL
 async function jadwalAdminView(area) {
