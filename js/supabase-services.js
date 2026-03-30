@@ -623,6 +623,29 @@ window.supabasePostAPI = async (action, payload) => {
         };
       }
 
+      case "clearUsersByRole": {
+        const { error } = await supabaseClient
+          .from("users")
+          .delete()
+          .eq("role", payload.role);
+        if (error) throw error;
+        return {
+          success: true,
+          message: `Berhasil menghapus seluruh data user`,
+        };
+      }
+      case "clearMasterData": {
+        let tbl = payload.type;
+        if (tbl === "tempat") tbl = "tempat_praktik";
+        // Filter dummy untuk menghapus semua baris (PostgREST butuh filter untuk delete)
+        const { error } = await supabaseClient
+          .from(tbl)
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000");
+        if (error) throw error;
+        return { success: true };
+      }
+
       default:
         return {
           success: true,
