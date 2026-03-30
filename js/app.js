@@ -1,0 +1,5392 @@
+const GAS_URL =
+  "https://script.google.com/macros/s/AKfycbxkVfL_dirGxL0_MK3J3vBButwz2oRIVVGHHWqJfA9zmvFDBuJOGHdPAkVc4Mr7Lot5/exec"; // GANTI DENGAN URL WEB APP GAS ANDA
+let currentUser = null;
+let html5QrcodeScanner = null;
+window.EKLINIK_CACHE = {};
+
+// Cache Helper
+async function fetchCachedAPI(action, payload = {}) {
+  if (
+    Object.keys(payload).length === 0 &&
+    ["getProdi", "getTempat", "getKelompok", "getKompetensi"].includes(action)
+  ) {
+    if (window.EKLINIK_CACHE[action]) {
+      return { success: true, data: window.EKLINIK_CACHE[action] };
+    }
+  }
+
+  // Fallback to normal fetch
+  const res = await fetchAPI(action, payload);
+
+  if (
+    res.success &&
+    Object.keys(payload).length === 0 &&
+    ["getProdi", "getTempat", "getKelompok", "getKompetensi"].includes(action)
+  ) {
+    window.EKLINIK_CACHE[action] = res.data;
+  }
+
+  return res;
+}
+
+// API Helper
+async function fetchAPI(action, payload = {}) {
+  if (typeof supabaseFetchAPI === "undefined") {
+    showToast("Error Konfigurasi", "Supabase Config belum dimuat!", "error");
+    return { success: false, message: "Supabase belum diatur" };
+  }
+
+  showLoader(true);
+  try {
+    const data = await supabaseFetchAPI(action, payload);
+    showLoader(false);
+    return data;
+  } catch (error) {
+    showLoader(false);
+    showToast("Koneksi Gagal", error.message, "error");
+    return { success: false, message: error.message };
+  }
+}
+
+async function postAPI(action, payload = {}) {
+  if (typeof supabasePostAPI === "undefined") {
+    showToast("Error Konfigurasi", "Supabase Config belum dimuat!", "error");
+    return { success: false, message: "Supabase belum diatur" };
+  }
+
+  showLoader(true);
+  try {
+    const data = await supabasePostAPI(action, payload);
+    showLoader(false);
+    return data;
+  } catch (error) {
+    showLoader(false);
+    showToast(
+      "Penyimpanan Gagal",
+      "Terjadi kesalahan koneksi: " + error.message,
+      "error",
+    );
+    return { success: false, message: error.message };
+  }
+}
+
+// UI State
+function checkAuth() {
+  const user = localStorage.getItem("eblogbook_user");
+  if (user) {
+    currentUser = JSON.parse(user);
+    document.getElementById("login-section").classList.add("hidden");
+    document.getElementById("dashboard-section").classList.remove("hidden");
+    initDashboard();
+  } else {
+    document.getElementById("login-section").classList.remove("hidden");
+    document.getElementById("dashboard-section").classList.add("hidden");
+  }
+}
+
+function initDashboard() {
+  document.getElementById("user-name-display").textContent = currentUser.nama;
+  let roleText = `<i class="fa-solid fa-shield-halved fa-sm"></i> ${currentUser.role}`;
+  if (currentUser.tempat_id && currentUser.tempat_id !== "-") {
+    // We'll fetch the location name if needed, but for now just show the ID or placeholder
+    // Actually, let's just use a generic workplace icon if it's a preceptor/mhs with location
+    roleText += ` <span class="badge bg-primary-soft text-primary" style="margin-left:5px; font-size:0.7rem; text-transform:none;"><i class="fa-solid fa-hospital"></i> Lahan Aktif</span>`;
+  }
+  document.getElementById("user-role-display").innerHTML = roleText;
+  document.getElementById("user-avatar-img").src =
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.nama)}&background=8b5cf6&color=fff&bold=true`;
+
+  // Setup Sidebar Nav based on Role
+  const nav = document.getElementById("sidebar-nav");
+  nav.innerHTML = "";
+
+  const menus = {
+    mahasiswa: [
+      {
+        id: "nav-dashboard",
+        icon: "fa-chart-pie",
+        text: "Dashboard",
+        view: "dashboardView",
+      },
+      {
+        id: "nav-presensi",
+        icon: "fa-clock",
+        text: "Presensi Harian",
+        view: "presensiView",
+      },
+      {
+        id: "nav-jadwal-mhs",
+        icon: "fa-calendar-alt",
+        text: "Jadwal Saya",
+        view: "jadwalMahasiswaView",
+      },
+      {
+        id: "nav-logbook",
+        icon: "fa-book-open",
+        text: "Logbook Tindakan",
+        view: "logbookView",
+      },
+      {
+        id: "nav-nilai-mhs",
+        icon: "fa-graduation-cap",
+        text: "Nilai Saya",
+        view: "nilaiMahasiswaView",
+      },
+    ],
+    preseptor: [
+      {
+        id: "nav-dashboard",
+        icon: "fa-chart-pie",
+        text: "Dashboard",
+        view: "dashboardView",
+      },
+      {
+        id: "nav-validasi",
+        icon: "fa-check-double",
+        text: "Validasi Logbook",
+        view: "validasiView",
+      },
+      {
+        id: "nav-mhs",
+        icon: "fa-users",
+        text: "Mahasiswa Bimbingan",
+        view: "mahasiswaView",
+      },
+    ],
+    preseptor_akademik: [
+      {
+        id: "nav-dashboard",
+        icon: "fa-chart-pie",
+        text: "Dashboard",
+        view: "dashboardView",
+      },
+      {
+        id: "nav-validasi",
+        icon: "fa-check-double",
+        text: "Validasi Logbook",
+        view: "validasiView",
+      },
+      {
+        id: "nav-mhs",
+        icon: "fa-users",
+        text: "Mahasiswa Bimbingan",
+        view: "mahasiswaView",
+      },
+    ],
+    admin: [
+      {
+        id: "nav-dashboard",
+        icon: "fa-chart-pie",
+        text: "Dashboard",
+        view: "dashboardView",
+      },
+      {
+        id: "nav-semua",
+        icon: "fa-database",
+        text: "Semua Data",
+        view: "adminView",
+      },
+      {
+        id: "nav-mhs",
+        icon: "fa-user-graduate",
+        text: "Manajemen Mahasiswa",
+        view: "mahasiswaAdminView",
+      },
+      {
+        id: "nav-kelompok",
+        icon: "fa-users-rectangle",
+        text: "Kelompok Mahasiswa",
+        view: "kelompokAdminView",
+      },
+      {
+        id: "nav-pre",
+        icon: "fa-user-doctor",
+        text: "Preseptor Klinik",
+        view: "preseptorAdminView",
+      },
+      {
+        id: "nav-pre-akd",
+        icon: "fa-chalkboard-teacher",
+        text: "Preseptor Akademik",
+        view: "preseptorAkademikAdminView",
+      },
+      {
+        id: "nav-tempat",
+        icon: "fa-hospital",
+        text: "Tempat Praktik",
+        view: "tempatAdminView",
+      },
+      {
+        id: "nav-komp",
+        icon: "fa-list-check",
+        text: "Kompetensi / Skill",
+        view: "kompetensiAdminView",
+      },
+      {
+        id: "nav-prodi",
+        icon: "fa-graduation-cap",
+        text: "Data Prodi",
+        view: "prodiAdminView",
+      },
+      {
+        id: "nav-bpr",
+        icon: "fa-chalkboard-user",
+        text: "Setup Bimb. Praktikum",
+        view: "bimbPraktikumAdminView",
+      },
+      {
+        id: "nav-bas",
+        icon: "fa-notes-medical",
+        text: "Setup Bimb. ASKEP",
+        view: "bimbAskepAdminView",
+      },
+      {
+        id: "nav-sik",
+        icon: "fa-user-check",
+        text: "Setup Sikap & Perilaku",
+        view: "sikapPerilakuAdminView",
+      },
+      {
+        id: "nav-final",
+        icon: "fa-file-signature",
+        text: "Penilaian Akhir",
+        view: "penilaianAkhirView",
+      },
+      {
+        id: "nav-jadwal",
+        icon: "fa-table",
+        text: "Daftar Jadwal Praktik",
+        view: "jadwalAdminView",
+      },
+      {
+        id: "nav-gen-kelompok",
+        icon: "fa-calendar-days",
+        text: "Generate Per Kelompok",
+        view: "generatorKelompokView",
+      },
+      {
+        id: "nav-laporan-admin",
+        icon: "fa-triangle-exclamation",
+        text: "Laporan Kejadian",
+        view: "adminLaporanView",
+      },
+      {
+        id: "nav-rekap-log",
+        icon: "fa-chart-pie",
+        text: "Rekapan Logbook",
+        view: "rekapLogbookAdminView",
+      },
+      {
+        id: "nav-settings",
+        icon: "fa-gears",
+        text: "Pengaturan",
+        view: "settingsAdminView",
+      },
+    ],
+  };
+
+  // Add Laporan menu to other roles
+  menus.mahasiswa.push({
+    id: "nav-laporan-mhs",
+    icon: "fa-triangle-exclamation",
+    text: "Laporan Kejadian",
+    view: "laporanView",
+  });
+  menus.preseptor.push({
+    id: "nav-laporan-pre",
+    icon: "fa-triangle-exclamation",
+    text: "Laporan Kejadian",
+    view: "laporanView",
+  });
+  menus.preseptor_akademik.push({
+    id: "nav-laporan-akd",
+    icon: "fa-triangle-exclamation",
+    text: "Laporan Kejadian",
+    view: "adminLaporanView",
+  });
+
+  const roleMenus = menus[currentUser.role] || [];
+
+  // Check localStorage for last active view
+  const lastActiveView = localStorage.getItem("activeView");
+  const lastMenuText = localStorage.getItem("activeMenuText");
+
+  let activeNavFound = false;
+
+  roleMenus.forEach((menu, index) => {
+    const a = document.createElement("a");
+    a.href = "#";
+
+    const isActive =
+      lastActiveView === menu.view || (!lastActiveView && index === 0);
+    if (isActive) activeNavFound = true;
+
+    a.className = `nav-item ${isActive ? "active" : ""} animate-fade-in delay-${(index + 1) * 100}`;
+    a.id = `nav-${menu.view}`;
+    a.innerHTML = `<i class="fa-solid ${menu.icon}"></i> <span>${menu.text}</span>`;
+
+    a.onclick = (e) => {
+      e.preventDefault();
+      document
+        .querySelectorAll(".nav-item")
+        .forEach((el) => el.classList.remove("active"));
+      a.classList.add("active");
+      document.getElementById("topbar-title-text").textContent = menu.text;
+
+      // Save to localStorage
+      localStorage.setItem("activeView", menu.view);
+      localStorage.setItem("activeMenuText", menu.text);
+
+      loadView(menu.view);
+      if (window.innerWidth <= 992)
+        document.getElementById("sidebar").classList.remove("open");
+    };
+    nav.appendChild(a);
+  });
+
+  if (roleMenus.length > 0) {
+    if (lastActiveView && activeNavFound) {
+      document.getElementById("topbar-title-text").textContent =
+        lastMenuText || "Dashboard";
+      loadView(lastActiveView);
+    } else {
+      // Default to first menu if no saved state or saved state invalid for current role
+      localStorage.setItem("activeView", roleMenus[0].view);
+      localStorage.setItem("activeMenuText", roleMenus[0].text);
+      document.getElementById("topbar-title-text").textContent =
+        roleMenus[0].text;
+      loadView(roleMenus[0].view);
+    }
+  }
+}
+
+// Router Simple
+function loadView(viewName) {
+  const area = document.getElementById("content-area");
+  area.innerHTML = ""; // clear
+  if (typeof window[viewName] === "function") {
+    window[viewName](area);
+  } else {
+    area.innerHTML = `
+            <div class="animate-fade-up text-center mt-3 text-muted">
+                <i class="fa-solid fa-triangle-exclamation fa-3x mb-2"></i>
+                <h3>View ${viewName} belum tersedia</h3>
+            </div>
+        `;
+  }
+}
+
+// ---------------- VIEWS ---------------- //
+
+// DASHBOARD VIEW (ALL ROLES)
+async function dashboardView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <h2 style="margin-bottom: 20px; color: var(--primary-dark);">Selamat Datang, ${currentUser.nama}</h2>
+            
+            <div id="dashboard-widgets" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                <!-- Skeleton Loading -->
+                <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:center;">
+                    <i class="fa-solid fa-spinner fa-spin fa-2x text-muted mb-2"></i>
+                    <div class="text-muted">Memuat data statistik...</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const res = await fetchAPI("getDashboardStats", {
+    user_id: currentUser.id,
+    role: currentUser.role,
+    tempat_id: currentUser.tempat_id || "",
+  });
+  const container = document.getElementById("dashboard-widgets");
+
+  if (!res.success || !res.data) {
+    container.innerHTML = `<div class="alert alert-danger">Gagal memuat statistik.</div>`;
+    return;
+  }
+
+  const d = res.data;
+  let html = "";
+
+  const createWidget = (icon, title, value, colorClass, bgColor) => `
+        <div style="background:#fff; border-radius:12px; padding:24px 20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); display:flex; align-items:center; transition: transform 0.2s; border-left: 5px solid ${bgColor};">
+            <div style="background:${bgColor}20; width:60px; height:60px; border-radius:12px; display:flex; justify-content:center; align-items:center; font-size:1.75rem; color:${bgColor}; margin-right:20px;">
+                <i class="${icon}"></i>
+            </div>
+            <div>
+                <div style="font-size:0.9rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px;">${title}</div>
+                <div style="font-size:2rem; font-weight:800; color:#1e293b; line-height:1;">${value}</div>
+            </div>
+        </div>
+    `;
+
+  if (currentUser.role === "admin") {
+    html += createWidget(
+      "fa-solid fa-user-graduate",
+      "Total Mahasiswa",
+      d.totalMhs,
+      "text-primary",
+      "#6366f1",
+    );
+    html += createWidget(
+      "fa-solid fa-users-rectangle",
+      "Kelompok",
+      d.totalKelompok,
+      "text-success",
+      "#10b981",
+    );
+    html += createWidget(
+      "fa-solid fa-user-doctor",
+      "Preseptor Klinik",
+      d.totalPreKlinik,
+      "text-info",
+      "#0ea5e9",
+    );
+    html += createWidget(
+      "fa-solid fa-chalkboard-teacher",
+      "Preseptor Akademik",
+      d.totalPreAkademik,
+      "text-warning",
+      "#f59e0b",
+    );
+    html += createWidget(
+      "fa-solid fa-hospital",
+      "Tempat Praktik",
+      d.totalTempat,
+      "text-secondary",
+      "#8b5cf6",
+    );
+    html += createWidget(
+      "fa-solid fa-list-check",
+      "Target Kompetensi",
+      d.totalKompetensi,
+      "text-dark",
+      "#475569",
+    );
+    html += createWidget(
+      "fa-solid fa-clipboard-check",
+      "Sudah Dinilai",
+      d.mhsDinilai,
+      "text-success",
+      "#22c55e",
+    );
+    html += createWidget(
+      "fa-solid fa-clipboard-question",
+      "Belum Dinilai",
+      d.mhsBelumDinilai,
+      "text-danger",
+      "#ef4444",
+    );
+  } else if (
+    currentUser.role === "preseptor" ||
+    currentUser.role === "preseptor_akademik"
+  ) {
+    html += createWidget(
+      "fa-solid fa-user-check",
+      "Mahasiswa Dinilai",
+      d.mhsDinilai,
+      "text-success",
+      "#22c55e",
+    );
+    html += createWidget(
+      "fa-solid fa-user-clock",
+      "Belum Dinilai",
+      d.mhsBelumDinilai,
+      "text-danger",
+      "#ef4444",
+    );
+    html += createWidget(
+      "fa-solid fa-file-circle-exclamation",
+      "Validasi Tertunda",
+      d.logbookPending,
+      "text-warning",
+      "#f59e0b",
+    );
+  } else if (currentUser.role === "mahasiswa") {
+    html += createWidget(
+      "fa-solid fa-book-medical",
+      "Logbook Terisi",
+      d.logbookDiisi,
+      "text-primary",
+      "#6366f1",
+    );
+    html += createWidget(
+      "fa-solid fa-book-open",
+      "Target Tersisa",
+      d.logbookBelumDiisi,
+      "text-warning",
+      "#f59e0b",
+    );
+
+    if (d.presensiHariIni) {
+      html += createWidget(
+        "fa-solid fa-calendar-check",
+        "Presensi Harian",
+        "Hadir",
+        "text-success",
+        "#22c55e",
+      );
+    } else {
+      html += createWidget(
+        "fa-solid fa-calendar-xmark",
+        "Presensi Harian",
+        "Belum",
+        "text-danger",
+        "#ef4444",
+      );
+    }
+  }
+
+  container.innerHTML = html;
+}
+
+const formatDateIndo = (dateStr, includeTime = false) => {
+  if (!dateStr) return "-";
+
+  // Jika input adalah format jam saja (HH:mm)
+  if (
+    typeof dateStr === "string" &&
+    dateStr.includes(":") &&
+    !dateStr.includes("-")
+  ) {
+    return dateStr.replace(":", ".") + " WITA";
+  }
+
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+
+  // Deteksi jika ini adalah "Tanggal Jam" dari Google Sheet yang tahunnya 1899 (hanya jam)
+  const isTimeOnly = d.getFullYear() === 1899 || d.getFullYear() === 1900;
+
+  const months = [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+  const tgl = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+
+  const jam = d.getHours().toString().padStart(2, "0");
+  const menit = d.getMinutes().toString().padStart(2, "0");
+
+  if (isTimeOnly) {
+    return `${jam}.${menit} WITA`;
+  }
+
+  if (includeTime) {
+    return `${tgl}, ${jam}.${menit} WITA`;
+  }
+  return tgl;
+};
+
+// MAHASISWA: JADWAL SAYA
+async function jadwalMahasiswaView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-calendar-alt text-primary"></i> Jadwal Praktik Saya</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert bg-primary-soft p-3 rounded mb-4" style="border-radius:12px;">
+                        <i class="fa-solid fa-circle-info text-primary"></i> Berikut adalah seluruh jadwal rotasi Anda. Pastikan hadir tepat waktu sesuai shift.
+                    </div>
+                    <div id="list-jadwal-mhs">
+                         <div class="text-center p-4"><i class="fa-solid fa-spinner fa-spin"></i> Memuat jadwal...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const res = await fetchAPI("getJadwal");
+  const container = document.getElementById("list-jadwal-mhs");
+  if (res.success && res.data) {
+    const myData = res.data.filter((j) => j.user_id == currentUser.id);
+    if (myData.length > 0) {
+      // Urutkan berdasarkan tanggal
+      myData.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+
+      container.innerHTML = myData
+        .map(
+          (j, idx) => `
+                <div class="jadwal-item animate-fade-up" style="animation-delay: ${idx * 50}ms; display:flex; gap:1.5rem; margin-bottom:1.5rem; border-left: 3px solid var(--primary); padding: 0.5rem 0 0.5rem 1.5rem; position:relative;">
+                    <div style="min-width: 80px;">
+                        <div style="font-weight:700; font-size:1.4rem; color:var(--primary); line-height:1;">${new Date(j.tanggal).getDate()}</div>
+                        <div style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">${formatDateIndo(j.tanggal).split(" ")[1]}</div>
+                    </div>
+                    <div>
+                        <h4 class="m-0" style="font-weight:600; color:var(--text-strong)">${j.nama_tempat}</h4>
+                        <div class="d-flex align-center gap-3 mt-1 wrap">
+                            <span class="badge" style="background:var(--bg-main); color:var(--text-strong)">Shift ${j.shift}</span>
+                            <span class="text-muted" style="font-size:0.85rem"><i class="fa-regular fa-clock"></i> ${formatDateIndo(j.jam_mulai)} - ${formatDateIndo(j.jam_selesai)}</span>
+                        </div>
+                    </div>
+                </div>
+            `,
+        )
+        .join("");
+    } else {
+      container.innerHTML = `<div class="empty-table p-4"><i class="fa-solid fa-calendar-day fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada jadwal rotasi yang ditetapkan untuk Anda.</div>`;
+    }
+  } else {
+    container.innerHTML = `<div class="empty-table p-4">Gagal memuat data jadwal.</div>`;
+  }
+}
+
+// MAHASISWA: PRESENSI
+async function presensiView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div id="today-schedule-banner"></div>
+            <div class="grid-cards">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h5>Jam Praktik Hari Ini</h5>
+                        <h2 id="jam-hari-ini">0 <span style="font-size:0.5em;color:var(--text-muted)">Jam</span></h2>
+                    </div>
+                    <div class="stat-icon"><i class="fa-solid fa-business-time"></i></div>
+                </div>
+                <div class="stat-card success-border">
+                    <div class="stat-info">
+                        <h5>Total Kehadiran</h5>
+                        <h2 id="total-hadir">0 <span style="font-size:0.5em;color:var(--text-muted)">Hari</span></h2>
+                    </div>
+                    <div class="stat-icon success-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                </div>
+            </div>
+            
+            <div class="card animate-fade-up delay-100">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-clipboard-user text-primary"></i> Presensi Klinik</h3>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary btn-sm" id="btn-checkin"><i class="fa-solid fa-qrcode"></i> Check-In</button>
+                        <button class="btn btn-warning btn-sm" id="btn-checkout"><i class="fa-solid fa-qrcode"></i> Check-Out</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="scanner-container" class="mb-3 hidden text-center animate-zoom-in">
+                        <h4 class="mb-2">Arahkan Kamera ke QR Code</h4>
+                        <div id="reader"></div>
+                        <button class="btn btn-danger-soft mt-3" id="stop-scan"><i class="fa-solid fa-stop"></i> Batalkan Scan QR</button>
+                    </div>
+
+                    <div class="alert bg-primary rounded p-3 mb-3" style="border-radius:12px; font-size: 0.9rem;">
+                        <i class="fa-solid fa-circle-info"></i> Minimal durasi praktik sehari penuh adalah <b>6 jam</b>. Pastikan Check-Out sebelum kembali.
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="table-presensi">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Masuk</th>
+                                    <th>Keluar</th>
+                                    <th>Lahan Praktik</th>
+                                    <th>Estimasi Durasi</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="5" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const [res, resJadwal] = await Promise.all([
+    fetchAPI("getPresensi", { user_id: currentUser.id }),
+    fetchAPI("getJadwal"),
+  ]);
+
+  // Safety check: is current view still presensi?
+  if (!document.getElementById("table-presensi")) return;
+
+  // Render Today's Schedule Banner
+  const today = new Date().toISOString().split("T")[0];
+  const mySchedule =
+    resJadwal.success && resJadwal.data
+      ? resJadwal.data.find(
+          (j) => j.user_id == currentUser.id && j.tanggal == today,
+        )
+      : null;
+
+  const banner = document.getElementById("today-schedule-banner");
+  if (mySchedule && banner) {
+    banner.innerHTML = `
+            <div class="card bg-primary-soft mb-3 border-primary animate-fade-in" style="border:1px solid var(--primary);">
+                <div class="card-body d-flex align-center justify-between">
+                    <div>
+                        <div style="font-size:0.8rem; color:var(--primary-dark); font-weight:600; text-transform:uppercase;">Jadwal Praktik Hari Ini</div>
+                        <h3 class="m-0 text-primary"><i class="fa-solid fa-location-dot"></i> ${mySchedule.nama_tempat}</h3>
+                        <p class="m-0" style="font-size:0.9rem; color:var(--text-muted);">Shift ${mySchedule.shift} (${formatDateIndo(mySchedule.jam_mulai)} - ${formatDateIndo(mySchedule.jam_selesai)})</p>
+                    </div>
+                    <div class="text-primary" style="font-size:2rem; opacity:0.3"><i class="fa-solid fa-calendar-check"></i></div>
+                </div>
+            </div>
+        `;
+  }
+
+  const tableBody = document.querySelector("#table-presensi tbody");
+  if (!tableBody) return;
+
+  if (res.success && res.data.length > 0) {
+    tableBody.innerHTML = res.data
+      .map((p) => {
+        const dur = p.durasi ? parseFloat(p.durasi) : 0;
+        let durHtml = p.durasi
+          ? `<span class="badge bg-success">${dur.toFixed(2)} Jam</span>`
+          : '<span class="badge bg-warning">Aktif (Belum CO)</span>';
+
+        if (dur > 0 && dur < 6)
+          durHtml +=
+            ' <span class="badge bg-danger ml-1" title="Kurang dari 6 jam!"><i class="fa-solid fa-triangle-exclamation"></i> Kurang</span>';
+
+        return `
+            <tr>
+                <td><strong>${formatDateIndo(p.tanggal)}</strong></td>
+                <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${formatDateIndo(p.jam_masuk)}</span></td>
+                <td>${p.jam_keluar ? `<span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${formatDateIndo(p.jam_keluar)}</span>` : "-"}</td>
+                <td>${p.lahan}</td>
+                <td>${durHtml}</td>
+            </tr>
+        `;
+      })
+      .join("");
+
+    const totalHadirEl = document.getElementById("total-hadir");
+    if (totalHadirEl)
+      totalHadirEl.innerHTML = `${res.data.length} <span style="font-size:0.5em;color:var(--text-muted)">Hari</span>`;
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="5" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada histori presensi ditemukan</td></tr>`;
+  }
+
+  const startScanner = (type) => {
+    document.getElementById("scanner-container").classList.remove("hidden");
+    html5QrcodeScanner = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+    html5QrcodeScanner
+      .start(
+        { facingMode: "environment" },
+        config,
+        async (decodedText) => {
+          html5QrcodeScanner.stop();
+          document.getElementById("scanner-container").classList.add("hidden");
+          document
+            .getElementById("beep-sound")
+            .play()
+            .catch((e) => console.log(e));
+
+          showLoader(true);
+          const actionTarget = type === "in" ? "checkIn" : "checkOut";
+          const logRes = await postAPI(actionTarget, {
+            user_id: currentUser.id,
+            lahan: decodedText,
+          });
+          showLoader(false);
+
+          if (logRes.success) {
+            showToast(
+              "Berhasil",
+              `Berhasil Check-${type.toUpperCase()}`,
+              "success",
+            );
+            presensiView(area); // Reload view
+          } else {
+            showToast("Gagal Disimpan", logRes.message, "error");
+          }
+        },
+        (err) => {},
+      )
+      .catch((err) => {
+        showToast(
+          "Error Kamera",
+          "Gagal mengakses kamera di perangkat Anda.",
+          "error",
+        );
+      });
+  };
+
+  document.getElementById("btn-checkin").onclick = () => startScanner("in");
+  document.getElementById("btn-checkout").onclick = () => startScanner("out");
+  document.getElementById("stop-scan").onclick = () => {
+    if (html5QrcodeScanner) html5QrcodeScanner.stop();
+    document.getElementById("scanner-container").classList.add("hidden");
+  };
+}
+
+// MAHASISWA: LOGBOOK
+async function logbookView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-book-medical text-primary"></i> Data Logbook Tindakan</h3>
+                    <button class="btn btn-primary btn-sm" id="btn-add-log"><i class="fa-solid fa-plus"></i> Tambah Tindakan</button>
+                </div>
+                <div class="card-body">
+                     <div class="table-responsive">
+                        <table id="table-logbook">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Kompetensi / Kasus</th>
+                                    <th>Lahan</th>
+                                    <th>Level</th>
+                                    <th>Status</th>
+                                    <th>Nilai</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="6" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+     `;
+
+  document.getElementById("btn-add-log").onclick = async () => {
+    showLoader(true);
+    const [resKomp, resTemp] = await Promise.all([
+      fetchAPI("getKompetensi", { user_id: currentUser.id }),
+      fetchAPI("getTempat"),
+    ]);
+    showLoader(false);
+
+    let optKomp =
+      '<option value="">-- Pilih Kompetensi Berdasarkan SK --</option>';
+    if (resKomp.success && resKomp.data) {
+      // Kelompokkan kompetensi berdasarkan kategori
+      const grouped = {};
+      resKomp.data.forEach((k) => {
+        const kat = k.kategori && k.kategori !== "-" ? k.kategori : "Lainnya";
+        if (!grouped[kat]) grouped[kat] = [];
+        grouped[kat].push(k);
+      });
+      const katKeys = Object.keys(grouped);
+      if (
+        katKeys.length > 1 ||
+        (katKeys.length === 1 && katKeys[0] !== "Lainnya")
+      ) {
+        // Tampilkan dengan optgroup
+        optKomp += katKeys
+          .map((kat) => {
+            const opts = grouped[kat]
+              .map(
+                (k) =>
+                  `<option value="${k.nama_skill}">${k.nama_skill}</option>`,
+              )
+              .join("");
+            return `<optgroup label="${kat}">${opts}</optgroup>`;
+          })
+          .join("");
+      } else {
+        // Flat list jika hanya 1 kategori / tanpa kategori
+        optKomp += resKomp.data
+          .map(
+            (k) => `<option value="${k.nama_skill}">${k.nama_skill}</option>`,
+          )
+          .join("");
+      }
+    }
+    let optTemp = '<option value="">-- Pilih Lahan Praktik --</option>';
+    if (resTemp.success && resTemp.data) {
+      optTemp += resTemp.data
+        .map(
+          (t) => `<option value="${t.nama_tempat}">${t.nama_tempat}</option>`,
+        )
+        .join("");
+    }
+
+    openModal(
+      "Tambah Logbook Tindakan",
+      `
+            <form id="form-logbook" class="animate-fade-in">
+                <div class="form-group">
+                    <label>Tanggal Pelaksanaan</label>
+                    <div class="input-with-icon">
+                        <i class="fa-regular fa-calendar"></i>
+                        <input type="date" id="log-tanggal" required class="form-control" value="${new Date().toISOString().split("T")[0]}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Lahan Praktik</label>
+                    <select id="log-lahan" required class="form-control">
+                        ${optTemp}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Jenis Kompetensi</label>
+                    <select id="log-kompetensi" required class="form-control">
+                        ${optKomp}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tingkat Keterlibatan (Level)</label>
+                    <select id="log-level" required class="form-control">
+                        <option value="Observasi">Observasi (Melihat)</option>
+                        <option value="Asistensi">Asistensi (Membantu Prseptor)</option>
+                        <option value="Mandiri">Mandiri (Melakukan Sendiri)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Refleksi & Deskripsi Kasus</label>
+                    <textarea id="log-deskripsi" rows="3" required class="form-control" placeholder="Tuliskan pengalaman tindakan (SOAP singkat / identifikasi etiologi)..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block mt-2"><i class="fa-solid fa-paper-plane"></i> Submit Logbook</button>
+            </form>
+        `,
+    );
+
+    document.getElementById("form-logbook").onsubmit = async (e) => {
+      e.preventDefault();
+      const payload = {
+        user_id: currentUser.id,
+        tanggal: document.getElementById("log-tanggal").value,
+        lahan: document.getElementById("log-lahan").value,
+        kompetensi: document.getElementById("log-kompetensi").value,
+        level: document.getElementById("log-level").value,
+        deskripsi: document.getElementById("log-deskripsi").value,
+      };
+
+      const res = await postAPI("addLogbook", payload);
+      if (res.success) {
+        closeModal();
+        showToast(
+          "Berhasil Menyimpan",
+          "Logbook Anda telah berhasil direkam.",
+          "success",
+        );
+        logbookView(document.getElementById("content-area"));
+      }
+    };
+  };
+
+  const res = await fetchAPI("getLogbook", { user_id: currentUser.id });
+  const tableBody = document.querySelector("#table-logbook tbody");
+  if (!tableBody) return;
+  if (res.success && res.data.length > 0) {
+    tableBody.innerHTML = res.data
+      .map((p) => {
+        let statusBadge =
+          p.status === "Disetujui"
+            ? "bg-success"
+            : p.status === "Ditolak"
+              ? "bg-danger"
+              : "bg-warning";
+        let statusIcon =
+          p.status === "Disetujui"
+            ? "fa-check"
+            : p.status === "Ditolak"
+              ? "fa-xmark"
+              : "fa-clock Rotate";
+        return `
+            <tr>
+                <td><strong>${formatDateIndo(p.tanggal)}</strong></td>
+                <td><span style="color:var(--primary-dark); font-weight:500;">${p.kompetensi}</span></td>
+                <td>${p.lahan}</td>
+                <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${p.level}</span></td>
+                <td><span class="badge ${statusBadge}"><i class="fa-solid ${statusIcon}"></i> ${p.status}</span></td>
+                <td><strong>${p.nilai || '<span class="text-muted">-</span>'}</strong></td>
+            </tr>
+        `;
+      })
+      .join("");
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="6" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada logbook tindakan yang dimasukkan</td></tr>`;
+  }
+}
+
+// MAHASISWA: KOMPETENSI (CHART)
+async function kompetensiView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up" id="kompetensi-charts-container">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-chart-line text-primary"></i> Progress Acuan Kompetensi</h3>
+                </div>
+                <div class="card-body" id="kompetensi-charts-body">
+                    <p class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const res = await fetchAPI("getKompetensi", { user_id: currentUser.id });
+  const chartsBody = document.getElementById("kompetensi-charts-body");
+  if (!chartsBody) return;
+
+  if (res.success && res.data.length > 0) {
+    // Kelompokkan berdasarkan kategori
+    const grouped = {};
+    res.data.forEach((d) => {
+      const kat = d.kategori && d.kategori !== "-" ? d.kategori : "Umum";
+      if (!grouped[kat]) grouped[kat] = [];
+      grouped[kat].push(d);
+    });
+
+    const katKeys = Object.keys(grouped);
+    Chart.defaults.font.family = "Outfit";
+    Chart.defaults.color = "#64748b";
+
+    // Buat chart per kategori
+    chartsBody.innerHTML = katKeys
+      .map(
+        (kat, i) => `
+            <div style="margin-bottom:2rem;">
+                <h4 style="color:var(--primary-dark); margin-bottom:0.75rem; font-size:1rem;"><i class="fa-solid fa-folder-open text-primary"></i> ${kat}</h4>
+                <canvas id="kompetensiChart-${i}" style="max-height: 350px; width:100%;"></canvas>
+            </div>
+        `,
+      )
+      .join('<hr style="opacity:0.1; margin: 1.5rem 0;">');
+
+    const colors = [
+      "#8b5cf6",
+      "#3b82f6",
+      "#10b981",
+      "#f59e0b",
+      "#ef4444",
+      "#6366f1",
+    ];
+    katKeys.forEach((kat, i) => {
+      const items = grouped[kat];
+      const labels = items.map((d) => d.nama_skill);
+      const target = items.map((d) => parseInt(d.target_minimal));
+      const pencapaian = items.map((d) => parseInt(d.pencapaian));
+
+      const ctx = document
+        .getElementById(`kompetensiChart-${i}`)
+        .getContext("2d");
+      new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Pencapaian Valid",
+              data: pencapaian,
+              backgroundColor: colors[i % colors.length],
+              borderRadius: 6,
+            },
+            {
+              label: "Target Minimal Kampus",
+              data: target,
+              backgroundColor: "rgba(203, 213, 225, 0.5)",
+              borderWidth: 0,
+              borderRadius: 6,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "top", labels: { usePointStyle: true } },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { borderDash: [5, 5], color: "#f1f5f9" },
+            },
+            x: {
+              grid: { display: false },
+            },
+          },
+        },
+      });
+    });
+  } else {
+    chartsBody.innerHTML = `<p class="empty-table"><i class="fa-solid fa-chart-bar fa-2x mb-2" style="display:block;color:#cbd5e1;"></i>Data kompetensi kurikulum belum tersedia.</p>`;
+  }
+}
+
+// MAHASISWA: NILAI SAYA
+async function nilaiMahasiswaView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-graduation-cap text-primary"></i> Progress Nilai Saya</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Informasi Penilaian:</strong> Nilai akhir Anda adalah gabungan dari nilai Preseptor Klinik dan Preseptor Akademik.
+                        Rentang nilai 0-100. Nilai akan muncul setelah preseptor menginput data.
+                    </div>
+                    
+                    <div id="nilai-mhs-content" style="margin-top:20px; text-align:center;">
+                        <i class="fa-solid fa-spinner fa-spin fa-2x text-muted"></i>
+                        <p class="mt-2 text-muted">Memuat data nilai...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  // Kita gunakan endpoint getPenilaianAkhir yang sudah ada, lalu filter by user id
+  const res = await fetchAPI("getPenilaianAkhir");
+  const container = document.getElementById("nilai-mhs-content");
+
+  if (res.success && res.data) {
+    const myData = res.data.find((d) => d.id === currentUser.id);
+    const wKlinik = res.weights?.w_klinik || 50;
+    const wAkademik = res.weights?.w_akademik || 50;
+
+    if (myData) {
+      const statusClass =
+        myData.total >= (res.threshold || 75) ? "text-success" : "text-danger";
+      container.innerHTML = `
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; text-align:left;">
+                    <div style="border: 1px solid #e0f2fe; border-radius: 12px; padding: 15px; background: #f0f9ff;">
+                        <h4 style="color: #0369a1; border-bottom: 1px solid #bae6fd; padding-bottom: 8px; margin-bottom: 12px; font-size: 1.1rem;">
+                            <i class="fa-solid fa-user-doctor"></i> Preseptor Klinik
+                            <span class="badge bg-primary float-right" style="font-size:0.7em">Bobot: ${wKlinik}%</span>
+                        </h4>
+                        <div class="d-flex justify-between mb-1"><span>Bimb. Praktikum:</span> <strong>${myData.klinik_prak || 0}</strong></div>
+                        <div class="d-flex justify-between mb-1"><span>Bimb. ASKEP:</span> <strong>${myData.klinik_askep || 0}</strong></div>
+                        <div class="d-flex justify-between mb-2"><span>Sikap & Perilaku:</span> <strong>${myData.klinik_sikap || 0}</strong></div>
+                        <div class="d-flex justify-between" style="border-top:1px dashed #bae6fd; padding-top:8px;">
+                            <span>Total Skor Klinik:</span> 
+                            <span style="font-size:1.1em; color:#0369a1; font-weight:bold">${myData.klinik_total || 0}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="border: 1px solid #fef3c7; border-radius: 12px; padding: 15px; background: #fffcf2;">
+                        <h4 style="color: #b45309; border-bottom: 1px solid #fde68a; padding-bottom: 8px; margin-bottom: 12px; font-size: 1.1rem;">
+                            <i class="fa-solid fa-chalkboard-teacher"></i> Preseptor Akademik
+                            <span class="badge bg-warning float-right" style="font-size:0.7em">Bobot: ${wAkademik}%</span>
+                        </h4>
+                        <div class="d-flex justify-between mb-1"><span>Bimb. Praktikum:</span> <strong>${myData.akademik_prak || 0}</strong></div>
+                        <div class="d-flex justify-between mb-1"><span>Bimb. ASKEP:</span> <strong>${myData.akademik_askep || 0}</strong></div>
+                        <div class="d-flex justify-between mb-2"><span>Sikap & Perilaku:</span> <strong>${myData.akademik_sikap || 0}</strong></div>
+                        <div class="d-flex justify-between" style="border-top:1px dashed #fde68a; padding-top:8px;">
+                            <span>Total Skor Akademik:</span> 
+                            <span style="font-size:1.1em; color:#b45309; font-weight:bold">${myData.akademik_total || 0}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; text-align:center;">
+                    <h5 class="text-muted" style="margin-bottom: 5px; font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Nilai Akhir Sementara</h5>
+                    <div style="font-size: 3rem; font-weight: 800; line-height: 1.2;" class="${statusClass}">
+                        ${myData.total ? parseFloat(myData.total).toFixed(1) : "0"}
+                    </div>
+                    <div style="margin-top:10px; font-size: 0.9rem;">
+                        <i class="fa-solid fa-circle-info text-primary"></i> Batas Lulus: <strong>${res.threshold || 75}</strong>
+                    </div>
+                </div>
+            `;
+    } else {
+      container.innerHTML = `
+                <div class="py-4">
+                    <i class="fa-solid fa-folder-open fa-3x mb-3" style="color:#cbd5e1;display:block"></i>
+                    <p class="text-muted" style="font-size:1.1rem;">Belum ada data nilai untuk Anda.</p>
+                </div>
+            `;
+    }
+  } else {
+    container.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-exclamation"></i> Gagal memuat data nilai.</span>`;
+  }
+}
+
+// PRESEPTOR: VALIDASI
+async function validasiView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-check-double text-primary"></i> Antrean Validasi Logbook</h3>
+                </div>
+                <div class="card-body">
+                     <div class="table-responsive">
+                        <table id="table-validasi">
+                            <thead>
+                                <tr>
+                                    <th>Mahasiswa</th>
+                                    <th>Tgl</th>
+                                    <th>Kompetensi</th>
+                                    <th>Lahan</th>
+                                    <th>Level</th>
+                                    <th style="text-align:right">Tindakan Validasi</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="6" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Mengecek antrean...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const res = await fetchAPI("getPendingLogs", {
+    tempat_id: currentUser.tempat_id,
+  });
+  const tableBody = document.querySelector("#table-validasi tbody");
+  if (!tableBody) return;
+  if (res.success && res.data.length > 0) {
+    tableBody.innerHTML = res.data
+      .map((p, idx) => {
+        return `
+            <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                <td>
+                    <div class="d-flex align-center gap-2">
+                        <div style="width:35px;height:35px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem">
+                            ${p.nama_mahasiswa.charAt(0)}
+                        </div>
+                        <strong>${p.nama_mahasiswa}</strong>
+                    </div>
+                </td>
+                <td>${p.tanggal}</td>
+                <td><span style="color:var(--primary-dark); font-weight:500;">${p.kompetensi}</span></td>
+                <td><span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-hospital"></i> ${p.nama_lahan || p.lahan}</span></td>
+                <td><span class="badge bg-primary">${p.level}</span></td>
+                <td style="text-align:right">
+                    <button class="btn btn-outline btn-sm" onclick="bukaModalValidasi('${p.id}', '${p.nama_mahasiswa}', '${p.deskripsi.replace(/'/g, "\\'")}')">
+                         Nilai & Cek
+                    </button>
+                </td>
+            </tr>
+        `;
+      })
+      .join("");
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="5" class="empty-table"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color:var(--success);display:block"></i>Semua logbook telah divalidasi.<br>Tidak ada antrean logbook pending.</td></tr>`;
+  }
+}
+
+window.bukaModalValidasi = (id, nama, deskripsi) => {
+  openModal(
+    "Sesi Validasi Tindakan Mahasiswa",
+    `
+        <div class="animate-fade-in">
+            <div class="alert bg-primary rounded p-3 mb-3 border" style="border-radius:12px; background:var(--primary-light);">
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.2rem">Pengirim Logbook</div>
+                <strong>${nama}</strong>
+            </div>
+            
+            <div class="form-group">
+                <label>Deskripsi/Refleksi Kasus Oleh Mahasiswa</label>
+                <div style="padding: 1rem; background: var(--bg-main); border-radius: 8px; border: 1px dashed #cbd5e1; font-size: 0.95rem;">
+                    ${deskripsi}
+                </div>
+            </div>
+
+            <hr style="border:none; border-top:1px solid #e2e8f0; margin: 1.5rem 0;">
+
+            <form id="form-validasi">
+                <div class="form-group">
+                    <label>Keputusan Evaluasi</label>
+                    <select id="val-status" class="form-control" required style="padding-left:1rem; font-weight:600; color:var(--text-strong)">
+                        <option value="Disetujui">Beri Approve (Disetujui Target)</option>
+                        <option value="Ditolak">Reject (Menolak Tindakan)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nilai Objektif (Scale: 0-100)</label>
+                    <div class="input-with-icon">
+                        <i class="fa-solid fa-star-half-stroke"></i>
+                        <input type="number" id="val-nilai" required class="form-control" min="0" max="100" placeholder="Skor Kualitas Tindakan">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Catatan Feedback/Review Preseptor</label>
+                    <textarea id="val-catatan" rows="3" class="form-control" required placeholder="Berikan arahan untuk pengembangan skill..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block mt-2"><i class="fa-solid fa-clipboard-check"></i> Eksekusi & Simpan Evaluasi</button>
+            </form>
+        </div>
+    `,
+  );
+
+  document.getElementById("form-validasi").onsubmit = async (e) => {
+    e.preventDefault();
+    const payload = {
+      log_id: id,
+      nilai: document.getElementById("val-nilai").value,
+      catatan: document.getElementById("val-catatan").value,
+      status: document.getElementById("val-status").value,
+      preseptor_id: currentUser.id,
+    };
+    const res = await postAPI("validasiLog", payload);
+    if (res.success) {
+      closeModal();
+      showToast(
+        "Evaluasi Sukses",
+        "Pembaruan logbook validasi berhasil disimpan",
+        "success",
+      );
+      loadView("validasiView"); // refresh
+    }
+  };
+};
+
+// PRESEPTOR: MAHASISWA BIMBINGAN & INPUT NILAI
+async function mahasiswaView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header d-flex justify-between align-center wrap gap-2">
+                    <h3><i class="fa-solid fa-users text-primary"></i> Daftar Mahasiswa Bimbingan</h3>
+                    <div class="filter-group d-flex align-center gap-2">
+                         <select id="filter-status-nilai" class="form-control" style="width:200px; padding:0.4rem;">
+                            <option value="all">Tampilkan Semua Status</option>
+                            <option value="belum">Pilih: Belum Dinilai</option>
+                            <option value="sudah">Pilih: Sudah Dinilai</option>
+                        </select>
+                    </div>
+                </div>
+                 <div class="card-body">
+                     <div class="table-responsive">
+                        <table id="table-mhs-bimb">
+                            <thead>
+                                <tr>
+                                    <th>Nama Mahasiswa</th>
+                                    <th>NIM / Username</th>
+                                    <th>Prodi & Lokasi</th>
+                                    <th>Tanggal Praktik</th>
+                                    <th style="text-align:right">Aksi Penilaian</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="4" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
+                        </table>
+                    </div>
+                 </div>
+            </div>
+        </div>
+     `;
+
+  const [resUsers, resJadwal, resTempat, resNilai] = await Promise.all([
+    fetchAPI("getUsers"),
+    fetchAPI("getJadwal"),
+    fetchAPI("getTempat"),
+    fetchAPI("getPenilaianAkhir"), // Ambil seluruh data nilai akhir utk cek status
+  ]);
+  const tableBody = document.querySelector("#table-mhs-bimb tbody");
+  if (!tableBody) return;
+  if (resUsers.success && resJadwal.success && resTempat.success) {
+    let mhs = resUsers.data.filter((u) => u.role === "mahasiswa");
+    const roleKeyArray =
+      currentUser.role === "preseptor_akademik"
+        ? "akd_components_count"
+        : "klinik_components_count"; // Helper to check if any components have scores from this preceptor type
+
+    // Map data tambahan
+    mhs = mhs.map((u) => {
+      // Lahan mapping
+      const userJadwal = resJadwal.data.filter((j) => j.user_id == u.id);
+      let relevantJadwal = userJadwal;
+
+      // if preceptor is assigned to specific locations, only get schedules for those locations
+      if (currentUser.tempat_id && currentUser.tempat_id !== "-") {
+        const preseptorTempat = currentUser.tempat_id.split(",");
+        relevantJadwal = userJadwal.filter((j) =>
+          preseptorTempat.includes(String(j.tempat_id)),
+        );
+      }
+
+      if (relevantJadwal.length > 0) {
+        const lahanNames = [
+          ...new Set(
+            relevantJadwal.map((j) => {
+              const t = resTempat.data.find((x) => x.id == j.tempat_id);
+              return t ? t.nama_tempat : "-";
+            }),
+          ),
+        ];
+        u.nama_lahan = lahanNames.join(", ");
+
+        // Sort by date before joining
+        relevantJadwal.sort(
+          (a, b) => new Date(a.tanggal) - new Date(b.tanggal),
+        );
+        const dates = relevantJadwal.map((j) => formatDateIndo(j.tanggal));
+        u.tanggal_praktik = dates.join("<br>");
+        u.isAssignedToPreceptor = true;
+      } else {
+        u.nama_lahan = "-";
+        u.tanggal_praktik = "-";
+        u.isAssignedToPreceptor = false;
+      }
+      // Nilai mapping
+      u.sudahDinilai = false;
+      if (resNilai.success && resNilai.data) {
+        const nilaiMhs = resNilai.data.find((n) => n.id == u.id);
+        if (nilaiMhs) {
+          // We consider 'sudah dinilai' if they have a total score > 0 in their respective category
+          // OR if we just want a simple check: if any of prak/askep/sikap in their category > 0
+          const prakScore =
+            currentUser.role === "preseptor_akademik"
+              ? nilaiMhs.akademik_prak
+              : nilaiMhs.klinik_prak;
+          const askepScore =
+            currentUser.role === "preseptor_akademik"
+              ? nilaiMhs.akademik_askep
+              : nilaiMhs.klinik_askep;
+          const sikapScore =
+            currentUser.role === "preseptor_akademik"
+              ? nilaiMhs.akademik_sikap
+              : nilaiMhs.klinik_sikap;
+
+          if (prakScore > 0 || askepScore > 0 || sikapScore > 0) {
+            u.sudahDinilai = true;
+          }
+        }
+      }
+      return u;
+    });
+
+    // Setup filter dropdown
+    document.getElementById("filter-status-nilai").onchange = (e) => {
+      renderTabelBimbingan(mhs, e.target.value);
+    };
+
+    // Render fungsi local
+    const renderTabelBimbingan = (dataList, filterStr) => {
+      // Apply filtering location logic strictly for 'preseptor' klinik
+      let displayData = dataList;
+      if (currentUser.tempat_id && currentUser.tempat_id !== "-") {
+        displayData = displayData.filter((u) => u.isAssignedToPreceptor);
+      }
+
+      // Apply manual dropdown filter
+      if (filterStr === "belum") {
+        displayData = displayData.filter((u) => !u.sudahDinilai);
+      } else if (filterStr === "sudah") {
+        displayData = displayData.filter((u) => u.sudahDinilai);
+      }
+
+      if (displayData.length > 0) {
+        tableBody.innerHTML = displayData
+          .map(
+            (u, idx) => `
+                    <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                        <td>
+                            <strong>${u.nama}</strong>
+                            ${u.sudahDinilai ? '<i class="fa-solid fa-circle-check text-success ml-1" title="Sudah memiliki nilai"></i>' : ""}
+                        </td>
+                        <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${u.username}</span></td>
+                        <td>
+                            <span class="badge bg-primary">${u.prodi}</span><br>
+                            <small class="text-muted"><i class="fa-solid fa-hospital"></i> ${u.nama_lahan}</small>
+                        </td>
+                        <td><small>${u.tanggal_praktik}</small></td>
+                        <td style="text-align:right">
+                            ${
+                              u.sudahDinilai
+                                ? `<button class="btn btn-warning-soft btn-sm" onclick="bukaModalInputNilai('${u.id}', '${u.nama}')">
+                                        <i class="fa-solid fa-pen-to-square"></i> Update Nilai
+                                   </button>`
+                                : `<button class="btn btn-primary btn-sm" onclick="bukaModalInputNilai('${u.id}', '${u.nama}')">
+                                        <i class="fa-solid fa-pen-nib"></i> Input Nilai
+                                   </button>`
+                            }
+                        </td>
+                    </tr>
+                `,
+          )
+          .join("");
+      } else {
+        tableBody.innerHTML = `<tr><td colspan="4" class="empty-table">Tidak ada mahasiswa yang sesuai kriteria filter.</td></tr>`;
+      }
+    };
+
+    // Initial render
+    renderTabelBimbingan(mhs, "all");
+  }
+}
+
+window.bukaModalInputNilai = async (mhsId, mhsNama) => {
+  showLoader(true);
+  const [m1, m2, m3, currentGrades] = await Promise.all([
+    fetchAPI("getBimbPraktikum"),
+    fetchAPI("getBimbAskep"),
+    fetchAPI("getSikapPerilaku"),
+    fetchAPI("getStudentGrades", {
+      student_id: mhsId,
+      grader_role: currentUser.role,
+    }),
+  ]);
+  showLoader(false);
+
+  const findVal = (type, compId) => {
+    const list = currentGrades.data[type] || [];
+    const found = list.find((r) => r.component_id == compId);
+    return found ? found.nilai : "";
+  };
+
+  const renderRows = (title, type, master, current) => {
+    if (!master.data || master.data.length === 0)
+      return `<p class="text-muted">Master ${title} belum diatur.</p>`;
+    return `
+            <div class="assessment-group mb-4">
+                <h4 class="mb-3 text-primary" style="font-weight:700; border-left:4px solid var(--primary); padding-left:10px; font-size:1rem">${title}</h4>
+                <div class="table-responsive" style="border-radius:12px; border:1px solid #e2e8f0; overflow:hidden;">
+                    <table class="table" style="font-size:0.85rem; margin-bottom:0">
+                        <thead style="background:#f8fafc">
+                            <tr>
+                                <th style="border-bottom:none">Komponen / Aspek Penilaian</th>
+                                <th width="80" class="text-center" style="border-bottom:none">Maks</th>
+                                <th width="100" class="text-center" style="border-bottom:none">Nilai</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${master.data
+                              .map((m) => {
+                                const maxVal = parseFloat(
+                                  type === "askep"
+                                    ? m.skor_maks || 100
+                                    : m.nilai_maksimal || 100,
+                                );
+                                return `
+                                <tr>
+                                    <td style="vertical-align:middle; line-height:1.4">${m.nama_komponen}</td>
+                                    <td class="text-center" style="vertical-align:middle"><strong>${maxVal}</strong></td>
+                                    <td style="vertical-align:middle">
+                                        <input type="number" step="0.1" class="form-control input-score" 
+                                            data-type="${type}" data-comp="${m.id}" data-max="${maxVal}"
+                                            value="${findVal(type, m.id)}" 
+                                            oninput="validateInputScore(this)"
+                                            placeholder="0" style="text-align:center; font-weight:700; padding:0.4rem;">
+                                        <div class="invalid-feedback text-danger" style="font-size:0.65rem; display:none; margin-top:4px; text-align:center">Melebihi ${maxVal}!</div>
+                                    </td>
+                                </tr>
+                            `;
+                              })
+                              .join("")}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+  };
+
+  openModal(
+    `Input Nilai: ${mhsNama}`,
+    `
+        <div id="container-nilai">
+            ${renderRows("Bimbingan Praktikum", "praktikum", m1)}
+            ${renderRows("Bimbingan ASKEP", "askep", m2)}
+            ${renderRows("Sikap & Perilaku", "sikap", m3)}
+            <button class="btn btn-primary btn-block mt-3" onclick="prosesSimpanNilai('${mhsId}')">
+                <i class="fa-solid fa-save"></i> Simpan Penilaian
+            </button>
+        </div>
+    `,
+  );
+};
+
+window.prosesSimpanNilai = async (mhsId) => {
+  const inputs = document.querySelectorAll(".input-score");
+  let hasError = false;
+  const results = [];
+
+  inputs.forEach((input) => {
+    const val = parseFloat(input.value);
+    const max = parseFloat(input.dataset.max);
+
+    if (input.value !== "") {
+      if (val > max) {
+        hasError = true;
+        input.style.borderColor = "#ef4444";
+      }
+      results.push({
+        type: input.dataset.type,
+        student_id: mhsId,
+        component_id: input.dataset.comp,
+        nilai: input.value,
+        preseptor_id: currentUser.id,
+      });
+    }
+  });
+
+  if (hasError)
+    return showToast(
+      "Gagal Simpan",
+      "Terdapat nilai yang melebihi batas maksimal yang diizinkan!",
+      "error",
+    );
+  if (results.length === 0)
+    return showToast("Peringatan", "Belum ada nilai yang diinput", "warning");
+
+  showToast("Menyimpan", "Sedang memproses data...", "info");
+  const res = await postAPI("saveGrades", {
+    results,
+    grader_role: currentUser.role,
+  });
+  if (res.success) {
+    closeModal();
+    showToast(
+      "Tersimpan",
+      "Seluruh nilai mahasiswa berhasil diperbarui",
+      "success",
+    );
+  }
+};
+
+window.validateInputScore = (el) => {
+  const maxVal = parseFloat(el.dataset.max);
+  const val = parseFloat(el.value);
+  const feedback = el.nextElementSibling;
+  if (val > maxVal) {
+    el.style.borderColor = "#ef4444";
+    if (feedback) feedback.style.display = "block";
+  } else {
+    el.style.borderColor = "";
+    if (feedback) feedback.style.display = "none";
+  }
+};
+
+// ADMIN: PENILAIAN AKHIR (RINGKASAN)
+async function penilaianAkhirView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header d-flex align-center justify-between wrap gap-3">
+                    <div>
+                        <h3><i class="fa-solid fa-file-signature text-primary"></i> Ringkasan Penilaian Akhir Mahasiswa</h3>
+                        <div class="text-muted" style="font-size:0.8rem" id="status-threshold-info">
+                            Rumus: (Prak 40%) + (ASKEP 40%) + (Sikap 20%). Batas Lulus: ...
+                        </div>
+                    </div>
+                    <div class="d-flex align-center gap-2 wrap">
+                        <div class="filter-group d-flex align-center gap-2">
+                             <select id="filter-prodi-assessment" class="form-control" style="width:180px; padding:0.4rem;">
+                                <option value="all">Semua Prodi</option>
+                            </select>
+                        </div>
+                        <div class="btn-group d-flex gap-2">
+                             <button class="btn btn-outline btn-sm" onclick="exportAssessmentCSV()"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                             <button class="btn btn-danger-soft btn-sm" onclick="exportAssessmentPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                             <button class="btn btn-danger btn-sm" onclick="hapusSemuaNilai()"><i class="fa-solid fa-trash-can"></i> Hapus Semua Nilai</button>
+                        </div>
+                    </div>
+                </div>
+                 <div class="card-body">
+                     <div class="table-responsive">
+                        <table id="table-final-scores" style="font-size:0.9rem">
+                            <thead>
+                                <tr>
+                                    <th>Nama Mahasiswa</th>
+                                    <th>Prodi</th>
+                                    <th>Praktikum (40%)</th>
+                                    <th>ASKEP (40%)</th>
+                                    <th>Sikap (20%)</th>
+                                    <th>NILAI AKHIR</th>
+                                    <th>STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="7" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menghitung skor...</td></tr></tbody>
+                        </table>
+                    </div>
+                 </div>
+            </div>
+        </div>
+    `;
+
+  showLoader(true);
+  const [allRes, prodiRes] = await Promise.all([
+    fetchAPI("getPenilaianAkhir"),
+    fetchAPI("getProdi"),
+  ]);
+  showLoader(false);
+
+  if (!allRes.success)
+    return showToast("Gagal", "Gagal memuat data penilaian", "error");
+
+  const tableBody = document.querySelector("#table-final-scores tbody");
+  const prodiSelect = document.getElementById("filter-prodi-assessment");
+  const thresholdInfo = document.getElementById("status-threshold-info");
+
+  const activeThreshold = allRes.threshold || 75;
+  const w = allRes.weights || { prak: 40, askep: 40, sikap: 20 };
+  const wKlinik = w.klinik || 50;
+  const wAkademik = w.akademik || 50;
+  window.lastWKlinik = wKlinik;
+  window.lastWAkademik = wAkademik;
+
+  thresholdInfo.innerHTML = `Rumus: (Prak ${w.prak}%) + (ASKEP ${w.askep}%) + (Sikap ${w.sikap}%). <strong>Nilai = ${wKlinik}% Klinik + ${wAkademik}% Akademik</strong>. Batas Lulus: <strong>${activeThreshold}</strong>`;
+
+  // Update Table Headers
+  const tableHeader = document.querySelector("#table-final-scores thead tr");
+  tableHeader.innerHTML = `
+        <th rowspan="2">Nama Mahasiswa</th>
+        <th rowspan="2">Prodi</th>
+        <th colspan="2" class="text-center" style="background:#e0f2fe; border-bottom:1px solid #bae6fd;">Preseptor Klinik (${wKlinik}%)</th>
+        <th colspan="2" class="text-center" style="background:#fef3c7; border-bottom:1px solid #fde68a;">Preseptor Akademik (${wAkademik}%)</th>
+        <th rowspan="2">NILAI AKHIR</th>
+        <th rowspan="2">STATUS</th>
+    `;
+  // Add sub-header row
+  const subHeaderRow = document.createElement("tr");
+  subHeaderRow.innerHTML = `
+        <th style="background:#e0f2fe; font-size:0.75rem">Skor</th>
+        <th style="background:#e0f2fe; font-size:0.75rem">Kontrib.</th>
+        <th style="background:#fef3c7; font-size:0.75rem">Skor</th>
+        <th style="background:#fef3c7; font-size:0.75rem">Kontrib.</th>
+    `;
+  tableHeader.parentElement.appendChild(subHeaderRow);
+
+  if (prodiRes.success && prodiRes.data) {
+    prodiRes.data.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p.nama_prodi;
+      opt.textContent = p.nama_prodi;
+      prodiSelect.appendChild(opt);
+    });
+  }
+
+  const renderAssessmentTable = (data) => {
+    window.dtAssessmentView = data;
+    if (!data || data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="8" class="empty-table">Tidak ada data penilaian.</td></tr>`;
+      return;
+    }
+
+    // Sort data by nama alphabetically
+    data.sort((a, b) => {
+      const nameA = a.nama || "";
+      const nameB = b.nama || "";
+      return nameA.localeCompare(nameB);
+    });
+
+    tableBody.innerHTML = data
+      .map((row, idx) => {
+        const statusClass =
+          row.total >= activeThreshold ? "bg-success" : "bg-danger";
+        const statusText =
+          row.total >= activeThreshold ? "LULUS" : "TIDAK LULUS";
+        return `
+                <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                    <td><strong>${row.nama}</strong><br><small class="text-muted">${row.username}</small></td>
+                    <td><span class="badge bg-primary-soft text-primary" style="font-weight:600">${row.prodi || "-"}</span></td>
+                    <td style="background:#f0f9ff">${row.klinik_total.toFixed(2)}</td>
+                    <td style="background:#f0f9ff"><strong>${((row.klinik_total * wKlinik) / 100).toFixed(2)}</strong></td>
+                    <td style="background:#fffbeb">${row.akademik_total.toFixed(2)}</td>
+                    <td style="background:#fffbeb"><strong>${((row.akademik_total * wAkademik) / 100).toFixed(2)}</strong></td>
+                    <td><span class="badge" style="font-size:1.1em; background:var(--primary); color:white">${row.total.toFixed(2)}</span></td>
+                    <td><span class="badge ${statusClass}">${statusText}</span></td>
+                </tr>
+            `;
+      })
+      .join("");
+  };
+
+  if (allRes.success) {
+    window.rawAssessmentData = allRes.data;
+    renderAssessmentTable(window.rawAssessmentData);
+  }
+
+  prodiSelect.onchange = (e) => {
+    const val = e.target.value;
+    if (val === "all") {
+      renderAssessmentTable(window.rawAssessmentData);
+    } else {
+      const filtered = window.rawAssessmentData.filter((d) => d.prodi === val);
+      renderAssessmentTable(filtered);
+    }
+  };
+}
+
+window.exportAssessmentCSV = () => {
+  if (!window.dtAssessmentView) return;
+  const wK = window.lastWKlinik || 50;
+  const wA = window.lastWAkademik || 50;
+  const headers = [
+    "Nama",
+    "NIM",
+    "Prodi",
+    "Skor Klinik",
+    `Kontrib. Klinik (${wK}%)`,
+    "Skor Akademik",
+    `Kontrib. Akademik (${wA}%)`,
+    "Total",
+    "Status",
+  ];
+  const rows = window.dtAssessmentView.map((r) => [
+    r.nama,
+    r.username,
+    r.prodi || "-",
+    r.klinik_total.toFixed(2),
+    ((r.klinik_total * wK) / 100).toFixed(2),
+    r.akademik_total.toFixed(2),
+    ((r.akademik_total * wA) / 100).toFixed(2),
+    r.total.toFixed(2),
+    r.total >= window.lastAssessmentThreshold ? "LULUS" : "TIDAK LULUS",
+  ]);
+  let csv =
+    "data:text/csv;charset=utf-8," +
+    headers.join(";") +
+    "\n" +
+    rows.map((e) => e.join(";")).join("\n");
+  const link = document.createElement("a");
+  link.href = encodeURI(csv);
+  link.download = `Penilaian_Akhir_eKlinik_${new Date().toLocaleDateString()}.csv`;
+  link.click();
+};
+
+window.exportAssessmentPDF = () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFont("helvetica", "bold");
+  doc.text("Laporan Ringkasan Penilaian Akhir", 14, 20);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Waktu Cetak: ${new Date().toLocaleString()}`, 14, 28);
+  doc.text(
+    `Nilai = ${window.lastWKlinik || 50}% Preseptor Klinik + ${window.lastWAkademik || 50}% Preseptor Akademik`,
+    14,
+    34,
+  );
+  const wK2 = window.lastWKlinik || 50;
+  const wA2 = window.lastWAkademik || 50;
+
+  const tableData = window.dtAssessmentView.map((r) => [
+    r.nama,
+    r.prodi || "-",
+    r.klinik_total.toFixed(2),
+    ((r.klinik_total * wK2) / 100).toFixed(2),
+    r.akademik_total.toFixed(2),
+    ((r.akademik_total * wA2) / 100).toFixed(2),
+    r.total.toFixed(2),
+    r.total >= window.lastAssessmentThreshold ? "LULUS" : "TIDAK LULUS",
+  ]);
+
+  doc.autoTable({
+    startY: 40,
+    head: [
+      [
+        "Nama",
+        "Prodi",
+        "Skor Klinik",
+        `Kontrib. ${wK2}%`,
+        "Skor Akademik",
+        `Kontrib. ${wA2}%`,
+        "Total",
+        "Status",
+      ],
+    ],
+    body: tableData,
+  });
+  doc.save(`Assessment_Report_${new Date().getTime()}.pdf`);
+};
+
+window.hapusSemuaNilai = async () => {
+  if (
+    confirm(
+      `⚠️ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data penilaian (Klinik & Akademik).\nSemua nilai dari kedua jenis preseptor akan dihapus.\n\nApakah Anda benar-benar yakin?`,
+    )
+  ) {
+    if (confirm(`Konfirmasi terakhir: Hapus semua data penilaian?`)) {
+      showLoader(true);
+      const res = await postAPI("clearAllGrades", {});
+      showLoader(false);
+      if (res.success) {
+        showToast("Berhasil", res.message, "success");
+        loadView("penilaianAkhirView");
+      }
+    }
+  }
+};
+
+window.backupDataJSON = async () => {
+  showLoader(true);
+  showToast("Memproses", "Mengekspor seluruh data...", "info");
+  const res = await fetchAPI("backupData");
+  showLoader(false);
+  if (res.success && res.data) {
+    const json = JSON.stringify(res.data, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `eKlinik_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Berhasil", "Backup berhasil diunduh", "success");
+  } else {
+    showToast("Gagal", "Gagal membuat backup", "error");
+  }
+};
+
+window.restoreDataJSON = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = "";
+
+  if (
+    !confirm(
+      `⚠️ PERINGATAN!\n\nRestore akan MENIMPA seluruh data yang ada dengan data dari file backup.\nPastikan Anda sudah mem-backup data saat ini terlebih dahulu.\n\nLanjutkan?`,
+    )
+  )
+    return;
+  if (!confirm(`Konfirmasi terakhir: Restore data dari file "${file.name}"?`))
+    return;
+
+  try {
+    const text = await file.text();
+    const backup = JSON.parse(text);
+    showLoader(true);
+    showToast("Memproses", "Sedang me-restore data...", "info");
+    const res = await postAPI("restoreData", { backup });
+    showLoader(false);
+    if (res.success) {
+      showToast("Berhasil", res.message, "success");
+      loadView("settingsAdminView");
+    } else {
+      showToast("Gagal", res.message || "Gagal me-restore data", "error");
+    }
+  } catch (err) {
+    showLoader(false);
+    showToast("Error", "File JSON tidak valid: " + err.message, "error");
+  }
+};
+
+// ADMIN: SEMUA DATA / EXPORT
+async function adminView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card mb-4" id="master-lahan-container">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-qrcode text-primary"></i> Master Lahan & QR Code Presensi</h3>
+                    <button class="btn btn-primary btn-sm" onclick="bukaModalSemuaQRCode()">
+                        <i class="fa-solid fa-layer-group"></i> Generate Semua QR
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="lahan-list-container" class="grid-cards" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+                        <div class="text-center w-100 text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Memuat Lahan Praktik...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-server text-primary"></i> Master Data Presensi Mahasiswa</h3>
+                    <div class="d-flex gap-2">
+                         <button class="btn btn-outline btn-sm" onclick="exportToCSV()"><i class="fa-solid fa-file-csv"></i> Unduh CSV</button>
+                         <button class="btn btn-danger-soft btn-sm" onclick="exportToPDF()"><i class="fa-solid fa-file-pdf"></i> Unduh PDF</button>
+                    </div>
+                </div>
+                 <div class="card-body">
+                     <div class="table-responsive">
+                        <table id="table-admin">
+                            <thead>
+                                <tr>
+                                                                         <th>Mahasiswa & Prodi</th>
+                                     <th>Lahan Praktik</th>
+
+                                    <th>Tanggal</th>
+                                    <th>Waktu Masuk</th>
+                                    <th>Waktu Keluar</th>
+                                                                        <th>Durasi</th>
+
+                                </tr>
+                            </thead>
+                                                        <tbody><tr><td colspan="6" class="empty-table">
+<i class="fa-solid fa-spinner fa-spin"></i> Sinkronisasi database...</td></tr></tbody>
+                        </table>
+                    </div>
+                 </div>
+            </div>
+        </div>
+     `;
+
+  const [resPresensi, resTempat] = await Promise.all([
+    fetchAPI("getAllPresensi"),
+    fetchAPI("getTempat"),
+  ]);
+
+  const lahanContainer = document.getElementById("lahan-list-container");
+  if (lahanContainer) {
+    if (resTempat.success && resTempat.data && resTempat.data.length > 0) {
+      lahanContainer.innerHTML = resTempat.data
+        .map(
+          (t) => `
+                 <div class="stat-card" style="padding: 1rem; align-items: start; flex-direction:column; gap:0.5rem; justify-content:start;">
+                    <div class="w-100 d-flex justify-between align-center mb-1">
+                        <strong style="font-size:1.1rem; color:var(--primary-dark); line-height:1.2;">${t.nama_tempat}</strong>
+                    </div>
+                    <span class="badge bg-primary-soft mb-2">ID: ${t.id}</span>
+                    <button class="btn btn-outline btn-sm w-100 mt-auto" onclick="bukaModalQRCode('${t.nama_tempat}')">
+                        <i class="fa-solid fa-qrcode"></i> Generate QR Code
+                    </button>
+                 </div>
+             `,
+        )
+        .join("");
+    } else {
+      lahanContainer.innerHTML = `<div class="text-center w-100 text-muted">Belum ada data lahan praktik.</div>`;
+    }
+  }
+
+  window.dtAdminPresensi = []; // For export
+  const tableBody = document.querySelector("#table-admin tbody");
+  if (!tableBody) return; // Defensive check for null
+
+  if (resPresensi.success && resPresensi.data.length > 0) {
+    window.dtAdminPresensi = resPresensi.data;
+    tableBody.innerHTML = resPresensi.data
+      .map((p) => {
+        const dur = p.durasi
+          ? parseFloat(p.durasi).toFixed(2) + " Jam"
+          : '<span class="text-muted"><i class="fa-solid fa-rotate fa-spin"></i> Aktif</span>';
+        return `
+            <tr>
+                <td>
+                    <strong>${p.nama}</strong><br>
+                    <small class="text-muted">${p.prodi || "-"}</small>
+                </td>
+                <td><span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-hospital"></i> ${p.nama_lahan}</span></td>
+                <td>${formatDateIndo(p.tanggal)}</td>
+                <td><span class="badge bg-primary">${formatDateIndo(p.jam_masuk)}</span></td>
+                <td>${p.jam_keluar ? `<span class="badge bg-primary">${formatDateIndo(p.jam_keluar)}</span>` : "-"}</td>
+                <td>${dur}</td>
+            </tr>
+        `;
+      })
+      .join("");
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="6" class="empty-table"><i class="fa-solid fa-database fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Tidak ada riwayat database presensi.</td></tr>`;
+  }
+}
+
+// ============ LAPORAN KEJADIAN VIEW (Pelapor) ============
+async function laporanView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card" style="border-top: 4px solid var(--danger);">
+                <div class="card-header">
+                    <h3 class="m-0 text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Buat Laporan Kejadian / Kendala</h3>
+                    <p class="text-muted mt-1" style="font-size:0.85rem;">Laporkan kendala atau kejadian luar biasa di tempat praktik untuk ditindaklanjuti.</p>
+                </div>
+                <div class="card-body">
+                    <form id="form-laporan">
+                        <div class="form-group">
+                            <label>Tipe Kejadian / Masalah</label>
+                            <select id="lap-tipe" class="form-control" required>
+                                <option value="">-- Pilih Tipe --</option>
+                                <option value="Absensi / Ketidakhadiran">Absensi / Ketidakhadiran</option>
+                                <option value="Pelanggaran Aturan">Pelanggaran Aturan</option>
+                                <option value="Kendala Teknis/Aplikasi">Kendala Teknis / Aplikasi</option>
+                                <option value="Masalah di Lahan Praktik">Masalah di Lahan Praktik</option>
+                                <option value="Lain-lain">Lain-lain</option>
+                            </select>
+                        </div>
+
+                        ${
+                          currentUser.role !== "mahasiswa"
+                            ? `
+                        <div class="form-group">
+                            <label>Mahasiswa Terkait (Opsional)</label>
+                            <select id="lap-student" class="form-control">
+                                <option value="-">-- Pilih Mahasiswa (Jika Ada) --</option>
+                            </select>
+                        </div>
+                        `
+                            : ""
+                        }
+
+                        <div class="form-group">
+                            <label>Deskripsi Kejadian</label>
+                            <textarea id="lap-deskripsi" class="form-control" rows="5" placeholder="Jelaskan secara detail kronologi kejadian..." required></textarea>
+                        </div>
+
+                        <div class="alert alert-warning-soft text-sm">
+                            <i class="fa-solid fa-circle-info"></i> Laporan ini akan langsung diteruskan ke Admin & Preseptor Akademik untuk dipelajari.
+                        </div>
+
+                        <div class="d-flex justify-end mt-4">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fa-solid fa-paper-plane"></i> Kirim Laporan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+
+  if (currentUser.role !== "mahasiswa") {
+    const studentSelect = document.getElementById("lap-student");
+    const resUsers = await fetchCachedAPI("getUsers");
+    if (resUsers.success) {
+      const students = resUsers.data.filter((u) => u.role === "mahasiswa");
+      students.sort((a, b) => (a.nama || "").localeCompare(b.nama || ""));
+      students.forEach((s) => {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = `${s.nama} (${s.id})`;
+        opt.dataset.nama = s.nama;
+        studentSelect.appendChild(opt);
+      });
+    }
+  }
+
+  document.getElementById("form-laporan").onsubmit = async (e) => {
+    e.preventDefault();
+    const payload = {
+      action: "addLaporan",
+      user_id: currentUser.id,
+      nama_pelapor: currentUser.nama,
+      role_pelapor: currentUser.role,
+      tipe_kejadian: document.getElementById("lap-tipe").value,
+      deskripsi: document.getElementById("lap-deskripsi").value,
+      student_id: document.getElementById("lap-student")
+        ? document.getElementById("lap-student").value
+        : "-",
+      nama_terlapor:
+        document.getElementById("lap-student") &&
+        document.getElementById("lap-student").value !== "-"
+          ? document.getElementById("lap-student").selectedOptions[0].dataset
+              .nama
+          : "-",
+    };
+
+    showLoader(true);
+    const res = await postAPI("addLaporan", payload);
+    showLoader(false);
+
+    if (res.success) {
+      showToast("Sukses", "Laporan berhasil dikirim.", "success");
+      laporanView(area);
+    } else {
+      showToast("Gagal", res.message || "Gagal mengirim laporan.", "error");
+    }
+  };
+
+  // Render Riwayat
+  area.insertAdjacentHTML(
+    "beforeend",
+    `
+        <div class="card mt-4 animate-fade-up delay-200">
+            <div class="card-header">
+                <h3 class="m-0"><i class="fa-solid fa-clock-rotate-left text-primary"></i> Riwayat Laporan Saya</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table-compact" id="table-riwayat-laporan">
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>TiPe</th>
+                                <th>Terlapor</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="5" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat riwayat...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `,
+  );
+
+  const resLap = await fetchAPI("getLaporan");
+  const tbody = document.querySelector("#table-riwayat-laporan tbody");
+  if (!tbody) return;
+
+  if (resLap.success && resLap.data.length > 0) {
+    const myReports = resLap.data
+      .filter((l) => l.user_id_pelapor == currentUser.id)
+      .reverse();
+    if (myReports.length > 0) {
+      tbody.innerHTML = myReports
+        .map(
+          (l) => `
+                <tr>
+                    <td class="text-sm">${formatDateIndo(l.tanggal, true)}</td>
+                    <td><span class="badge bg-danger-soft text-danger">${l.tipe_kejadian}</span></td>
+                    <td>${l.nama_terlapor !== "-" ? l.nama_terlapor : "-"}</td>
+                    <td><span class="badge ${l.status === "Baru" ? "bg-danger" : "bg-success"}">${l.status}</span></td>
+                    <td>
+                        <button class="btn btn-outline btn-xs" onclick="detailLaporan('${l.id}')">
+                            <i class="fa-solid fa-eye"></i> Detail
+                        </button>
+                    </td>
+                </tr>
+            `,
+        )
+        .join("");
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5" class="empty-table">Belum ada laporan yang Anda buat.</td></tr>`;
+    }
+  } else {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-table">Belum ada laporan yang Anda buat.</td></tr>`;
+  }
+
+  window.detailLaporan = async (id) => {
+    const res = await fetchAPI("getLaporan");
+    const lap = res.data.find((x) => x.id === id);
+    if (lap) {
+      openModal(
+        "Detail Laporan Kejadian",
+        `
+                <div class="py-2">
+                    <div class="mb-3">
+                        <label class="d-block text-muted text-xs uppercase font-bold">Tipe Kejadian</label>
+                        <div class="font-bold text-danger">${lap.tipe_kejadian}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="d-block text-muted text-xs uppercase font-bold">Tanggal</label>
+                        <div>${formatDateIndo(lap.tanggal, true)}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="d-block text-muted text-xs uppercase font-bold">Terlapor</label>
+                        <div>${lap.nama_terlapor !== "-" ? lap.nama_terlapor : "Tidak ada (Masalah Umum)"}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="d-block text-muted text-xs uppercase font-bold">Deskripsi</label>
+                        <div class="p-3 bg-light rounded text-sm" style="white-space:pre-wrap;">${lap.deskripsi}</div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="d-block text-muted text-xs uppercase font-bold">Status Tindak Lanjut</label>
+                        <span class="badge ${lap.status === "Baru" ? "bg-danger" : "bg-success"}">${lap.status}</span>
+                    </div>
+                </div>
+            `,
+      );
+    }
+  };
+}
+
+// ============ ADMIN LAPORAN VIEW (Admin & Preseptor Akademik) ============
+async function adminLaporanView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="m-0"><i class="fa-solid fa-triangle-exclamation text-danger"></i> Daftar Laporan Kejadian</h3>
+                    <p class="text-muted mt-1" style="font-size:0.85rem;">Gunakan halaman ini untuk memantau laporan dari mahasiswa dan preseptor klinik.</p>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table-compact" id="table-laporan">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Pelapor</th>
+                                    <th>Masalah</th>
+                                    <th>Terlapor</th>
+                                    <th>Deskripsi</th>
+                                    <th>Status</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="7" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat Laporan...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const res = await fetchAPI("getLaporan");
+  const tbody = document.querySelector("#table-laporan tbody");
+  if (!tbody) return;
+
+  if (res.success && res.data.length > 0) {
+    tbody.innerHTML = res.data
+      .reverse()
+      .map((l) => {
+        const statusColor = l.status === "Baru" ? "bg-danger" : "bg-success";
+        return `
+                <tr>
+                    <td class="text-sm">${formatDateIndo(l.tanggal, true)}</td>
+                    <td>
+                        <strong>${l.nama_pelapor}</strong><br>
+                        <small class="text-muted">${l.role_pelapor}</small>
+                    </td>
+                    <td><span class="badge bg-danger-soft text-danger">${l.tipe_kejadian}</span></td>
+                    <td>${l.nama_terlapor !== "-" ? `<strong>${l.nama_terlapor}</strong>` : "-"}</td>
+                    <td style="max-width:300px; white-space:normal;" class="text-sm">${l.deskripsi}</td>
+                    <td><span class="badge ${statusColor}">${l.status}</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            ${
+                              currentUser.role === "admin"
+                                ? l.status === "Baru"
+                                  ? `
+                                    <button class="btn btn-outline btn-xs" onclick="updateStatusLaporan('${l.id}', 'Ditindak Lanjuti')">
+                                        <i class="fa-solid fa-check"></i> Proses
+                                    </button>
+                                `
+                                  : '<span class="text-success" style="font-size:0.75rem;"><i class="fa-solid fa-circle-check"></i> Selesai</span>'
+                                : l.status === "Baru"
+                                  ? '<span class="text-muted text-xs">Menunggu Proses</span>'
+                                  : '<span class="text-success" style="font-size:0.75rem;"><i class="fa-solid fa-circle-check"></i> Selesai</span>'
+                            }
+                            
+                            ${
+                              currentUser.role === "admin"
+                                ? `
+                                <button class="btn btn-danger-soft btn-xs" onclick="hapusLaporan('${l.id}')">
+                                    <i class="fa-solid fa-trash"></i> Hapus
+                                </button>
+                            `
+                                : ""
+                            }
+                        </div>
+                    </td>
+                </tr>
+            `;
+      })
+      .join("");
+  } else {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-table">Belum ada laporan kejadian.</td></tr>`;
+  }
+
+  window.updateStatusLaporan = async (id, status) => {
+    if (!confirm(`Tandai laporan ini sebagai ${status}?`)) return;
+    showLoader(true);
+    const res = await postAPI("updateLaporanStatus", { id, status });
+    showLoader(false);
+    if (res.success) {
+      showToast("Sukses", "Status laporan diperbarui.", "success");
+      adminLaporanView(area);
+    } else {
+      showToast("Gagal", res.message || "Gagal memperbarui status.", "error");
+    }
+  };
+
+  window.hapusLaporan = async (id) => {
+    if (
+      !confirm("Apakah Anda yakin ingin menghapus laporan ini secara permanen?")
+    )
+      return;
+    showLoader(true);
+    const res = await postAPI("deleteLaporan", { id });
+    showLoader(false);
+    if (res.success) {
+      showToast("Sukses", "Laporan berhasil dihapus.", "success");
+      adminLaporanView(area);
+    } else {
+      showToast("Gagal", res.message || "Gagal menghapus laporan.", "error");
+    }
+  };
+}
+
+// ============ GENERATE JADWAL VIEW ============
+async function generatorKelompokView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card mb-4" style="border-top: 4px solid var(--primary);">
+                <div class="card-header">
+                    <h3 class="m-0"><i class="fa-solid fa-calendar-days text-primary"></i> Generator Jadwal Praktik Kelompok</h3>
+                    <p class="text-muted mt-1" style="font-size:0.85rem;">Buat jadwal penempatan stase secara massal berdasarkan Kelompok.</p>
+                </div>
+                <div class="card-body">
+                    <form id="form-generate-jadwal">
+                        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:1rem">
+                            <div class="form-group mb-0">
+                                <label>Tanggal Mulai Periode Pertama</label>
+                                <input type="date" id="input-tanggal-mulai" class="form-control" required value="${new Date().toISOString().split("T")[0]}">
+                            </div>
+                            <div class="form-group mb-0">
+                                <label>Jumlah Putaran / Stase Rotasi</label>
+                                <input type="number" id="input-jumlah-stase" class="form-control" min="1" max="10" value="1" required>
+                                <small class="text-muted">Setiap stase otomatis berdurasi 1 minggu.</small>
+                            </div>
+                        </div>
+                        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:1rem">
+                            <div class="form-group mb-0">
+                                <label>Jam Mulai (Shift 1)</label>
+                                <input type="time" id="input-jam-mulai-kelompok" class="form-control" required value="07:00">
+                            </div>
+                            <div class="form-group mb-0">
+                                <label>Jumlah Shift per Hari</label>
+                                <select id="input-jumlah-shift-kelompok" class="form-control">
+                                    <option value="1">1 Shift (8 jam)</option>
+                                    <option value="2">2 Shift (12 jam)</option>
+                                    <option value="3" selected>3 Shift (8 jam)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="stase-container" class="mb-4 d-flex flex-column gap-3"></div>
+                        <div class="d-flex justify-between align-center mt-4">
+                            <label class="d-flex align-center gap-2" style="cursor:pointer; font-weight:600; font-size:0.9rem">
+                                <input type="checkbox" id="check-clear-jadwal" checked> Hapus seluruh jadwal lama sebelum memproses
+                            </label>
+                            <button type="button" class="btn btn-primary" onclick="generatePreviewJadwal()">
+                                <i class="fa-solid fa-eye"></i> Tampilkan Preview Matriks
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="preview-jadwal-container" class="card hidden animate-fade-up">
+                <div class="card-header bg-primary-soft">
+                    <h3 class="m-0 text-primary"><i class="fa-solid fa-table"></i> Preview Penempatan Kelompok</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y:auto">
+                        <table id="table-preview-jadwal" class="table-compact text-sm" style="width:100%; min-width:800px">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-end mt-4">
+                        <button class="btn btn-success" onclick="eksekusiGenerateJadwal()">
+                            <i class="fa-solid fa-floppy-disk"></i> Simpan ke Database
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  showLoader(true);
+  const [resKelompok, resTempat] = await Promise.all([
+    fetchCachedAPI("getKelompok"),
+    fetchCachedAPI("getTempat"),
+  ]);
+  showLoader(false);
+
+  if (!resKelompok.success || !resTempat.success) {
+    showToast("Error", "Gagal memuat master data (Kelompok/Tempat)", "error");
+    return;
+  }
+
+  window.masterKelompokForJadwal = resKelompok.data;
+  window.masterTempatForJadwal = resTempat.data;
+
+  const renderStaseConfig = () => {
+    const count =
+      parseInt(document.getElementById("input-jumlah-stase").value) || 1;
+    const startDateStr = document.getElementById("input-tanggal-mulai").value;
+    const container = document.getElementById("stase-container");
+    let html = "";
+
+    let baseDate = new Date();
+    if (startDateStr) {
+      baseDate = new Date(startDateStr);
+    }
+
+    for (let i = 1; i <= count; i++) {
+      let startD = new Date(baseDate);
+      let endD = new Date(baseDate);
+      endD.setDate(baseDate.getDate() + 6); // 1 week is 7 days inclusive
+
+      const formatD = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+
+      const startStr = startDateStr ? formatD(startD) : "";
+      const endStr = startDateStr ? formatD(endD) : "";
+
+      html += `
+                <div class="stase-card" style="padding:15px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc;">
+                    <h4 style="margin-top:0; color:var(--primary-dark); font-size:1rem; border-bottom:1px solid #cbd5e1; padding-bottom:5px;">Putaran / Stase ${i}</h4>
+                    <div class="grid" style="grid-template-columns: 1fr 1fr; gap:15px">
+                        <div class="form-group mb-0">
+                            <label>Tanggal Mulai</label>
+                            <input type="date" class="form-control stase-start" data-stase="${i}" value="${startStr}" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label>Tanggal Selesai</label>
+                            <input type="date" class="form-control stase-end" data-stase="${i}" value="${endStr}" required>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+      // Advance by 7 days for the next rotation
+      baseDate.setDate(baseDate.getDate() + 7);
+    }
+    container.innerHTML = html;
+    document.getElementById("preview-jadwal-container").classList.add("hidden");
+  };
+
+  document
+    .getElementById("input-jumlah-stase")
+    .addEventListener("input", renderStaseConfig);
+  document
+    .getElementById("input-tanggal-mulai")
+    .addEventListener("input", renderStaseConfig);
+  renderStaseConfig(); // initial
+}
+
+window.generatePreviewJadwal = () => {
+  const staseCount = parseInt(
+    document.getElementById("input-jumlah-stase").value,
+  );
+  const kelompokList = window.masterKelompokForJadwal || [];
+  const tempatList = window.masterTempatForJadwal || [];
+
+  if (kelompokList.length === 0)
+    return showToast(
+      "Peringatan",
+      "Belum ada master kelompok mahasiswa!",
+      "warning",
+    );
+  if (tempatList.length === 0)
+    return showToast(
+      "Peringatan",
+      "Belum ada master tempat praktik!",
+      "warning",
+    );
+
+  const staseData = [];
+  for (let i = 1; i <= staseCount; i++) {
+    const start = document.querySelector(
+      `.stase-start[data-stase="${i}"]`,
+    ).value;
+    const end = document.querySelector(`.stase-end[data-stase="${i}"]`).value;
+    if (!start || !end)
+      return showToast(
+        "Validasi",
+        `Harap lengkapi tanggal untuk stase ${i}`,
+        "error",
+      );
+    if (new Date(start) > new Date(end))
+      return showToast(
+        "Validasi",
+        `Tanggal awal stase ${i} lebih besar dari akhir`,
+        "error",
+      );
+    staseData.push({ stase: i, start, end });
+  }
+
+  const tableHead = document.querySelector("#table-preview-jadwal thead");
+  const tableBody = document.querySelector("#table-preview-jadwal tbody");
+
+  // Head
+  let headHtml = `<tr>
+        <th style="min-width:150px">Kelompok</th>
+        <th style="width:80px; text-align:center"><i class="fa-solid fa-users"></i> Jml</th>
+    `;
+  staseData.forEach((s) => {
+    headHtml += `<th>Stase ${s.stase}<br><small style="font-weight:normal;color:#64748b">${formatDateIndo(s.start)} - ${formatDateIndo(s.end)}</small></th>`;
+  });
+  headHtml += `</tr>`;
+  tableHead.innerHTML = headHtml;
+
+  // Build tempat options
+  const tempatSelect = tempatList
+    .map((t) => `<option value="${t.id}">${t.nama_tempat}</option>`)
+    .join("");
+
+  // Body
+  let bodyHtml = "";
+  kelompokList.forEach((k, idx) => {
+    let rowHtml = `<tr>
+            <td><strong>${k.nama_kelompok}</strong></td>
+            <td style="text-align:center"><span class="badge bg-primary-soft text-primary">${k.jumlah_anggota || 0}</span></td>
+        `;
+    staseData.forEach((s, sIdx) => {
+      // Default Round-Robin logic for initial selection
+      const defaultTempatIdx = (idx + sIdx) % tempatList.length;
+      const t = tempatList[defaultTempatIdx];
+
+      rowHtml += `
+                <td>
+                    <select class="form-control select-tempat-preview" data-kelompok="${k.id}" data-stase="${s.stase}" style="padding:0.3rem; font-size:0.85rem">
+                        <option value="">- Tidak Tersetting -</option>
+                        ${tempatList.map((opt) => `<option value="${opt.id}" ${opt.id === t.id ? "selected" : ""}>${opt.nama_tempat}</option>`).join("")}
+                    </select>
+                </td>
+            `;
+    });
+    rowHtml += `</tr>`;
+    bodyHtml += rowHtml;
+  });
+
+  tableBody.innerHTML = bodyHtml;
+  document
+    .getElementById("preview-jadwal-container")
+    .classList.remove("hidden");
+
+  // Store stase parameters globally to be accessed later during save
+  window.currentStaseConfig = staseData;
+};
+
+window.eksekusiGenerateJadwal = async () => {
+  const selects = document.querySelectorAll(".select-tempat-preview");
+  const assignments = [];
+
+  // Construct assignments payload
+  selects.forEach((sel) => {
+    const kelId = sel.getAttribute("data-kelompok");
+    const staseNo = parseInt(sel.getAttribute("data-stase"));
+    const tempatId = sel.value;
+    const staseInfo = window.currentStaseConfig.find(
+      (s) => s.stase === staseNo,
+    );
+
+    if (tempatId) {
+      assignments.push({
+        kelompok_id: kelId,
+        tempat_id: tempatId,
+        tgl_mulai: staseInfo.start,
+        tgl_selesai: staseInfo.end,
+      });
+    }
+  });
+
+  if (assignments.length === 0)
+    return showToast(
+      "Warning",
+      "Tidak ada pemetaan tempat yang dipilih",
+      "warning",
+    );
+
+  const clearExisting = document.getElementById("check-clear-jadwal").checked;
+  const shiftCount = document.getElementById(
+    "input-jumlah-shift-kelompok",
+  ).value;
+  const startTime = document.getElementById("input-jam-mulai-kelompok").value;
+
+  if (
+    !confirm(
+      `Anda akan membuat ${assignments.length} pusingan jadwal grup.\n\nLanjutkan proses penyimpanan?`,
+    )
+  )
+    return;
+
+  showLoader(true);
+  showToast("Memproses", "Menyusun jadwal...", "info");
+  const res = await postAPI("generateJadwalKelompok", {
+    assignments,
+    clearExisting,
+    shiftCount,
+    startTime,
+  });
+  showLoader(false);
+
+  if (res.success) {
+    showToast("Berhasil", res.message, "success");
+    document.getElementById("preview-jadwal-container").classList.add("hidden");
+  } else {
+    showToast("Gagal", res.message, "error");
+  }
+};
+
+async function rekapLogbookAdminView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header d-flex justify-between align-center wrap gap-3">
+                    <h3 class="m-0"><i class="fa-solid fa-chart-pie text-primary"></i> Rekapan Logbook Mahasiswa</h3>
+                    <div class="d-flex gap-2">
+                        <div class="input-with-icon" style="width:250px;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-rekap" class="form-control" placeholder="Cari nama mahasiswa...">
+                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="exportRekapCSV()"><i class="fa-solid fa-file-csv"></i> Unduh Rekap</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="table-rekap-log" style="font-size:0.9rem">
+                            <thead>
+                                <tr>
+                                    <th>Mahasiswa & Prodi</th>
+                                    <th>Status Kompetensi (Detail)</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="2" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menganalisis logbook...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const res = await fetchAPI("getRekapLogbook");
+  const tableBody = document.querySelector("#table-rekap-log tbody");
+  if (!tableBody) return;
+
+  window.dtRekapLog = [];
+  if (res.success && res.data) {
+    window.dtRekapLog = res.data;
+    const render = (data) => {
+      if (data.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Tidak ada data ditemukan</td></tr>`;
+        return;
+      }
+      tableBody.innerHTML = data
+        .map((m, idx) => {
+          const totalTercapai = m.rekap.filter(
+            (r) => r.status === "Tercapai",
+          ).length;
+          const totalTarget = m.rekap.length;
+
+          return `
+                <tr class="animate-fade-up">
+                    <td style="width:250px; vertical-align:top">
+                        <strong>${m.nama}</strong><br>
+                        <small class="text-muted">${m.prodi}</small>
+                        <div class="mt-2">
+                             <span class="badge ${totalTercapai === totalTarget ? "bg-success" : "bg-warning"}" style="font-size:0.75rem">
+                                ${totalTercapai} / ${totalTarget} Kompetensi
+                             </span>
+                        </div>
+                        <button class="btn btn-primary-soft btn-sm mt-3" onclick="toggleRekapDetail('${m.user_id}')" id="btn-toggle-${m.user_id}">
+                            <i class="fa-solid fa-eye"></i> Lihat Detail
+                        </button>
+                    </td>
+                    <td>
+                        <div id="rekap-detail-${m.user_id}" class="hidden">
+                            ${(() => {
+                              // Group rekap by kategori
+                              const gRekap = {};
+                              m.rekap.forEach((r) => {
+                                const kat =
+                                  r.kategori && r.kategori !== "-"
+                                    ? r.kategori
+                                    : "Umum";
+                                if (!gRekap[kat]) gRekap[kat] = [];
+                                gRekap[kat].push(r);
+                              });
+                              return Object.keys(gRekap)
+                                .map(
+                                  (kat) => `
+                                    <div style="margin-bottom:1rem;">
+                                        <div style="font-weight:700; font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
+                                            <i class="fa-solid fa-folder-open text-primary" style="margin-right:6px;"></i>${kat}
+                                        </div>
+                                        <div class="grid-skills-rekap" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
+                                            ${gRekap[kat]
+                                              .map(
+                                                (r) => `
+                                                <div class="skill-rekap-card" style="padding:10px; border-radius:8px; background:var(--bg-main); border-left: 4px solid ${r.status === "Tercapai" ? "#22c55e" : "#ef4444"};">
+                                                    <div style="font-weight:600; font-size:0.8rem; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${r.nama_skill}</div>
+                                                    <div class="d-flex justify-between align-center mt-2">
+                                                        <span class="badge ${r.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.75rem">${r.capaian} / ${r.target}</span>
+                                                        <small style="color:${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}; font-weight:700; font-size:0.75rem">${r.status.toUpperCase()}</small>
+                                                    </div>
+                                                </div>
+                                            `,
+                                              )
+                                              .join("")}
+                                        </div>
+                                    </div>
+                                `,
+                                )
+                                .join("");
+                            })()}
+                        </div>
+                        <div id="rekap-summary-text-${m.user_id}" class="text-muted" style="font-size:0.85rem">
+                            <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
+                        </div>
+                    </td>
+                </tr>
+            `;
+        })
+        .join("");
+    };
+
+    render(res.data);
+
+    document.getElementById("search-rekap").oninput = (e) => {
+      const q = e.target.value.toLowerCase();
+      const filtered = res.data.filter((m) => m.nama.toLowerCase().includes(q));
+      render(filtered);
+    };
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Gagal memuat rekap data</td></tr>`;
+  }
+}
+
+window.toggleRekapDetail = (userId) => {
+  const el = document.getElementById(`rekap-detail-${userId}`);
+  const summary = document.getElementById(`rekap-summary-text-${userId}`);
+  const btn = document.getElementById(`btn-toggle-${userId}`);
+
+  if (el.classList.contains("hidden")) {
+    el.classList.remove("hidden");
+    if (summary) summary.classList.add("hidden");
+    btn.innerHTML = `<i class="fa-solid fa-eye-slash"></i> Sembunyikan`;
+    btn.classList.replace("btn-primary-soft", "btn-danger-soft");
+  } else {
+    el.classList.add("hidden");
+    if (summary) summary.classList.remove("hidden");
+    btn.innerHTML = `<i class="fa-solid fa-eye"></i> Lihat Detail`;
+    btn.classList.replace("btn-danger-soft", "btn-primary-soft");
+  }
+};
+
+window.exportRekapCSV = () => {
+  if (!window.dtRekapLog) return;
+  let csv = "Nama Mahasiswa;Prodi;Kompetensi;Capaian;Target;Status\n";
+  window.dtRekapLog.forEach((m) => {
+    m.rekap.forEach((r) => {
+      csv += `"${m.nama}";"${m.prodi}";"${r.nama_skill}";${r.capaian};${r.target};"${r.status}"\n`;
+    });
+  });
+  const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csv);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "Rekap_Logbook_Mahasiswa.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+window.mahasiswaAdminView = (area) =>
+  renderUserManagement(area, "mahasiswa", "Mahasiswa", "fa-user-graduate");
+window.preseptorAdminView = (area) =>
+  renderUserManagement(area, "preseptor", "Preseptor Klinik", "fa-user-doctor");
+window.preseptorAkademikAdminView = (area) =>
+  renderUserManagement(
+    area,
+    "preseptor_akademik",
+    "Preseptor Akademik",
+    "fa-chalkboard-teacher",
+  );
+
+// ============ KELOMPOK ADMIN VIEW ============
+async function kelompokAdminView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header d-flex justify-between align-center wrap gap-2">
+                    <h3><i class="fa-solid fa-users-rectangle text-primary"></i> Kelompok Mahasiswa</h3>
+                    <div class="d-flex gap-2 wrap">
+                        <button class="btn btn-outline btn-sm" onclick="downloadKelompokTemplate()"><i class="fa-solid fa-download"></i> Template</button>
+                        <label class="btn btn-warning btn-sm m-0" style="cursor:pointer">
+                            <i class="fa-solid fa-upload"></i> Import
+                            <input type="file" accept=".csv" class="hidden" onchange="importKelompokCSV(event)">
+                        </label>
+                        <button class="btn btn-danger-soft btn-sm" onclick="clearMasterData('kelompok', 'Kelompok')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
+                        <button class="btn btn-primary btn-sm" onclick="bukaModalKelompok()"><i class="fa-solid fa-plus"></i> Tambah Kelompok</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="table-kelompok">
+                            <thead>
+                                <tr>
+                                    <th>Nama Kelompok</th>
+                                    <th>Jumlah Anggota</th>
+                                    <th style="text-align:right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="3" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const res = await fetchAPI("getKelompok");
+  const tableBody = document.querySelector("#table-kelompok tbody");
+  if (res.success && res.data && res.data.length > 0) {
+    tableBody.innerHTML = res.data
+      .map(
+        (k, idx) => `
+            <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                <td><strong><i class="fa-solid fa-users-rectangle" style="color:var(--primary)"></i> ${k.nama_kelompok}</strong></td>
+                <td><span class="badge bg-primary" style="font-size:0.95em">${k.jumlah_anggota || 0} mahasiswa</span></td>
+                <td style="text-align:right">
+                    <button class="btn btn-icon-ghost" onclick="aturAnggotaKelompok('${k.id}', '${k.nama_kelompok}')"><i class="fa-solid fa-user-plus" title="Atur Anggota"></i></button>
+                    <button class="btn btn-icon-ghost" onclick="bukaModalKelompok('${k.id}')"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-icon-ghost text-danger" onclick="hapusMaster('kelompok','${k.id}')"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `,
+      )
+      .join("");
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="3" class="empty-table">Belum ada kelompok.</td></tr>`;
+  }
+}
+
+window.bukaModalKelompok = (id = null) => {
+  let nama = "";
+  if (id && window.kelompokData) {
+    // not available from renderMasterData, fetch inline
+  }
+  const isEdit = !!id;
+  openModal(
+    isEdit ? "Edit Kelompok" : "Tambah Kelompok Baru",
+    `
+        <form id="form-kelompok" class="animate-fade-in">
+            <div class="form-group">
+                <label>Nama Kelompok</label>
+                <div class="input-with-icon">
+                    <i class="fa-solid fa-users-rectangle"></i>
+                    <input type="text" id="kelompok-nama" required class="form-control" placeholder="Contoh: Kelompok A">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block mt-3"><i class="fa-solid fa-save"></i> ${isEdit ? "Simpan Perubahan" : "Buat Kelompok"}</button>
+        </form>
+    `,
+  );
+
+  document.getElementById("form-kelompok").onsubmit = async (e) => {
+    e.preventDefault();
+    const payload = {
+      type: "kelompok",
+      id: id || "",
+      nama: document.getElementById("kelompok-nama").value,
+    };
+    const action = isEdit ? "editMaster" : "addMaster";
+    const res = await postAPI(action, payload);
+    if (res.success) {
+      closeModal();
+      showToast("Berhasil", res.message, "success");
+      loadView("kelompokAdminView");
+    }
+  };
+};
+
+window.aturAnggotaKelompok = async (kelompokId, namaKelompok) => {
+  showLoader(true);
+  const resUsers = await fetchAPI("getUsers");
+  showLoader(false);
+  if (!resUsers.success) return;
+
+  const mahasiswa = resUsers.data.filter((u) => u.role === "mahasiswa");
+
+  const checkboxes = mahasiswa
+    .map((m) => {
+      const checked = m.kelompok_id == kelompokId ? "checked" : "";
+      const otherGroup =
+        m.kelompok_id && m.kelompok_id !== "-" && m.kelompok_id !== kelompokId
+          ? `<span class="badge bg-warning" style="font-size:0.7em; margin-left:6px">di kelompok lain</span>`
+          : "";
+      return `
+            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:var(--bg-main); cursor:pointer; margin-bottom:4px;">
+                <input type="checkbox" class="chk-anggota" value="${m.id}" ${checked} style="width:18px; height:18px; accent-color:var(--primary);">
+                <span><strong>${m.nama}</strong> <small class="text-muted">(${m.username})</small>${otherGroup}</span>
+            </label>
+        `;
+    })
+    .join("");
+
+  openModal(
+    `Atur Anggota: ${namaKelompok}`,
+    `
+        <div class="form-group mb-3">
+            <input type="text" id="search-anggota" class="form-control" placeholder="Cari mahasiswa..." style="margin-bottom:8px">
+        </div>
+        <div id="list-anggota" style="max-height:350px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; padding:8px;">
+            ${checkboxes || '<span class="text-muted">Tidak ada mahasiswa</span>'}
+        </div>
+        <button class="btn btn-primary btn-block mt-3" onclick="simpanAnggotaKelompok('${kelompokId}')"><i class="fa-solid fa-save"></i> Simpan Anggota</button>
+    `,
+  );
+
+  // Search filter
+  document.getElementById("search-anggota").oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll("#list-anggota label").forEach((label) => {
+      label.style.display = label.textContent.toLowerCase().includes(q)
+        ? ""
+        : "none";
+    });
+  };
+};
+
+window.simpanAnggotaKelompok = async (kelompokId) => {
+  const memberIds = Array.from(
+    document.querySelectorAll(".chk-anggota:checked"),
+  ).map((c) => c.value);
+
+  closeModal();
+  showLoader(true);
+  showToast("Memproses", "Menyimpan anggota kelompok...", "info");
+
+  const res = await postAPI("setKelompokBulk", {
+    kelompok_id: kelompokId,
+    member_ids: memberIds,
+  });
+
+  showLoader(false);
+  if (res.success) {
+    showToast("Berhasil", res.message, "success");
+  }
+  loadView("kelompokAdminView");
+};
+
+window.downloadKelompokTemplate = async () => {
+  showLoader(true);
+  const [resUsers, resKelompok] = await Promise.all([
+    fetchAPI("getUsers"),
+    fetchAPI("getKelompok"),
+  ]);
+  showLoader(false);
+  if (!resUsers.success) return;
+
+  const mahasiswa = resUsers.data.filter((u) => u.role === "mahasiswa");
+  const kelompokMap = {};
+  if (resKelompok.success && resKelompok.data) {
+    resKelompok.data.forEach((k) => {
+      kelompokMap[k.id] = k.nama_kelompok;
+    });
+  }
+
+  let csv = "nama;username;kelompok\n";
+  mahasiswa.forEach((m) => {
+    const kNama = kelompokMap[m.kelompok_id] || "";
+    csv += `"${m.nama}";"${m.username}";"${kNama}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "Template_Kelompok_Mahasiswa.csv";
+  link.click();
+  URL.revokeObjectURL(link.href);
+  showToast("Berhasil", "Template berhasil diunduh", "success");
+};
+
+window.importKelompokCSV = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = "";
+
+  const text = await file.text();
+  const cleanText = text.replace(/^\uFEFF/, ""); // strip BOM
+  const lines = cleanText.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return showToast("Error", "File CSV kosong", "error");
+
+  // Auto-detect delimiter from header
+  const header = lines[0];
+  const delimiter = header.includes(";") ? ";" : ",";
+
+  // Parse rows (skip header)
+  const assignments = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i]
+      .split(delimiter)
+      .map((c) => c.replace(/^"|"$/g, "").trim());
+    if (cols.length >= 3 && cols[1] && cols[2]) {
+      assignments.push({ username: cols[1], kelompok: cols[2] });
+    }
+  }
+
+  if (assignments.length === 0)
+    return showToast("Error", "Tidak ada data valid", "error");
+
+  showLoader(true);
+  showToast("Memproses", "Mengimpor data kelompok...", "info");
+  const res = await postAPI("importKelompokAssignment", { assignments });
+  showLoader(false);
+
+  if (res.success) {
+    showToast("Berhasil", res.message, "success");
+    loadView("kelompokAdminView");
+  } else {
+    showToast("Error", res.message || "Gagal import", "error");
+  }
+};
+
+async function renderUserManagement(area, roleFilter, title, icon) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header d-flex align-center justify-between wrap gap-3">
+                    <div class="d-flex align-center gap-3 wrap">
+                        <h3 class="m-0"><i class="fa-solid ${icon} text-primary"></i> Manajemen ${title}</h3>
+                        <div class="input-with-icon" style="width:250px;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-users" class="form-control" placeholder="Cari nama atau ID..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                         <button class="btn btn-outline btn-sm" onclick="downloadUserTemplate('${roleFilter}')"><i class="fa-solid fa-download"></i> Template</button>
+                         <label class="btn btn-warning btn-sm m-0" style="cursor:pointer; margin:0;">
+                             <i class="fa-solid fa-upload"></i> Import
+                             <input type="file" id="import-csv-file" accept=".csv" class="hidden" onchange="handleImportCSV(event, '${roleFilter}')">
+                         </label>
+                         <button class="btn btn-primary btn-sm" onclick="bukaModalUser('${roleFilter}', null)"><i class="fa-solid fa-plus"></i> Tambah</button>
+                         <button class="btn btn-danger btn-sm" onclick="hapusSemuaUsers('${roleFilter}', '${title}')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
+                    </div>
+                </div>
+                 <div class="card-body">
+                     <div class="table-responsive">
+                        <table id="table-users-${roleFilter}">
+                            <thead>
+                                <tr>
+                                    <th>Nama Pengguna</th>
+                                    <th>Username / ID</th>
+                                    ${roleFilter === "mahasiswa" ? "<th>Prodi</th><th>Angkatan</th>" : "<th>Tempat Tugas</th>"}
+                                    <th style="text-align:right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="${roleFilter === "mahasiswa" ? 5 : 4}" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
+                        </table>
+                    </div>
+                 </div>
+            </div>
+        </div>
+     `;
+
+  showLoader(true);
+  const [resUsers, resTempat] = await Promise.all([
+    fetchAPI("getUsers"),
+    roleFilter !== "mahasiswa"
+      ? fetchCachedAPI("getTempat")
+      : Promise.resolve({ success: false }),
+  ]);
+  showLoader(false);
+
+  const tableBody = document.querySelector(`#table-users-${roleFilter} tbody`);
+  if (!tableBody) return;
+  window["adminUsersData_" + roleFilter] = [];
+
+  const renderUsers = (data) => {
+    if (data.length > 0) {
+      tableBody.innerHTML = data
+        .map((u, idx) => {
+          let infoLahan = "-";
+          if (
+            (roleFilter === "preseptor" ||
+              roleFilter === "preseptor_akademik") &&
+            resTempat.success
+          ) {
+            const tids = (u.tempat_id || "-").split(",");
+            const names = tids
+              .map((tid) => {
+                const t = resTempat.data.find((x) => x.id == tid);
+                return t ? t.nama_tempat : "";
+              })
+              .filter((n) => n);
+            infoLahan = names.length > 0 ? names.join(", ") : "-";
+          }
+          return `
+                <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                    <td><strong>${u.nama}</strong></td>
+                    <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${u.username}</span></td>
+                    ${roleFilter === "mahasiswa" ? `<td><span class="badge bg-primary">${u.prodi}</span></td><td><span class="badge bg-primary-soft text-primary">${u.angkatan && u.angkatan !== "-" ? u.angkatan : "-"}</span></td>` : `<td><span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-hospital"></i> ${infoLahan}</span></td>`}
+                    <td style="text-align:right">
+                        <button class="btn btn-icon-ghost" onclick="bukaModalUser('${roleFilter}', '${u.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button class="btn btn-icon-ghost text-danger" onclick="deleteUser('${u.id}', '${roleFilter}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        })
+        .join("");
+    } else {
+      tableBody.innerHTML = `<tr><td colspan="${roleFilter === "mahasiswa" ? 5 : 4}" class="empty-table"><i class="fa-solid fa-users-slash fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Tidak ditemukan data matching</td></tr>`;
+    }
+  };
+
+  if (resUsers.success && resUsers.data && resUsers.data.length > 0) {
+    const filteredByRole = resUsers.data.filter((u) => u.role === roleFilter);
+    window["adminUsersData_" + roleFilter] = filteredByRole;
+    renderUsers(filteredByRole);
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="${roleFilter === "mahasiswa" ? 5 : 4}" class="empty-table"><i class="fa-solid fa-users-slash fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data ${title}</td></tr>`;
+  }
+
+  document.getElementById("search-users").oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    const results = window["adminUsersData_" + roleFilter].filter(
+      (u) =>
+        u.nama.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q),
+    );
+    renderUsers(results);
+  };
+}
+
+window.bukaModalUser = async (roleFilter, id = null) => {
+  let user = {
+    id: "",
+    nama: "",
+    username: "",
+    password: "",
+    role: roleFilter,
+    prodi: "",
+  };
+  let isEdit = false;
+
+  if (id && window["adminUsersData_" + roleFilter]) {
+    user =
+      window["adminUsersData_" + roleFilter].find((u) => u.id === id) || user;
+    isEdit = true;
+  }
+
+  let prodiOptions = '<option value="">-- Kosong / Tidak Ada --</option>';
+  if (roleFilter === "mahasiswa") {
+    const pRes = await fetchAPI("getProdi");
+    if (pRes.success && pRes.data) {
+      prodiOptions += pRes.data
+        .map(
+          (p) =>
+            `<option value="${p.nama_prodi}" ${user.prodi === p.nama_prodi ? "selected" : ""}>${p.nama_prodi}</option>`,
+        )
+        .join("");
+    }
+  }
+
+  let prodiHtml = "";
+  let tempatHtml = "";
+  if (roleFilter === "mahasiswa") {
+    prodiHtml = `
+            <div class="form-group">
+                <label>Program Studi / Spesialisasi</label>
+                <select id="user-prodi" class="form-control">
+                    ${prodiOptions}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Angkatan</label>
+                <div class="input-with-icon">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <input type="number" id="user-angkatan" class="form-control" min="2000" max="2099" placeholder="Cth: 2024" value="${user.angkatan && user.angkatan !== "-" ? user.angkatan : ""}">
+                </div>
+            </div>
+        `;
+  } else if (
+    roleFilter === "preseptor" ||
+    roleFilter === "preseptor_akademik"
+  ) {
+    const tRes = await fetchAPI("getTempat");
+    let tempatCheckboxes = "";
+    const currentTempatIds = (user.tempat_id || "-").split(",");
+    if (tRes.success && tRes.data) {
+      tempatCheckboxes = tRes.data
+        .map(
+          (t) => `
+                <label style="display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:8px; background:var(--bg-main); cursor:pointer; margin-bottom:4px;">
+                    <input type="checkbox" class="chk-tempat" value="${t.id}" ${currentTempatIds.includes(t.id) ? "checked" : ""} style="width:18px; height:18px; accent-color:var(--primary);">
+                    <span><i class="fa-solid fa-hospital" style="color:var(--primary)"></i> ${t.nama_tempat}</span>
+                </label>
+            `,
+        )
+        .join("");
+    }
+    tempatHtml = `
+            <div class="form-group">
+                <label>Tempat Tugas (Lahan Praktik) — bisa pilih lebih dari 1</label>
+                <div style="max-height:200px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; padding:8px;">
+                    ${tempatCheckboxes || '<span class="text-muted">Belum ada data tempat</span>'}
+                </div>
+            </div>
+        `;
+  }
+
+  openModal(
+    isEdit
+      ? "Edit Profil " +
+          (roleFilter === "mahasiswa" ? "Mahasiswa" : "Preseptor")
+      : "Pendaftaran Pengguna Baru",
+    `
+        <form id="form-user" class="animate-fade-in">
+            <input type="hidden" id="user-id" value="${user.id}">
+            <input type="hidden" id="user-role" value="${roleFilter}">
+            <div class="form-group">
+                <label>Nama Lengkap</label>
+                <div class="input-with-icon">
+                    <i class="fa-regular fa-user"></i>
+                    <input type="text" id="user-nama" required class="form-control" value="${user.nama}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Username / NIM / NIP</label>
+                <div class="input-with-icon">
+                    <i class="fa-solid fa-id-badge"></i>
+                    <input type="text" id="user-username" required class="form-control" value="${user.username}" ${isEdit ? 'readonly style="background:#f1f5f9; cursor:not-allowed;" title="Username Tidak Bisa Diubah"' : ""}>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Kata Sandi ${isEdit ? '<span class="text-muted" style="font-weight:400">(Kosongkan jika tak diubah)</span>' : ""}</label>
+                <div class="input-with-icon">
+                    <i class="fa-solid fa-key"></i>
+                    <input type="password" id="user-password" ${isEdit ? "" : "required"} class="form-control" placeholder="••••••••">
+                </div>
+            </div>
+            ${prodiHtml}
+            ${tempatHtml}
+            <button type="submit" class="btn btn-primary btn-block mt-3"><i class="fa-solid fa-save"></i> ${isEdit ? "Simpan Perubahan" : "Daftarkan Akun"}</button>
+        </form>
+    `,
+  );
+
+  document.getElementById("form-user").onsubmit = async (e) => {
+    e.preventDefault();
+    const payload = {
+      id: document.getElementById("user-id").value,
+      nama: document.getElementById("user-nama").value,
+      username: document.getElementById("user-username").value,
+      password: document.getElementById("user-password").value,
+      role: document.getElementById("user-role").value,
+      prodi: document.getElementById("user-prodi")
+        ? document.getElementById("user-prodi").value
+        : "-",
+      tempat_id:
+        document.querySelectorAll(".chk-tempat:checked").length > 0
+          ? Array.from(document.querySelectorAll(".chk-tempat:checked"))
+              .map((c) => c.value)
+              .join(",")
+          : "-",
+      angkatan: document.getElementById("user-angkatan")
+        ? document.getElementById("user-angkatan").value || "-"
+        : "-",
+      kelompok_id:
+        isEdit && window.adminUsersData_mahasiswa
+          ? window.adminUsersData_mahasiswa.find(
+              (u) => u.id === document.getElementById("user-id").value,
+            )?.kelompok_id || "-"
+          : "-",
+    };
+    const action = isEdit ? "editUser" : "addUser";
+    showToast("Memproses", "Sedang menyimpan...", "info");
+    const res = await postAPI(action, payload);
+    if (res.success) {
+      closeModal();
+      showToast("Sukses", res.message, "success");
+      if (roleFilter === "mahasiswa") loadView("mahasiswaAdminView");
+      else if (roleFilter === "preseptor_akademik")
+        loadView("preseptorAkademikAdminView");
+      else loadView("preseptorAdminView");
+    }
+  };
+};
+
+window.hapusSemuaUsers = async (role, title) => {
+  if (
+    confirm(
+      `⚠️ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
+    )
+  ) {
+    if (confirm(`Konfirmasi terakhir: Hapus semua data ${title}?`)) {
+      showLoader(true);
+      const res = await postAPI("clearUsersByRole", { role: role });
+      showLoader(false);
+      if (res.success) {
+        showToast("Berhasil", res.message, "success");
+        if (role === "preseptor_akademik")
+          loadView("preseptorAkademikAdminView");
+        else if (role === "mahasiswa") loadView("mahasiswaAdminView");
+        else loadView("preseptorAdminView");
+      }
+    }
+  }
+};
+
+window.deleteUser = async (id, roleFilter) => {
+  if (
+    confirm("PERINGATAN ⚠️\\n\\nAnda yakin ingin menghapus akun ini permanen?")
+  ) {
+    const res = await postAPI("deleteUser", { id });
+    if (res.success) {
+      showToast("Terhapus", "Pengguna berhasil dicabut dari sistem", "success");
+      if (roleFilter === "mahasiswa") loadView("mahasiswaAdminView");
+      else loadView("preseptorAdminView");
+    }
+  }
+};
+
+window.downloadUserTemplate = async (roleFilter) => {
+  let headers = ["nama", "username", "password", "prodi", "angkatan"];
+  let rows = [];
+
+  if (roleFilter === "mahasiswa") {
+    rows = [
+      ["Ibrahim Wicaksono", "ibrahim112", "Pass123", "D3 Keperawatan", "2024"],
+      ["Siti Aisyah", "aisyah09", "Pass456", "S1 Profesi Ners", "2023"],
+    ];
+  } else {
+    headers.push("tempat_id");
+    // Ambil data tempat asli untuk contoh
+    const tRes = await fetchAPI("getTempat");
+    let exampleId = "T123";
+    let refText =
+      "\n\n# REFERENSI TEMPAT TUGAS (Gunakan ID di bawah untuk kolom tempat_id):\n# ID ; Nama Tempat\n";
+
+    if (tRes.success && tRes.data && tRes.data.length > 0) {
+      exampleId = tRes.data[0].id;
+      tRes.data.forEach((t) => {
+        refText += `# ${t.id} ; ${t.nama_tempat}\n`;
+      });
+    }
+
+    rows = [
+      ["Dr. Haryanto, Sp.PD", "haryanto.md", "PassHaryanto", "-", exampleId],
+      ["Ners. Rinawati, S.Kep", "rina.kep", "RinaPassx", "-", exampleId],
+    ];
+
+    let csvContent =
+      "data:text/csv;charset=utf-8," +
+      headers.join(";") +
+      "\n" +
+      rows.map((e) => e.join(";")).join("\n") +
+      refText;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Template_Import_${roleFilter}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(
+      "Template Diunduh",
+      "Cek referensi tempat tugas di bagian bawah file CSV",
+      "info",
+    );
+    return;
+  }
+
+  let csvContent =
+    "data:text/csv;charset=utf-8," +
+    headers.join(";") +
+    "\n" +
+    rows.map((e) => e.join(";")).join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `Template_Import_${roleFilter}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast(
+    "Template Diunduh",
+    "Silakan isi data mengikuti baris header",
+    "info",
+  );
+};
+
+window.handleImportCSV = (e, roleFilter) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = "";
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    const text = event.target.result;
+    const rows = text
+      .split(/\r?\n/)
+      .map((row) => row.trim())
+      .filter((row) => row !== "");
+    if (rows.length < 2)
+      return showToast(
+        "Gagal",
+        "Format CSV kosong atau tidak ada data.",
+        "error",
+      );
+
+    const delimiter = rows[0].includes(";") ? ";" : ",";
+    const headersRaw = parseCSVLine(rows[0], delimiter);
+    const headers = headersRaw.map((h) =>
+      h
+        .trim()
+        .toLowerCase()
+        .replace(/(^"|"$)/g, ""),
+    );
+    const mappedUsers = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const cols = parseCSVLine(rows[i], delimiter);
+      let u = { role: roleFilter };
+      for (let j = 0; j < headers.length; j++) {
+        if (cols[j] !== undefined && headers[j]) {
+          u[headers[j]] = cols[j].replace(/(^"|"$)/g, "").trim();
+        }
+      }
+      mappedUsers.push(u);
+    }
+
+    if (
+      confirm(
+        `🔎 Ditemukan ${mappedUsers.length} data untuk di-import (Role: ${roleFilter}).\nLanjut proses?`,
+      )
+    ) {
+      const res = await postAPI("importUsers", { users: mappedUsers });
+      if (res.success && res.summary) {
+        const s = res.summary;
+        const statusType =
+          s.failCount > 0
+            ? s.successCount > 0
+              ? "warning"
+              : "error"
+            : "success";
+
+        showToast(
+          "Import Selesai",
+          `${s.successCount} Berhasil, ${s.failCount} Gagal.`,
+          statusType,
+        );
+
+        if (s.failCount > 0) {
+          const failDetails = s.failedRows
+            .map((f) => `Baris ${f.row}: ${f.reason}`)
+            .join("\n");
+
+          openModal(
+            "Laporan Import Gagal",
+            `
+                        <div class="animate-fade-in">
+                            <div class="alert bg-danger rounded p-3 mb-3" style="border-radius:12px; background:var(--danger-light); color:var(--danger); border:1px solid var(--danger);">
+                                <strong>Peringatan!</strong><br>
+                                Ditemukan <b>${s.failCount}</b> baris yang gagal di-upload karena kesalahan data atau duplikasi.
+                            </div>
+                            <div style="max-height: 200px; overflow-y: auto; background:#f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; font-family: monospace; font-size: 0.85rem; margin-bottom: 1.5rem;">
+                                ${failDetails.replace(/\n/g, "<br>")}
+                            </div>
+                            <button class="btn btn-danger btn-block" onclick="downloadFailedCSV('${roleFilter}', ${JSON.stringify(s.failedRows).replace(/"/g, "&quot;")})">
+                                <i class="fa-solid fa-file-export"></i> Unduh Data Baris Gagal (CSV)
+                            </button>
+                            <p class="text-muted text-center mt-2" style="font-size:0.8rem">Gunakan file ini untuk memperbaiki data lalu upload kembali.</p>
+                        </div>
+                    `,
+          );
+        }
+
+        if (roleFilter === "mahasiswa") loadView("mahasiswaAdminView");
+        else loadView("preseptorAdminView");
+      }
+    }
+  };
+  reader.readAsText(file);
+};
+
+window.downloadFailedCSV = (roleFilter, failedRows) => {
+  if (!failedRows || failedRows.length === 0) return;
+
+  const headers = [
+    "Baris",
+    "Alasan_Gagal",
+    "nama",
+    "username",
+    "password",
+    "prodi",
+  ];
+  const csvData = failedRows.map((f) => {
+    const d = f.data;
+    return [
+      f.row,
+      f.reason,
+      d.nama || "",
+      d.username || "",
+      d.password || "",
+      d.prodi || "-",
+    ].join(";");
+  });
+
+  let csvContent =
+    "data:text/csv;charset=utf-8," +
+    headers.join(";") +
+    "\n" +
+    csvData.join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `GAGAL_IMPORT_${roleFilter.toUpperCase()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+// ADMIN: PENGATURAN SISTEM
+async function settingsAdminView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-gears text-primary"></i> Pengaturan Sistem</h3>
+                </div>
+                <div class="card-body">
+                    <form id="form-settings" style="max-width:600px">
+                        <div class="alert bg-primary-soft p-3 rounded mb-4" style="border-radius:12px; font-size:0.9rem">
+                            <i class="fa-solid fa-circle-info text-primary"></i> 
+                            Pengaturan di bawah ini akan mengatur parameter perhitungan nilai akhir & kelulusan secara global.
+                        </div>
+
+                        <div class="form-group">
+                            <label>Batas Lulus Mahasiswa (0-100)</label>
+                            <div class="input-with-icon">
+                                <i class="fa-solid fa-flag-checkered"></i>
+                                <input type="number" id="set-batas-lulus" class="form-control" step="1" min="0" max="100" required>
+                            </div>
+                        </div>
+
+                        <hr class="my-4" style="opacity:0.1">
+                        <h4 class="mb-3"><i class="fa-solid fa-calculator text-primary"></i> Konfigurasi Bobot Nilai Akhir</h4>
+                        <p class="text-muted mb-4" style="font-size:0.85rem">Pastikan total penjumlahan seluruh bobot adalah <strong>100%</strong>.</p>
+
+                        <div class="grid-cards" style="grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                            <div class="form-group">
+                                <label>Praktikum (%)</label>
+                                <input type="number" id="set-w-prak" class="form-control" min="0" max="100" required>
+                            </div>
+                            <div class="form-group">
+                                <label>ASKEP (%)</label>
+                                <input type="number" id="set-w-askep" class="form-control" min="0" max="100" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Sikap (%)</label>
+                                <input type="number" id="set-w-sikap" class="form-control" min="0" max="100" required>
+                            </div>
+                        </div>
+                        
+                        <div id="weight-error" class="hidden alert bg-danger-soft text-danger p-2 mb-3" style="font-size:0.8rem">
+                             <i class="fa-solid fa-triangle-exclamation"></i> Total bobot saat ini <span id="current-weight-total">0</span>%. Harus 100%.
+                        </div>
+
+                        <hr class="my-4" style="opacity:0.1">
+                        <h4 class="mb-3"><i class="fa-solid fa-scale-balanced text-primary"></i> Proporsi Preseptor Klinik & Akademik</h4>
+                        <p class="text-muted mb-4" style="font-size:0.85rem">Tentukan persentase kontribusi masing-masing preseptor terhadap nilai akhir. Total harus <strong>100%</strong>.</p>
+                        <div class="grid-cards" style="grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                            <div class="form-group">
+                                <label>Preseptor Klinik (%)</label>
+                                <input type="number" id="set-w-klinik" class="form-control" min="0" max="100" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Preseptor Akademik (%)</label>
+                                <input type="number" id="set-w-akademik" class="form-control" min="0" max="100" required>
+                            </div>
+                        </div>
+                        <div id="weight-preseptor-error" class="hidden alert bg-danger-soft text-danger p-2 mb-3" style="font-size:0.8rem">
+                             <i class="fa-solid fa-triangle-exclamation"></i> Total Klinik + Akademik saat ini <span id="current-preseptor-total">0</span>%. Harus 100%.
+                        </div>
+
+                        <hr class="my-4" style="opacity:0.1">
+                        <h4 class="mb-3 text-danger"><i class="fa-solid fa-broom"></i> Pemeliharaan Database</h4>
+                        <div class="alert bg-danger-soft p-3 rounded mb-4" style="border-radius:12px; font-size:0.85rem">
+                            <i class="fa-solid fa-triangle-exclamation"></i> 
+                            Gunakan tombol di bawah jika data tabel User terlihat berantakan (nama/id bergeser kolom).
+                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-block mb-3" onclick="repairUserDatabase()">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Bersihkan Baris Berantakan (Auto Alignment)
+                        </button>
+
+                        <hr class="my-4" style="opacity:0.1">
+                        <h4 class="mb-3" style="color:var(--primary)"><i class="fa-solid fa-cloud-arrow-down"></i> Backup & Restore Data</h4>
+                        <div class="alert bg-primary-soft p-3 rounded mb-4" style="border-radius:12px; font-size:0.85rem">
+                            <i class="fa-solid fa-circle-info text-primary"></i>
+                            Backup akan mengekspor SELURUH data (semua sheet) dalam format JSON. Restore akan menimpa data yang ada.
+                        </div>
+                        <div class="d-flex gap-2 mb-3 wrap">
+                            <button type="button" class="btn btn-primary" onclick="backupDataJSON()">
+                                <i class="fa-solid fa-download"></i> Backup Data (JSON)
+                            </button>
+                            <label class="btn btn-warning m-0" style="cursor:pointer">
+                                <i class="fa-solid fa-upload"></i> Restore Data (JSON)
+                                <input type="file" accept=".json" class="hidden" onchange="restoreDataJSON(event)">
+                            </label>
+                        </div>
+
+                        <hr class="my-4" style="opacity:0.1">
+                        <button type="submit" class="btn btn-primary" id="btn-save-settings">
+                            <i class="fa-solid fa-save"></i> Simpan Seluruh Pengaturan
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const res = await fetchAPI("getSettings");
+  if (res.success && res.data) {
+    const getVal = (key) => {
+      const f = res.data.find((s) => s.key === key);
+      return f ? f.value : "";
+    };
+    document.getElementById("set-batas-lulus").value =
+      getVal("batas_lulus") || 75;
+    document.getElementById("set-w-prak").value = getVal("w_prak") || 40;
+    document.getElementById("set-w-askep").value = getVal("w_askep") || 40;
+    document.getElementById("set-w-sikap").value = getVal("w_sikap") || 20;
+    document.getElementById("set-w-klinik").value = getVal("w_klinik") || 50;
+    document.getElementById("set-w-akademik").value =
+      getVal("w_akademik") || 50;
+  }
+
+  const validateWeights = () => {
+    const w1 = parseFloat(document.getElementById("set-w-prak").value) || 0;
+    const w2 = parseFloat(document.getElementById("set-w-askep").value) || 0;
+    const w3 = parseFloat(document.getElementById("set-w-sikap").value) || 0;
+    const total = w1 + w2 + w3;
+    document.getElementById("current-weight-total").textContent = total;
+    if (total !== 100) {
+      document.getElementById("weight-error").classList.remove("hidden");
+      document.getElementById("btn-save-settings").disabled = true;
+    } else {
+      document.getElementById("weight-error").classList.add("hidden");
+      document.getElementById("btn-save-settings").disabled = false;
+    }
+  };
+
+  ["set-w-prak", "set-w-askep", "set-w-sikap"].forEach((id) => {
+    document.getElementById(id).oninput = validateWeights;
+  });
+
+  const validatePreseptorWeights = () => {
+    const wk = parseFloat(document.getElementById("set-w-klinik").value) || 0;
+    const wa = parseFloat(document.getElementById("set-w-akademik").value) || 0;
+    const total = wk + wa;
+    document.getElementById("current-preseptor-total").textContent = total;
+    if (total !== 100) {
+      document
+        .getElementById("weight-preseptor-error")
+        .classList.remove("hidden");
+      document.getElementById("btn-save-settings").disabled = true;
+    } else {
+      document.getElementById("weight-preseptor-error").classList.add("hidden");
+      // Only enable if component weights are also valid
+      validateWeights();
+    }
+  };
+  ["set-w-klinik", "set-w-akademik"].forEach((id) => {
+    document.getElementById(id).oninput = validatePreseptorWeights;
+  });
+
+  document.getElementById("form-settings").onsubmit = async (e) => {
+    e.preventDefault();
+    const payload = {
+      settings: {
+        batas_lulus: document.getElementById("set-batas-lulus").value,
+        w_prak: document.getElementById("set-w-prak").value,
+        w_askep: document.getElementById("set-w-askep").value,
+        w_sikap: document.getElementById("set-w-sikap").value,
+        w_klinik: document.getElementById("set-w-klinik").value,
+        w_akademik: document.getElementById("set-w-akademik").value,
+      },
+    };
+    const saveRes = await postAPI("saveSettings", payload);
+    if (saveRes.success) {
+      showToast("Berhasil", "Pengaturan sistem telah diperbarui", "success");
+    }
+  };
+}
+
+window.repairUserDatabase = async () => {
+  if (
+    confirm(
+      "⚠️ PERINGATAN REPARASI\n\nSistem akan mencoba memperbaiki baris yang berantakan (nama/id bergeser) secara otomatis.\nProses ini mungkin memakan waktu beberapa saat.\n\nLanjutkan?",
+    )
+  ) {
+    showLoader(true);
+    const res = await postAPI("repairUsers");
+    showLoader(false);
+    if (res.success) {
+      showToast("Berhasil", res.message, "success");
+      loadView("settingsAdminView");
+    }
+  }
+};
+
+window.tempatAdminView = (area) =>
+  renderMasterData(
+    area,
+    "tempat",
+    "Tempat Praktik",
+    "fa-hospital",
+    ["Nama Tempat Praktik"],
+    ["nama_tempat"],
+    "getTempat",
+  );
+window.prodiAdminView = (area) =>
+  renderMasterData(
+    area,
+    "prodi",
+    "Program Studi",
+    "fa-graduation-cap",
+    ["Nama Program Studi"],
+    ["nama_prodi"],
+    "getProdi",
+  );
+window.kompetensiAdminView = (area) =>
+  renderMasterData(
+    area,
+    "kompetensi",
+    "Kompetensi / Skill",
+    "fa-list-check",
+    ["Nama Kompetensi", "Target Minimal", "Kategori", "Angkatan"],
+    ["nama_skill", "target_minimal", "kategori", "angkatan"],
+    "getKompetensiAll",
+  );
+window.bimbPraktikumAdminView = (area) =>
+  renderMasterData(
+    area,
+    "bimb_praktikum",
+    "Bimbingan Praktikum",
+    "fa-chalkboard-user",
+    ["Komponen Penilaian", "Nilai Maksimal"],
+    ["nama_komponen", "nilai_maksimal"],
+    "getBimbPraktikum",
+  );
+window.bimbAskepAdminView = (area) =>
+  renderMasterData(
+    area,
+    "bimb_askep",
+    "Bimbingan ASKEP",
+    "fa-notes-medical",
+    ["Komponen Penilaian", "Bobot", "Skor Maks (100)"],
+    ["nama_komponen", "bobot", "skor_maks"],
+    "getBimbAskep",
+  );
+window.sikapPerilakuAdminView = (area) =>
+  renderMasterData(
+    area,
+    "sikap_perilaku",
+    "Sikap & Perilaku",
+    "fa-user-check",
+    ["Aspek Penilaian", "Nilai Maksimal"],
+    ["nama_komponen", "nilai_maksimal"],
+    "getSikapPerilaku",
+  );
+
+async function renderMasterData(
+  area,
+  type,
+  title,
+  icon,
+  colsHeader,
+  colsKey,
+  fetchAction,
+) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header d-flex justify-between align-center wrap gap-2">
+                    <h3><i class="fa-solid ${icon} text-primary"></i> Master ${title}</h3>
+                    <div class="d-flex gap-2 wrap">
+                        ${
+                          type === "kompetensi" || type === "tempat"
+                            ? `
+                            <button class="btn btn-outline btn-sm" onclick="downloadMasterTemplate('${type}')"><i class="fa-solid fa-file-csv"></i> Template CSV</button>
+                            <label class="btn btn-outline btn-sm m-0" style="cursor:pointer">
+                                <i class="fa-solid fa-file-import"></i> Import CSV
+                                <input type="file" accept=".csv" class="hidden" onchange="handleImportMasterCSV(event, '${type}')">
+                            </label>
+                        `
+                            : ""
+                        }
+                        <button class="btn btn-danger-soft btn-sm" onclick="clearMasterData('${type}', '${title}')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
+                        <button class="btn btn-primary btn-sm" onclick="bukaModalMaster('${type}', '${title}')"><i class="fa-solid fa-plus"></i> Tambah Baru</button>
+                    </div>
+                </div>
+                 <div class="card-body">
+                     <div class="table-responsive">
+                        <table id="table-master-${type}">
+                            <thead>
+                                <tr>
+                                    ${colsHeader.map((c) => `<th>${c}</th>`).join("")}
+                                    <th style="text-align:right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="${colsHeader.length + 1}" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
+                        </table>
+                    </div>
+                 </div>
+            </div>
+        </div>
+     `;
+
+  const res = await fetchAPI(fetchAction);
+  const tableBody = document.querySelector(`#table-master-${type} tbody`);
+  if (res.success && res.data && res.data.length > 0) {
+    window["adminMasterData_" + type] = res.data;
+    let htmlRows = res.data.map((row, idx) => {
+      let tds = colsKey
+        .map((k) => {
+          if (
+            k === "nama_tempat" ||
+            k === "nama_prodi" ||
+            k === "nama_skill" ||
+            k === "nama_komponen"
+          ) {
+            let text = row[k] || "";
+            // Temukan titik pertama yang didahului angka untuk memisahkan Title dan List
+            let firstNumIdx = text.search(/[0-9]+\./);
+            let titlePart = text;
+            let listPart = "";
+
+            if (firstNumIdx !== -1) {
+              titlePart = text.substring(0, firstNumIdx).trim();
+              listPart = text.substring(firstNumIdx);
+            }
+
+            // Rapikan penomoran di listPart
+            let formattedList = listPart.replace(
+              /([0-9]+\.)/g,
+              '<br><span style="color:var(--primary); font-weight:700; margin-right:8px; display:inline-block; width:20px;">$1</span>',
+            );
+
+            return `<td>
+                        <div style="margin-bottom:4px;"><strong style="color:var(--primary-dark); font-size:1.05em; border-bottom:1px dashed #cbd5e1">${titlePart}</strong></div>
+                        <div style="line-height:1.7; color:var(--text-strong); padding-left:5px;">${formattedList}</div>
+                     </td>`;
+          }
+
+          // Hitung Skor Maksimal secara otomatis untuk ASKEP (Bobot % * 100)
+          if (k === "skor_maks" && type === "bimb_askep") {
+            let bobot = parseFloat(row["bobot"]) || 0;
+            let skorMaks = ((bobot * 100) / 100).toFixed(1);
+            return `<td><span class="badge bg-secondary" style="font-size:0.9em; background:#f1f5f9; color:var(--primary-dark); border:1px solid #e2e8f0">${skorMaks}</span></td>`;
+          }
+
+          // Gunakan check null/undefined agar angka 0 tetap muncul
+          let val =
+            row[k] !== undefined && row[k] !== null && row[k] !== ""
+              ? row[k]
+              : "-";
+          return `<td><span class="badge bg-primary" style="font-size:0.9em; padding: 0.4rem 0.8rem;">${val}${k === "bobot" ? "%" : ""}</span></td>`;
+        })
+        .join("");
+      return `
+            <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                ${tds}
+                <td style="text-align:right">
+                    <button class="btn btn-icon-ghost" onclick="bukaModalMaster('${type}', '${title}', '${row.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('${type}', '${row.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+
+    // Tambahkan Total Skor jika tipe Bimbingan Praktikum
+    if (type === "bimb_praktikum") {
+      const totalSkor = res.data.reduce(
+        (acc, curr) => acc + (parseFloat(curr.nilai_maksimal) || 0),
+        0,
+      );
+      htmlRows.push(`
+                <tr style="background:var(--bg-light); font-weight:bold; border-top:2px solid #e2e8f0">
+                    <td><strong class="text-primary">TOTAL SKOR MAKSIMAL</strong></td>
+                    <td><span class="badge bg-danger" style="font-size:1.1em; padding:0.5rem 1rem;">${totalSkor}</span></td>
+                    <td></td>
+                </tr>
+             `);
+    }
+
+    // Tambahkan Total Bobot jika tipe Bimbingan ASKEP
+    if (type === "bimb_askep") {
+      const totalBobot = res.data.reduce(
+        (acc, curr) => acc + (parseFloat(curr.bobot) || 0),
+        0,
+      );
+      const totalSkorMaks = ((totalBobot * 100) / 100).toFixed(0);
+      htmlRows.push(`
+                <tr style="background:var(--bg-light); font-weight:bold; border-top:2px solid #e2e8f0; vertical-align:middle;">
+                    <td><strong class="text-primary">TOTAL PERHITUNGAN (Jika Nilai = 100)</strong></td>
+                    <td><span class="badge ${totalBobot === 100 ? "bg-success" : "bg-warning"}" style="font-size:1.1em; padding:0.5rem 1rem;">${totalBobot}%</span></td>
+                    <td><span class="badge bg-danger" style="font-size:1.1em; padding:0.5rem 1rem;">${totalSkorMaks}</span></td>
+                    <td></td>
+                </tr>
+             `);
+    }
+
+    // Tambahkan Total Nilai jika tipe Sikap & Perilaku
+    if (type === "sikap_perilaku") {
+      const totalNilai = res.data.reduce(
+        (acc, curr) => acc + (parseFloat(curr.nilai_maksimal) || 0),
+        0,
+      );
+      htmlRows.push(`
+                <tr style="background:var(--bg-light); font-weight:bold; border-top:2px solid #e2e8f0; vertical-align:middle;">
+                    <td>
+                        <div class="text-primary">TOTAL SKOR MAKSIMAL</div>
+                        <div class="text-muted" style="font-size:0.8em; font-weight:normal; margin-top:4px;">
+                            <i class="fa-solid fa-calculator"></i> Nilai Akhir: (Skor Perolehan &times; 100) / ${totalNilai}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-primary" style="font-size:1.1em; padding:0.5rem 1rem;">${totalNilai}</span>
+                    </td>
+                    <td></td>
+                </tr>
+             `);
+    }
+
+    tableBody.innerHTML = htmlRows.join("");
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="${colsHeader.length + 1}" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data</td></tr>`;
+  }
+}
+
+window.bukaModalMaster = (type, title, id = null) => {
+  let doc = { id: "", nama: "", target: "", kategori: "" };
+  let isEdit = false;
+
+  const dataArr = window["adminMasterData_" + type];
+  if (id && dataArr) {
+    let f = dataArr.find((u) => u.id === id);
+    if (f) {
+      doc.id = f.id;
+      if (type === "tempat") doc.nama = f.nama_tempat;
+      if (type === "prodi") doc.nama = f.nama_prodi;
+      if (type === "kompetensi") {
+        doc.nama = f.nama_skill;
+        doc.target = f.target_minimal;
+        doc.kategori = f.kategori || "";
+        doc.angkatan = f.angkatan || "";
+      }
+      if (type === "bimb_praktikum") {
+        doc.nama = f.nama_komponen;
+        doc.nilai_maksimal = f.nilai_maksimal;
+      }
+      if (type === "bimb_askep") {
+        doc.nama = f.nama_komponen;
+        doc.bobot = f.bobot;
+      }
+      if (type === "sikap_perilaku") {
+        doc.nama = f.nama_komponen;
+        doc.nilai_maksimal = f.nilai_maksimal;
+      }
+      isEdit = true;
+    }
+  }
+
+  let extraField = "";
+  if (type === "kompetensi") {
+    // Generate angkatan options
+    const currentYear = new Date().getFullYear();
+    let angkatanOptions = `<option value="Semua" ${doc.angkatan === "Semua" || doc.angkatan === "-" || !doc.angkatan ? "selected" : ""}>Semua Angkatan</option>`;
+    for (let yr = currentYear + 1; yr >= currentYear - 5; yr--) {
+      angkatanOptions += `<option value="${yr}" ${doc.angkatan == yr ? "selected" : ""}>${yr}</option>`;
+    }
+
+    extraField = `
+            <div class="form-group">
+                <label>Kategori Kompetensi</label>
+                <input type="text" id="master-kategori" required class="form-control" value="${doc.kategori}" placeholder="Cth: Kebutuhan Dasar Manusia" list="kategori-list">
+                <datalist id="kategori-list"></datalist>
+            </div>
+            <div class="form-group">
+                <label>Berlaku untuk Angkatan</label>
+                <div class="input-with-icon">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <select id="master-angkatan" class="form-control">
+                        ${angkatanOptions}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Target Minimal Pencapaian</label>
+                <input type="number" id="master-target" required class="form-control" value="${doc.target || 0}" placeholder="Berapa kali? cth: 20">
+            </div>
+        `;
+  } else if (type === "bimb_praktikum") {
+    extraField = `
+            <div class="form-group">
+                <label>Nilai Maksimal</label>
+                <input type="number" id="master-extra" required class="form-control" value="${doc.nilai_maksimal || 0}" placeholder="Cth: 100">
+            </div>
+        `;
+  } else if (type === "sikap_perilaku") {
+    extraField = `
+            <div class="form-group">
+                <label>Nilai Maksimal (Skala Likert)</label>
+                <input type="number" id="master-extra" required class="form-control" value="${doc.nilai_maksimal || 4}" placeholder="Cth: 4">
+            </div>
+        `;
+  } else if (type === "bimb_askep") {
+    extraField = `
+            <div class="form-group">
+                <label>Bobot Penilaian (%)</label>
+                <input type="number" id="master-extra" required class="form-control" value="${doc.bobot || 0}" placeholder="Cth: 20">
+            </div>
+        `;
+  }
+
+  openModal(
+    isEdit ? `Edit ${title}` : `Tambah ${title}`,
+    `
+        <form id="form-master" class="animate-fade-in">
+            <input type="hidden" id="master-id" value="${doc.id}">
+            <input type="hidden" id="master-type" value="${type}">
+            <div class="form-group">
+                <label>${type === "sikap_perilaku" ? "Aspek Penilaian" : "Komponen Penilaian"}</label>
+                <input type="text" id="master-nama" required class="form-control" value="${doc.nama}" placeholder="Tuliskan nama...">
+            </div>
+            ${extraField}
+            <button type="submit" class="btn btn-primary btn-block mt-3"><i class="fa-solid fa-save"></i> ${isEdit ? "Simpan Data" : "Tambah Baru"}</button>
+        </form>
+    `,
+  );
+
+  // Populate datalist for kategori suggestions from existing data
+  if (type === "kompetensi" && dataArr) {
+    const uniqueKats = [
+      ...new Set(dataArr.map((k) => k.kategori).filter((k) => k && k !== "-")),
+    ];
+    const dl = document.getElementById("kategori-list");
+    if (dl)
+      dl.innerHTML = uniqueKats.map((k) => `<option value="${k}">`).join("");
+  }
+
+  document.getElementById("form-master").onsubmit = async (e) => {
+    e.preventDefault();
+    const payload = {
+      type: document.getElementById("master-type").value,
+      id: document.getElementById("master-id").value,
+      nama: document.getElementById("master-nama").value,
+      target: document.getElementById("master-target")
+        ? document.getElementById("master-target").value
+        : "",
+      kategori: document.getElementById("master-kategori")
+        ? document.getElementById("master-kategori").value
+        : "",
+      angkatan: document.getElementById("master-angkatan")
+        ? document.getElementById("master-angkatan").value
+        : "",
+      nilai_maksimal:
+        ["bimb_praktikum", "sikap_perilaku"].includes(
+          document.getElementById("master-type").value,
+        ) && document.getElementById("master-extra")
+          ? document.getElementById("master-extra").value
+          : "",
+      bobot:
+        document.getElementById("master-type").value === "bimb_askep" &&
+        document.getElementById("master-extra")
+          ? document.getElementById("master-extra").value
+          : "",
+    };
+    const action = isEdit ? "editMaster" : "addMaster";
+    showToast("Memproses", "Menyimpan ke Database...", "info");
+    const res = await postAPI(action, payload);
+    if (res.success) {
+      closeModal();
+      showToast("Sukses", res.message, "success");
+      const views = {
+        tempat: "tempatAdminView",
+        prodi: "prodiAdminView",
+        kompetensi: "kompetensiAdminView",
+        bimb_praktikum: "bimbPraktikumAdminView",
+        bimb_askep: "bimbAskepAdminView",
+        sikap_perilaku: "sikapPerilakuAdminView",
+      };
+      loadView(views[type]);
+    }
+  };
+};
+
+window.deleteMaster = async (type, id) => {
+  if (confirm("Yakin ingin menghapus master data ini secara permanen?")) {
+    const res = await postAPI("deleteMaster", { type, id });
+    if (res.success) {
+      showToast("Terhapus", "Data berhasil dihapus dari sistem", "success");
+      const views = {
+        tempat: "tempatAdminView",
+        prodi: "prodiAdminView",
+        kompetensi: "kompetensiAdminView",
+        bimb_praktikum: "bimbPraktikumAdminView",
+        bimb_askep: "bimbAskepAdminView",
+        sikap_perilaku: "sikapPerilakuAdminView",
+      };
+      loadView(views[type]);
+    }
+  }
+};
+
+window.clearMasterData = async (type, title) => {
+  if (
+    confirm(
+      `⚠️ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
+    )
+  ) {
+    if (confirm(`Konfirmasi terakhir: Hapus semua data ${title}?`)) {
+      showLoader(true);
+      const res = await postAPI("clearMaster", { type: type });
+      showLoader(false);
+      if (res.success) {
+        showToast("Berhasil", res.message, "success");
+        loadView(
+          type === "kompetensi" ? "kompetensiAdminView" : type + "AdminView",
+        );
+      }
+    }
+  }
+};
+
+window.downloadMasterTemplate = (type) => {
+  let headers = [];
+  let rows = [];
+  if (type === "kompetensi") {
+    headers = ["nama_skill", "target_minimal", "kategori", "angkatan"];
+    rows = [
+      ["Injeksi Intravena (IV)", "20", "Kebutuhan Dasar Manusia", "Semua"],
+      ["Pemasangan Infus", "15", "Kebutuhan Dasar Manusia", "2024"],
+      ["Perawatan Luka Post-Op", "10", "Keperawatan Medikal Bedah", "2023"],
+    ];
+  } else if (type === "tempat") {
+    headers = ["nama_tempat"];
+    rows = [
+      ["RSUD Kota Bandung"],
+      ["Puskesmas Sukajadi"],
+      ["Stase Keperawatan Anak"],
+    ];
+  }
+
+  let csvContent =
+    "data:text/csv;charset=utf-8," +
+    headers.join(";") +
+    "\n" +
+    rows.map((e) => e.join(";")).join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `Template_Import_${type}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast(
+    "Template Diunduh",
+    "Gunakan pemisah Titik Koma (;) atau Koma (,)",
+    "info",
+  );
+};
+
+const parseCSVLine = (line, delim) => {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') inQuotes = !inQuotes;
+    else if (char === delim && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else current += char;
+  }
+  result.push(current.trim());
+  return result;
+};
+
+window.handleImportMasterCSV = (e, type) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    const text = event.target.result;
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
+    if (lines.length < 2) return showToast("Gagal", "File kosong", "error");
+
+    const delimiter = lines[0].includes(";") ? ";" : ",";
+    const headers = parseCSVLine(lines[0], delimiter).map((h) =>
+      h
+        .trim()
+        .toLowerCase()
+        .replace(/(^"|"$)/g, ""),
+    );
+    const data = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i], delimiter);
+      let obj = {};
+      headers.forEach((h, idx) => {
+        if (cols[idx] !== undefined)
+          obj[h] = cols[idx].replace(/(^"|"$)/g, "").trim();
+      });
+      data.push(obj);
+    }
+
+    if (confirm(`Impor ${data.length} data ${type}?`)) {
+      showLoader(true);
+      const res = await postAPI("importMaster", { type: type, data: data });
+      showLoader(false);
+      if (res.success) {
+        showToast("Impor Berhasil", res.message, "success");
+        loadView(
+          type === "kompetensi" ? "kompetensiAdminView" : type + "AdminView",
+        );
+      }
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+};
+
+// EXPORT FUNCTIONS
+window.exportToCSV = () => {
+  if (!window.dtAdminPresensi || window.dtAdminPresensi.length === 0)
+    return showToast(
+      "Informasi",
+      "Tidak ada data presensi yang bisa di-export",
+      "warning",
+    );
+
+  const headers = [
+    "Mahasiswa",
+    "Prodi",
+    "Lahan Praktik",
+    "Tanggal",
+    "Jam Masuk",
+    "Jam Keluar",
+    "Durasi (Jam)",
+  ];
+  const rows = window.dtAdminPresensi.map((p) => [
+    `"${p.nama}"`,
+    `"${p.prodi || "-"}"`,
+    `"${p.nama_lahan}"`,
+    p.tanggal,
+    p.jam_masuk,
+    p.jam_keluar || "",
+    p.durasi || 0,
+  ]);
+
+  const csvContent =
+    "data:text/csv;charset=utf-8," +
+    headers.join(",") +
+    "\n" +
+    rows.map((e) => e.join(",")).join("\n");
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "Laporan_Master_Presensi.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast("Export Berhasil", "File CSV telah diunduh", "success");
+};
+
+window.exportToPDF = () => {
+  if (typeof window.jspdf === "undefined")
+    return showToast(
+      "Error Sistem",
+      "Module render PDF (jsPDF) belum ter-load",
+      "error",
+    );
+  if (!window.dtAdminPresensi || window.dtAdminPresensi.length === 0)
+    return showToast("Informasi", "Tidak ada data presensi", "warning");
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Laporan Resmi Presensi Praktik Klinik Mahasiswa", 14, 20);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(
+    `Tanggal Cetak: ${new Date().toLocaleDateString("id-ID")} | Dicetak oleh Sistem E-Klinik`,
+    14,
+    28,
+  );
+
+  const tableColumn = [
+    "Mahasiswa",
+    "Prodi",
+    "Lahan Praktik",
+    "Tanggal",
+    "Masuk",
+    "Keluar",
+    "Durasi",
+  ];
+  const tableRows = window.dtAdminPresensi.map((p) => [
+    p.nama,
+    p.prodi || "-",
+    p.nama_lahan,
+    p.tanggal,
+    p.jam_masuk,
+    p.jam_keluar || "-",
+    p.durasi ? parseFloat(p.durasi).toFixed(2) : "0",
+  ]);
+
+  doc.autoTable({
+    head: [tableColumn],
+    body: tableRows,
+    startY: 35,
+    theme: "grid",
+    styles: { fontSize: 9, font: "helvetica" },
+    headStyles: { fillColor: [139, 92, 246] } /* Primary Purple */,
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+  });
+
+  doc.save("Laporan_Master_Presensi_Klinik.pdf");
+  showToast(
+    "Penyelesaian Render",
+    "Dokumen PDF berhasil diciptakan",
+    "success",
+  );
+};
+
+// ---------------- UTILS & EVENTS ---------------- //
+
+function showToast(title, message, type = "info") {
+  const container = document.getElementById("toast-container");
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+
+  let icon = "fa-circle-info";
+  if (type === "success") icon = "fa-circle-check";
+  if (type === "error") icon = "fa-circle-exclamation";
+  if (type === "warning") icon = "fa-triangle-exclamation";
+
+  toast.innerHTML = `
+        <div class="toast-icon">
+            <i class="fa-solid ${icon}"></i>
+        </div>
+        <div class="toast-content">
+            <h4>${title}</h4>
+            <p>${message}</p>
+        </div>
+    `;
+  container.appendChild(toast);
+
+  // Animate in
+  setTimeout(() => toast.classList.add("show"), 50);
+
+  // Auto remove
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 400); // 0.4s sync CSS transition
+  }, 4500);
+}
+
+function showLoader(show) {
+  const loader = document.getElementById("loader");
+  if (show) loader.classList.remove("hidden");
+  else {
+    setTimeout(() => {
+      loader.classList.add("hidden");
+    }, 200); // Small delay to prevent flashing
+  }
+}
+
+function openModal(title, bodyHtml) {
+  document.getElementById("modal-title").innerHTML = title;
+  document.getElementById("modal-body").innerHTML = bodyHtml;
+  document.getElementById("app-modal").classList.remove("hidden");
+
+  // Restart zoom animation if previously fired
+  const content = document.querySelector(".modal-content");
+  content.classList.remove("animate-zoom-in");
+  void content.offsetWidth;
+  content.classList.add("animate-zoom-in");
+}
+
+function closeModal() {
+  document.getElementById("app-modal").classList.add("hidden");
+}
+
+// Listeners
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const u = document.getElementById("username").value;
+  const p = document.getElementById("password").value;
+
+  const res = await fetchAPI("login", { username: u, password: p });
+
+  if (res.success) {
+    // PWA Database/Version Check: Force refresh if needed
+    const currentVersion = "2.0-supabase";
+    const savedVersion = localStorage.getItem("app_version");
+
+    if (savedVersion !== currentVersion) {
+      localStorage.clear(); // Clear old cached data
+      localStorage.setItem("app_version", currentVersion);
+      localStorage.setItem("eblogbook_user", JSON.stringify(res.user));
+
+      showToast(
+        "Sistem Diperbarui",
+        "Menyesuaikan database Supabase...",
+        "info",
+      );
+      setTimeout(() => {
+        window.location.reload(true); // Force reload from server
+      }, 1500);
+      return;
+    }
+
+    localStorage.setItem("eblogbook_user", JSON.stringify(res.user));
+    showToast(
+      "Otentikasi Berhasil",
+      `Selamat datang kembali, ${res.user.nama}`,
+      "success",
+    );
+    checkAuth();
+  } else {
+    showToast(
+      "Akses Ditolak",
+      res.message || "Terdapat kesalahan kredensial User/NIM dan Password",
+      "error",
+    );
+  }
+});
+
+document.getElementById("logout-btn").addEventListener("click", () => {
+  localStorage.removeItem("eblogbook_user");
+  currentUser = null;
+  checkAuth();
+  showToast("Sesi Diakhiri", "Anda telah di-logout dengan aman", "info");
+});
+
+// ADMIN: GENERATE JADWAL
+async function jadwalAdminView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header d-flex justify-between align-center wrap gap-2">
+                    <h3><i class="fa-solid fa-calendar-days text-primary"></i> Jadwal Praktik Mahasiswa</h3>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline btn-sm" onclick="exportJadwalExcel()">
+                            <i class="fa-solid fa-file-excel text-success"></i> Unduh Excel
+                        </button>
+                        <button class="btn btn-danger-soft btn-sm" onclick="exportJadwalPDF()">
+                            <i class="fa-solid fa-file-pdf"></i> Unduh PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-between align-center mb-3 wrap gap-3" style="background:#f1f5f9; padding:12px; border-radius:8px;">
+                        <span class="text-sm" style="color:#475569">
+                            <i class="fa-solid fa-circle-info text-primary"></i> Info: <strong>P</strong> = Pagi, <strong>S</strong> = Siang, <strong>M</strong> = Malam
+                        </span>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm" style="background:#e2e8f0; color:#475569;" onclick="document.querySelectorAll('.table-responsive').forEach(el=>el.scrollBy({left: -300, behavior: 'smooth'}))">
+                                <i class="fa-solid fa-chevron-left"></i> Geser Tabel Ke Kiri
+                            </button>
+                            <button class="btn btn-sm" style="background:#e2e8f0; color:#475569;" onclick="document.querySelectorAll('.table-responsive').forEach(el=>el.scrollBy({left: 300, behavior: 'smooth'}))">
+                                Geser Tabel Ke Kanan <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="jadwal-table-wrapper" class="d-flex flex-column gap-5 mt-4" style="padding-bottom:10px">
+                        <div class="table-responsive">
+                            <table class="table-compact text-sm table-bordered" style="width:100%">
+                                <tbody><tr><td class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat jadwal...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const [resJadwal, resUsers] = await Promise.all([
+    fetchAPI("getJadwal"),
+    fetchAPI("getUsers"),
+  ]);
+
+  const wrapper = document.querySelector("#jadwal-table-wrapper");
+  window.dtJadwalAdmin = [];
+
+  if (
+    resJadwal.success &&
+    resJadwal.data &&
+    resJadwal.data.length > 0 &&
+    resUsers.success
+  ) {
+    window.dtJadwalAdmin = resJadwal.data;
+    const users = resUsers.data;
+    const schedules = resJadwal.data;
+
+    // Group schedules by explicit Kelompok ID
+    const groupsTemp = {};
+    schedules.forEach((s) => {
+      const u = users.find((usr) => usr.id == s.user_id);
+      if (u) {
+        const kId = parseInt(u.kelompok_id) || u.kelompok_id || "Unassigned";
+        if (!groupsTemp[kId]) {
+          groupsTemp[kId] = {
+            id: kId,
+            usersMap: {},
+            schedules: [],
+          };
+        }
+        if (!groupsTemp[kId].usersMap[u.id]) groupsTemp[kId].usersMap[u.id] = u;
+        groupsTemp[kId].schedules.push(s);
+      }
+    });
+
+    const groups = Object.values(groupsTemp).map((g) => {
+      return {
+        ...g,
+        users: Object.values(g.usersMap).sort((a, b) =>
+          (a.nama || "").localeCompare(b.nama || ""),
+        ),
+      };
+    });
+
+    // Sort groups by earliest schedule date
+    groups.sort((a, b) => {
+      const aMin = Math.min(
+        ...a.schedules.map((s) => new Date(s.tanggal).getTime()),
+      );
+      const bMin = Math.min(
+        ...b.schedules.map((s) => new Date(s.tanggal).getTime()),
+      );
+      return aMin - bMin;
+    });
+
+    let htmlOut = "";
+
+    groups.forEach((group, groupIdx) => {
+      // Break group schedules into continuous Stase blocks based on dates & tempat
+      const dates = [...new Set(group.schedules.map((s) => s.tanggal))].sort();
+      const blocks = [];
+      let currentBlockDates = [];
+      let currentTempat = null;
+      let currentTempatName = null;
+
+      dates.forEach((d) => {
+        // assume group is in same place
+        const schedToday = group.schedules.find((s) => s.tanggal === d);
+        if (!schedToday) return;
+
+        const tId = schedToday.tempat_id;
+        const tName = schedToday.nama_tempat;
+
+        if (currentBlockDates.length === 0) {
+          currentBlockDates.push(d);
+          currentTempat = tId;
+          currentTempatName = tName;
+        } else {
+          if (tId === currentTempat) {
+            currentBlockDates.push(d);
+          } else {
+            blocks.push({
+              tempat_id: currentTempat,
+              nama_tempat: currentTempatName,
+              dates: currentBlockDates,
+            });
+            currentBlockDates = [d];
+            currentTempat = tId;
+            currentTempatName = tName;
+          }
+        }
+      });
+      if (currentBlockDates.length > 0)
+        blocks.push({
+          tempat_id: currentTempat,
+          nama_tempat: currentTempatName,
+          dates: currentBlockDates,
+        });
+
+      // Build single wide table for this Kelompok
+      let headHtml1 = `<tr style="background:#fff000; color:#000;">`;
+      let headHtml2 = `<tr style="background:#fff000; color:#000;">`;
+
+      headHtml1 += `
+                <th rowspan="2" style="width:30px; text-align:center; vertical-align:middle; border:1px solid #333;">No</th>
+                <th rowspan="2" style="min-width:200px; text-align:center; vertical-align:middle; border:1px solid #333; white-space:normal">Nama Mahasiswa</th>
+                <th rowspan="2" style="width:140px; text-align:center; vertical-align:middle; border:1px solid #333;">NIM</th>
+            `;
+
+      blocks.forEach((block, blockIdx) => {
+        headHtml1 += `
+                    <th rowspan="2" style="width:160px; text-align:center; vertical-align:middle; border:1px solid #333; white-space:normal">${blockIdx > 0 ? "Tempat Praktik" : "Tempat Praktik"}</th>
+                    <th colspan="${block.dates.length}" style="text-align:center; border:1px solid #333;">JADWAL</th>
+                `;
+
+        block.dates.forEach((dStr, dayIdx) => {
+          const dObj = new Date(dStr);
+          const mStr = [
+            "Januari",
+            "Februari",
+            "Maret",
+            "April",
+            "Mei",
+            "Juni",
+            "Juli",
+            "Agustus",
+            "September",
+            "Oktober",
+            "November",
+            "Desember",
+          ][dObj.getMonth()];
+          headHtml2 += `<th style="text-align:center; border:1px solid #333; padding:4px;">${dObj.getDate()} ${mStr}</th>`;
+        });
+      });
+
+      headHtml1 += `</tr>`;
+      headHtml2 += `</tr>`;
+
+      let bodyHtml = "";
+      group.users.forEach((u, index) => {
+        bodyHtml += `<tr style="background:#fff;">`;
+        bodyHtml += `<td style="text-align:center; border:1px solid #333">${index + 1}</td>`;
+        bodyHtml += `<td style="border:1px solid #333; padding:4px 8px; white-space:normal">${u.nama}</td>`;
+        bodyHtml += `<td style="border:1px solid #333; padding-left:4px;">${u.username}</td>`;
+
+        blocks.forEach((block, blockIdx) => {
+          if (index === 0) {
+            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #333; background:#fff; padding: 4px; white-space:normal">${block.nama_tempat}</td>`;
+          }
+
+          block.dates.forEach((dStr) => {
+            const s = group.schedules.find(
+              (x) => x.user_id == u.id && x.tanggal === dStr,
+            );
+            let shiftText = "";
+            if (s && s.shift) {
+              if (s.shift == 1 || s.shift == "1") shiftText = "P";
+              else if (s.shift == 2 || s.shift == "2") shiftText = "S";
+              else if (s.shift == 3 || s.shift == "3") shiftText = "M";
+              else shiftText = `<span style="color:#2563eb">Libur</span>`;
+            } else {
+              shiftText = `<span style="color:#2563eb">Libur</span>`;
+            }
+            bodyHtml += `<td style="text-align:center; border:1px solid #333">${shiftText}</td>`;
+          });
+        });
+
+        bodyHtml += `</tr>`;
+      });
+
+      htmlOut += `
+                <div class="table-responsive animate-fade-up delay-${(groupIdx % 5) * 100}" style="border-radius:4px; box-shadow:0 0 10px rgba(0,0,0,0.05)">
+                    <table class="table-compact text-sm table-bordered" style="width:max-content; font-size: 0.85rem; border-collapse: collapse;">
+                        <thead style="position: sticky; top: 0; z-index: 10;">
+                            ${headHtml1}
+                            ${headHtml2}
+                        </thead>
+                        <tbody>
+                            ${bodyHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+    });
+
+    wrapper.innerHTML = htmlOut;
+  } else {
+    wrapper.innerHTML = `
+            <div class="table-responsive">
+                <table class="table-compact text-sm" style="width:100%">
+                    <tbody><tr><td class="empty-table">Belum ada jadwal yang digenerate.</td></tr></tbody>
+                </table>
+            </div>`;
+  }
+}
+
+window.exportJadwalPDF = async () => {
+  if (!window.dtJadwalAdmin || window.dtJadwalAdmin.length === 0)
+    return showToast("Gagal", "Tidak ada data jadwal untuk dicetak", "warning");
+
+  showLoader(true);
+  const resUsers = await fetchAPI("getUsers");
+  showLoader(false);
+  if (!resUsers.success)
+    return showToast("Gagal", "Gagal memuat referensi mahasiswa.", "error");
+
+  const users = resUsers.data;
+  const schedules = window.dtJadwalAdmin;
+
+  // Grouping identical to HTML table logic
+  const groupsTemp = {};
+  schedules.forEach((s) => {
+    const u = users.find((usr) => usr.id == s.user_id);
+    if (u) {
+      const kId = parseInt(u.kelompok_id) || u.kelompok_id || "Unassigned";
+      if (!groupsTemp[kId]) {
+        groupsTemp[kId] = {
+          id: kId,
+          usersMap: {},
+          schedules: [],
+        };
+      }
+      if (!groupsTemp[kId].usersMap[u.id]) groupsTemp[kId].usersMap[u.id] = u;
+      groupsTemp[kId].schedules.push(s);
+    }
+  });
+
+  const groups = Object.values(groupsTemp).map((g) => {
+    return {
+      ...g,
+      users: Object.values(g.usersMap).sort((a, b) =>
+        (a.nama || "").localeCompare(b.nama || ""),
+      ),
+    };
+  });
+
+  groups.sort((a, b) => {
+    const aMin = Math.min(
+      ...a.schedules.map((s) => new Date(s.tanggal).getTime()),
+    );
+    const bMin = Math.min(
+      ...b.schedules.map((s) => new Date(s.tanggal).getTime()),
+    );
+    return aMin - bMin;
+  });
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", format: "a4" });
+
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text(
+    "Jadwal Praktik Klinik Mahasiswa Lengkap (Berdasarkan Kelompok)",
+    14,
+    20,
+  );
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(
+    `Waktu Cetak: ${new Date().toLocaleString()} | P: Pagi, S: Siang, M: Malam`,
+    14,
+    26,
+  );
+
+  let startY = 32;
+
+  groups.forEach((group, groupIdx) => {
+    const dates = [...new Set(group.schedules.map((s) => s.tanggal))].sort();
+    const blocks = [];
+    let currentBlockDates = [];
+    let currentTempat = null;
+    let currentTempatName = null;
+
+    dates.forEach((d) => {
+      const schedToday = group.schedules.find((s) => s.tanggal === d);
+      if (!schedToday) return;
+      const tId = schedToday.tempat_id;
+      const tName = schedToday.nama_tempat;
+
+      if (currentBlockDates.length === 0) {
+        currentBlockDates.push(d);
+        currentTempat = tId;
+        currentTempatName = tName;
+      } else {
+        if (tId === currentTempat) {
+          currentBlockDates.push(d);
+        } else {
+          blocks.push({
+            tempat_id: currentTempat,
+            nama_tempat: currentTempatName,
+            dates: currentBlockDates,
+          });
+          currentBlockDates = [d];
+          currentTempat = tId;
+          currentTempatName = tName;
+        }
+      }
+    });
+    if (currentBlockDates.length > 0)
+      blocks.push({
+        tempat_id: currentTempat,
+        nama_tempat: currentTempatName,
+        dates: currentBlockDates,
+      });
+
+    // Build headers dynamically
+    const headRow1 = ["No", "Nama Mahasiswa", "NIM"];
+    const headRow2 = ["", "", ""];
+
+    blocks.forEach((block, bIdx) => {
+      headRow1.push("Tempat Praktik");
+      headRow2.push(""); // placeholder
+
+      block.dates.forEach((dStr) => {
+        const dObj = new Date(dStr);
+        const mStr = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "Mei",
+          "Jun",
+          "Jul",
+          "Ags",
+          "Sep",
+          "Okt",
+          "Nov",
+          "Des",
+        ][dObj.getMonth()];
+        headRow1.push(`${dObj.getDate()} ${mStr}`);
+        headRow2.push("Jadwal"); // Sub-header
+      });
+    });
+
+    // Build Body Data
+    const bodyData = [];
+    group.users.forEach((u, index) => {
+      const rowData = [index + 1, u.nama, u.username];
+
+      blocks.forEach((block, bIdx) => {
+        rowData.push(block.nama_tempat); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
+
+        block.dates.forEach((dStr) => {
+          const s = group.schedules.find(
+            (x) => x.user_id == u.id && x.tanggal === dStr,
+          );
+          let shiftText = "Libur";
+          if (s && s.shift) {
+            if (s.shift == 1 || s.shift == "1") shiftText = "P";
+            else if (s.shift == 2 || s.shift == "2") shiftText = "S";
+            else if (s.shift == 3 || s.shift == "3") shiftText = "M";
+          }
+          rowData.push(shiftText);
+        });
+      });
+      bodyData.push(rowData);
+    });
+
+    if (groupIdx > 0) {
+      doc.addPage();
+      startY = 20;
+      doc.text(
+        `Lanjutan Kelompok: ${group.id} (Disusun otomatis berdasarkan pola stase yang sama)`,
+        14,
+        startY - 5,
+      );
+    } else {
+      doc.text(`Kelompok: ${group.id}`, 14, startY - 2);
+    }
+
+    // Apply autoTable
+    doc.autoTable({
+      startY: startY,
+      head: [headRow1],
+      body: bodyData,
+      theme: "grid",
+      headStyles: {
+        fillColor: [255, 240, 0],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+        halign: "center",
+        fontSize: 8,
+      },
+      bodyStyles: { fontSize: 8, halign: "center" },
+      columnStyles: {
+        0: { halign: "center", cellWidth: 10 },
+        1: { halign: "left", cellWidth: 45 },
+        2: { halign: "center", cellWidth: 25 },
+      },
+      styles: { cellPadding: 1, overflow: "linebreak" },
+      didParseCell: function (data) {
+        // Left align Tempat Praktik columns
+        if (data.section === "body" && data.row.raw) {
+          // Check mapping for tempat praktik columns
+          // In headRow1 they equal "Tempat Praktik"
+          if (headRow1[data.column.index] === "Tempat Praktik") {
+            data.cell.styles.halign = "left";
+            data.cell.styles.fontSize = 7;
+          }
+        }
+
+        // Colorize Libur
+        if (data.section === "body" && data.cell.raw === "Libur") {
+          data.cell.styles.textColor = [37, 99, 235]; // Blue
+        }
+      },
+    });
+
+    startY = doc.lastAutoTable.finalY + 15;
+  });
+
+  doc.save(`Jadwal_Praktik_Matriks_${new Date().getTime()}.pdf`);
+};
+
+window.exportJadwalExcel = () => {
+  if (!window.dtJadwalAdmin || window.dtJadwalAdmin.length === 0)
+    return showToast(
+      "Gagal",
+      "Tidak ada data jadwal untuk diekspor",
+      "warning",
+    );
+
+  // Gather all tables generated for the cohorts
+  const tables = document.querySelectorAll("#jadwal-table-wrapper table");
+  if (tables.length === 0)
+    return showToast("Gagal", "Tabel tidak ditemukan", "error");
+
+  let excelContent = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+        <!--[if gte mso 9]>
+        <xml>
+            <x:ExcelWorkbook>
+                <x:ExcelWorksheets>
+                    <x:ExcelWorksheet>
+                        <x:Name>Jadwal_Praktik</x:Name>
+                        <x:WorksheetOptions>
+                            <x:DisplayGridlines/>
+                        </x:WorksheetOptions>
+                    </x:ExcelWorksheet>
+                </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <meta charset="utf-8">
+        <style>
+            table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
+            th, td { border: 1px solid #000000; padding: 5px; font-family: Arial, sans-serif; font-size: 12px; }
+            th { background-color: #ffff00; text-align: center; vertical-align: middle; font-weight: bold; }
+            td { vertical-align: middle; }
+            .info-text { font-size: 14px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; }
+        </style>
+    </head>
+    <body>
+        <div class="info-text">Export Jadwal Praktik Klinik Mahasiswa - Generated at ${new Date().toLocaleString()}</div>
+        <div class="info-text" style="color:#475569; font-weight:normal; margin-bottom:20px;">Keterangan: P = Pagi, S = Siang, M = Malam, Teks Biru = Libur</div>
+    `;
+
+  tables.forEach((table, i) => {
+    excelContent += `<div><strong>Kelompok Blok ${i + 1}</strong></div>`;
+    excelContent += table.outerHTML;
+    excelContent += `<br><br>`;
+  });
+
+  excelContent += `</body></html>`;
+
+  // Create Blob and trigger download
+  const blob = new Blob([excelContent], { type: "application/vnd.ms-excel" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Jadwal_Praktik_Matriks_${new Date().getTime()}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+window.bukaModalGenerateJadwal = async () => {
+  showLoader(true);
+  const resTempat = await fetchAPI("getTempat");
+  showLoader(false);
+
+  if (!resTempat.success)
+    return showToast("Gagal", "Gagal mengambil data tempat praktik", "error");
+
+  const lokasiOptions = resTempat.data
+    .map(
+      (t) => `
+        <label class="d-flex align-center gap-2 mb-2" style="cursor:pointer; background:#f8fafc; padding:0.6rem 1rem; border-radius:8px; border:1px solid #e2e8f0;">
+            <input type="checkbox" name="gen-locations" value="${t.id}" checked style="width:18px; height:18px;">
+            <span style="font-size:0.9rem; font-weight:500;">${t.nama_tempat}</span>
+        </label>
+    `,
+    )
+    .join("");
+
+  openModal(
+    "Generate Jadwal Praktik Otomatis",
+    `
+        <form id="form-generate-jadwal" class="animate-fade-in">
+            <div class="grid-cards" style="grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:0;">
+                <div class="form-group">
+                    <label>Tanggal Mulai</label>
+                    <input type="date" id="gen-start-date" required class="form-control" value="${new Date().toISOString().split("T")[0]}">
+                </div>
+                <div class="form-group">
+                    <label>Tanggal Selesai</label>
+                    <input type="date" id="gen-end-date" required class="form-control" value="${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}">
+                </div>
+            </div>
+
+            <div class="grid-cards" style="grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:0;">
+                <div class="form-group">
+                    <label>Jam Mulai (Shift 1)</label>
+                    <input type="time" id="gen-start-time" required class="form-control" value="07:00">
+                </div>
+                <div class="form-group">
+                    <label>Jumlah Shift per Hari</label>
+                    <select id="gen-shift-count" class="form-control">
+                        <option value="1">1 Shift (8 jam)</option>
+                        <option value="2">2 Shift (12 jam)</option>
+                        <option value="3" selected>3 Shift (8 jam)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Pilih Lokasi Praktik yang Aktif</label>
+                <div style="max-height: 180px; overflow-y: auto; padding-right:5px;">
+                    ${lokasiOptions}
+                </div>
+            </div>
+
+            <div class="alert bg-primary-soft p-3 rounded mb-3" style="border-radius:12px;">
+                <i class="fa-solid fa-circle-info text-primary"></i> 
+                Sistem akan membagi seluruh mahasiswa aktif ke lokasi & shift yang dipilih secara merata.
+            </div>
+
+            <label class="d-flex align-center gap-2 mb-4" style="cursor:pointer;">
+                <input type="checkbox" id="gen-clear-existing" style="width:18px; height:18px;">
+                <span class="text-danger" style="font-weight:600; font-size:0.9rem;">Hapus/Reset Seluruh Jadwal Lama Sebelum Generate</span>
+            </label>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-calendar-check"></i> Eksekusi & Generate Sekarang
+            </button>
+        </form>
+    `,
+  );
+
+  document.getElementById("form-generate-jadwal").onsubmit = async (e) => {
+    e.preventDefault();
+
+    const locIds = Array.from(
+      document.querySelectorAll('input[name="gen-locations"]:checked'),
+    ).map((cb) => cb.value);
+    if (locIds.length === 0)
+      return showToast(
+        "Peringatan",
+        "Pilih minimal satu lokasi praktik",
+        "warning",
+      );
+
+    const payload = {
+      startDate: document.getElementById("gen-start-date").value,
+      endDate: document.getElementById("gen-end-date").value,
+      startTime: document.getElementById("gen-start-time").value,
+      shiftCount: document.getElementById("gen-shift-count").value,
+      locationIds: locIds,
+      clearExisting: document.getElementById("gen-clear-existing").checked,
+    };
+
+    if (
+      confirm(
+        "Generate jadwal akan menghapus/menambah data jadwal baru. Lanjutkan?",
+      )
+    ) {
+      const genRes = await postAPI("generateJadwal", payload);
+      if (genRes.success) {
+        closeModal();
+        showToast(
+          "Sukses",
+          genRes.message || "Jadwal praktik berhasil disusun secara otomatis",
+          "success",
+        );
+        loadView("jadwalAdminView");
+      } else {
+        showToast(
+          "Gagal Generate",
+          genRes.message || "Terjadi kesalahan saat membuat jadwal",
+          "error",
+        );
+      }
+    }
+  };
+};
+
+// Toggle Sidebar Mobile
+document.getElementById("toggle-sidebar").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.toggle("open");
+});
+document.getElementById("close-sidebar").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.remove("open");
+});
+document.querySelector(".close-modal").addEventListener("click", closeModal);
+document.querySelector(".modal-backdrop").addEventListener("click", closeModal);
+
+// Init
+window.addEventListener("DOMContentLoaded", () => {
+  checkAuth();
+});
+
+// ============ QR CODE GENERATOR ============
+window.bukaModalQRCode = (namaLahan) => {
+  openModal(
+    "QR Code Lahan Praktik",
+    `
+        <div class="text-center w-100 d-flex flex-column align-center justify-center py-4">
+            <h4 class="mb-4 text-primary" style="font-size:1.3rem;">${namaLahan}</h4>
+            <div id="qrcode-render-area" style="background:#fff; padding:1.5rem; border-radius:12px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); display:inline-block; margin-bottom:1.5rem;"></div>
+            <p class="text-muted text-sm px-4 mb-4">Cetak QR Code ini dan tempelkan pada lokasi praktik agar dapat discan oleh mahasiswa saat instruksi Check-In/Check-Out.</p>
+            <div class="d-flex gap-2 w-100 justify-center">
+                <button class="btn btn-primary" onclick="downloadQRCode('${namaLahan}')">
+                    <i class="fa-solid fa-download"></i> Unduh / Simpan Gambar
+                </button>
+                <button class="btn btn-outline" onclick="printQRCode('${namaLahan}')">
+                    <i class="fa-solid fa-print"></i> Cetak Langsung
+                </button>
+            </div>
+        </div>
+    `,
+  );
+
+  // Give DOM time to render the modal area before generating QR
+  setTimeout(() => {
+    const qrArea = document.getElementById("qrcode-render-area");
+    if (qrArea) {
+      qrArea.innerHTML = "";
+      new QRCode(qrArea, {
+        text: namaLahan,
+        width: 250,
+        height: 250,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H,
+      });
+    }
+  }, 150);
+};
+
+window.downloadQRCode = (namaLahan) => {
+  const canvas = document.querySelector("#qrcode-render-area canvas");
+  if (canvas) {
+    const link = document.createElement("a");
+    link.download = `QRCode_Lahan_${namaLahan.replace(/[^a-zA-Z0-9]/g, "_")}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }
+};
+
+window.printQRCode = (namaLahan) => {
+  const canvas = document.querySelector("#qrcode-render-area canvas");
+  if (!canvas) return;
+  const dataUrl = canvas.toDataURL();
+  const printWindow = window.open("", "", "width=600,height=600");
+  // Inline HTML to print the canvas image directly
+  printWindow.document.write(`
+        <html>
+            <head>
+                <title>Print QR Code - ${namaLahan}</title>
+                <style>
+                    body { text-align:center; font-family:sans-serif; padding-top:40px; }
+                    h2 { margin-bottom:10px; font-size:24px; }
+                    h3 { color:#6d28d9; margin-bottom:30px; font-size:20px; }
+                    img { width:350px; height:350px; border:2px solid #ccc; padding:20px; border-radius:16px; margin:0 auto; display:block; }
+                    p { margin-top:40px; color:#666; font-size:14px; }
+                    @media print {
+                        img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    }
+                </style>
+            </head>
+            <body>
+                <h2>QR CODE PRESENSI</h2>
+                <h3>${namaLahan}</h3>
+                <img src="${dataUrl}" onload="window.print(); window.close();" />
+                <p>Gunakan Aplikasi E-Logbook Klinik untuk memindai kode absensi ini.</p>
+            </body>
+        </html>
+    `);
+  printWindow.document.close();
+};
+
+window.bukaModalSemuaQRCode = async () => {
+  showLoader(true);
+  const resTempat = await fetchAPI("getTempat");
+  showLoader(false);
+
+  if (!resTempat.success || !resTempat.data || resTempat.data.length === 0) {
+    return showToast(
+      "Gagal",
+      "Tidak ada data lahan praktik untuk di-generate.",
+      "warning",
+    );
+  }
+
+  const daftarLahan = resTempat.data;
+
+  openModal(
+    "Generate Semua QR Code Lahan",
+    `
+        <div class="py-4">
+            <div class="card bg-primary-soft mb-4 border-primary">
+                <div class="card-body d-flex justify-between align-center">
+                    <div>
+                        <h4 class="m-0 text-primary">Cetak Kolektif QR Code</h4>
+                        <p class="m-0 text-sm text-muted">Total ${daftarLahan.length} Lahan Praktik terdeteksi.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="cetakSemuaQRCode()">
+                        <i class="fa-solid fa-print"></i> Cetak Semua QR
+                    </button>
+                </div>
+            </div>
+            
+            <div id="bulk-qrcode-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem;">
+                <!-- QR Codes will be rendered here -->
+            </div>
+        </div>
+    `,
+  );
+
+  // Delay briefly for DOM rendering
+  setTimeout(() => {
+    const gridArea = document.getElementById("bulk-qrcode-grid");
+    if (!gridArea) return;
+
+    gridArea.innerHTML = daftarLahan
+      .map(
+        (l) => `
+            <div class="stat-card" style="flex-direction:column; padding:1.5rem; text-align:center;">
+                <div id="qr-bulk-${l.id}" style="margin:0 auto 1rem; background:#fff; padding:10px; border-radius:8px; border:1px solid #eee;"></div>
+                <strong style="font-size:0.9rem;">${l.nama_tempat}</strong>
+            </div>
+        `,
+      )
+      .join("");
+
+    // Generate QR for each
+    daftarLahan.forEach((l) => {
+      new QRCode(document.getElementById(`qr-bulk-${l.id}`), {
+        text: l.nama_tempat,
+        width: 150,
+        height: 150,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H,
+      });
+    });
+  }, 200);
+};
+
+window.cetakSemuaQRCode = async () => {
+  const resTempat = await fetchAPI("getTempat");
+  if (!resTempat.success || !resTempat.data) return;
+
+  const daftarLahan = resTempat.data;
+  const printWindow = window.open("", "", "width=850,height=900");
+
+  let htmlContent = `
+        <html>
+            <head>
+                <title>Cetak Semua QR Code Presensi</title>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; }
+                    .qr-container { 
+                        display: inline-block; 
+                        width: 45%; 
+                        margin: 2%; 
+                        padding: 20px; 
+                        border: 1px dashed #ccc; 
+                        text-align: center; 
+                        page-break-inside: avoid;
+                        vertical-align: top;
+                    }
+                    .qr-box { margin: 20px auto; }
+                    h2 { font-size: 18px; margin-bottom: 5px; }
+                    p { font-size: 12px; color: #666; }
+                    @media print {
+                        .qr-container { border: 1px solid #eee; }
+                    }
+                </style>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+            </head>
+            <body>
+                <h1 style="text-align:center;">Daftar QR Code Presensi Lahan</h1>
+                <div id="print-area"></div>
+                <script>
+                    const lahan = ${JSON.stringify(daftarLahan)};
+                    const area = document.getElementById('print-area');
+                    
+                    lahan.forEach(l => {
+                        const div = document.createElement('div');
+                        div.className = 'qr-container';
+                        div.innerHTML = '<h2>' + l.nama_tempat + '</h2><div id="qr-' + l.id + '" class="qr-box"></div><p>E-Logbook Klinik - QR Presensi</p>';
+                        area.appendChild(div);
+                        
+                        new QRCode(document.getElementById('qr-' + l.id), {
+                            text: l.nama_tempat,
+                            width: 250,
+                            height: 250
+                        });
+                    });
+
+                    window.onload = () => {
+                        setTimeout(() => {
+                            window.print();
+                            // window.close();
+                        }, 1000);
+                    };
+                </script>
+            </body>
+        </html>
+    `;
+
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+};
