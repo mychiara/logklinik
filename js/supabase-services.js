@@ -531,6 +531,14 @@ window.supabasePostAPI = async (action, payload) => {
         if (error) throw error;
         return { success: true };
       }
+      case "setKelompokBulk": {
+        const { error } = await supabaseClient
+          .from("users")
+          .update({ kelompok: payload.kelompok_id })
+          .in("id", payload.member_ids);
+        if (error) throw error;
+        return { success: true };
+      }
       // Generic CRUD Add/Update Users
       case "addUser":
       case "updateUser": {
