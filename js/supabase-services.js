@@ -599,6 +599,22 @@ window.supabasePostAPI = async (action, payload) => {
         return { success: true };
       }
 
+      case "importUsers": {
+        const { error } = await supabaseClient
+          .from("users")
+          .upsert(payload.users, { onConflict: "id" });
+
+        if (error) throw error;
+        return {
+          success: true,
+          summary: {
+            successCount: payload.users.length,
+            failCount: 0,
+            failedRows: [],
+          },
+        };
+      }
+
       default:
         return {
           success: true,
