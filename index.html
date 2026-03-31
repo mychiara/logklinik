@@ -83,7 +83,7 @@
                         </button>
                     </form>
                     <div class="login-footer">
-                        <span>Sistem Edukasi Terpadu &copy; 2024</span>
+                        <span>E-Klinik Management V.1 build by <a href="https://masandigital.com" target="_blank" style="color: var(--primary);">masandigital.com</a> @2026</span>
                     </div>
                 </div>
             </div>
@@ -117,9 +117,7 @@
             </nav>
             
             <div class="sidebar-footer">
-                <button id="logout-btn" class="btn btn-danger-soft btn-block">
-                    <i class="fa-solid fa-sign-out-alt"></i> Keluar Sesi
-                </button>
+                <p class="text-xs text-muted text-center">E-Klinik Mgmt V.1<br>@2026 masandigital.com</p>
             </div>
         </aside>
 
@@ -133,11 +131,16 @@
                         <strong id="topbar-title-text" class="ml-1">Dashboard</strong>
                     </div>
                 </div>
-                <div class="topbar-right gap-3">
+                <div class="topbar-right">
                     <div class="pulse-icon">
-                        <button class="btn-icon-ghost" title="Notifikasi"><i class="fa-regular fa-bell"></i></button>
-                        <span class="ping"></span>
+                        <button id="notif-btn" class="btn-icon-ghost" title="Notifikasi" onclick="bukaModalNotifikasi()"><i class="fa-regular fa-bell"></i></button>
+                        <span id="notif-count" class="badge bg-danger hidden" style="position: absolute; top: -5px; right: -5px; padding: 0.2rem 0.4rem; font-size: 0.65rem;">0</span>
+                        <span id="notif-ping" class="ping"></span>
                     </div>
+                    <div class="v-divider"></div>
+                    <button id="logout-btn" class="btn btn-danger-soft btn-sm" title="Keluar">
+                        <i class="fa-solid fa-power-off"></i> <span class="desktop-only ml-2">Keluar</span>
+                    </button>
                 </div>
             </header>
             
