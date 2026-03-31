@@ -35,6 +35,53 @@
 
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Animation Utilities */
+  --animation-stagger: 0.1s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+}
+
+.animate-fade {
+  animation: fadeIn 0.4s ease forwards;
+}
+.animate-slide {
+  animation: slideInRight 0.4s ease forwards;
 }
 
 * {
@@ -718,6 +765,48 @@ textarea.form-control {
   border: 1px solid #e2e8f0;
   margin-bottom: 1.5rem;
   overflow: hidden;
+  position: relative;
+}
+
+.card-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.stat-card-premium {
+  overflow: visible !important;
+  z-index: 1;
+}
+
+.stat-card-premium .stat-icon {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  transform: rotate(15deg);
+  opacity: 0.2;
+  font-size: 4rem;
+  width: auto;
+  height: auto;
+  background: transparent;
+}
+
+.pulse-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--success);
+  border-radius: 50%;
+  position: relative;
+}
+
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--success);
+  animation: pulse 2s infinite;
 }
 .card-header {
   padding: 1.5rem;

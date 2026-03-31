@@ -1,205 +1,11 @@
-// Layanan Data melalui Supabase
-// File ini menggantikan fetchAPI dan postAPI dari Google Apps Script
-
-const MOCK_DATA = {
-  login: (payload) => {
-    if (payload.username === "mhs" && payload.password === "123")
-      return {
-        success: true,
-        user: { id: "M1", nama: "Jessica Anastasya", role: "mahasiswa" },
-      };
-    if (payload.username === "pre" && payload.password === "123")
-      return {
-        success: true,
-        user: { id: "P1", nama: "Dr. Andi Saputra, M.Kes", role: "preseptor" },
-      };
-    if (payload.username === "adm" && payload.password === "123")
-      return {
-        success: true,
-        user: { id: "A1", nama: "SysAdmin Akademika", role: "admin" },
-      };
-    return {
-      success: false,
-      message: "User/pass salah. Akun Demo: (mhs/123), (pre/123), (adm/123)",
-    };
-  },
-  getPresensi: {
-    success: true,
-    data: [
-      {
-        tanggal: "2024-03-01",
-        jam_masuk: "07:30",
-        jam_keluar: "15:30",
-        lahan: "RSUD Kota Provinsi",
-        durasi: "8",
-      },
-      {
-        tanggal: "2024-03-02",
-        jam_masuk: "07:45",
-        jam_keluar: null,
-        lahan: "Puskesmas Harapan Bangsa",
-        durasi: null,
-      },
-    ],
-  },
-  getLogbook: {
-    success: true,
-    data: [
-      {
-        tanggal: "2024-03-01",
-        kompetensi: "Pasang Infus",
-        lahan: "RSUD Kota Provinsi",
-        level: "Mandiri",
-        status: "Disetujui",
-        nilai: 95,
-      },
-      {
-        tanggal: "2024-03-02",
-        kompetensi: "Rawat Luka",
-        lahan: "Puskesmas Harapan Bangsa",
-        level: "Asistensi",
-        status: "Menunggu Validasi",
-      },
-    ],
-  },
-  getKompetensi: {
-    success: true,
-    data: [
-      {
-        nama_skill: "Pemasangan Infus Perifer",
-        target_minimal: "20",
-        pencapaian: "15",
-      },
-      {
-        nama_skill: "Perawatan Luka Dasar/Lanjut",
-        target_minimal: "15",
-        pencapaian: "16",
-      },
-      {
-        nama_skill: "Pemenuhan KDM Oksigenasi",
-        target_minimal: "10",
-        pencapaian: "4",
-      },
-    ],
-  },
-  getPendingLogs: {
-    success: true,
-    data: [
-      {
-        id: "L1",
-        nama_mahasiswa: "Jessica Anastasya",
-        tanggal: "2024-03-02",
-        kompetensi: "Rawat Luka",
-        level: "Asistensi",
-        deskripsi: "Kasus ulkus diabetikum derajat 2 pada pria 50 tahun.",
-      },
-    ],
-  },
-  getAllPresensi: {
-    success: true,
-    data: [
-      {
-        nama: "Jessica Anastasya",
-        tanggal: "2024-03-01",
-        jam_masuk: "07:30",
-        jam_keluar: "15:30",
-        durasi: "8",
-      },
-      {
-        nama: "Riko Kurniawan",
-        tanggal: "2024-03-01",
-        jam_masuk: "08:00",
-        jam_keluar: "12:30",
-        durasi: "4.5",
-      },
-    ],
-  },
-  getUsers: {
-    success: true,
-    data: [
-      {
-        id: "A1",
-        nama: "SysAdmin Akademika",
-        username: "adm",
-        role: "admin",
-        prodi: "-",
-      },
-      {
-        id: "M1",
-        nama: "Jessica Anastasya",
-        username: "mhs",
-        role: "mahasiswa",
-        prodi: "D3 Keperawatan",
-      },
-      {
-        id: "P1",
-        nama: "Dr. Andi Saputra, M.Kes",
-        username: "pre",
-        role: "preseptor",
-        prodi: "-",
-      },
-    ],
-  },
-  getProdi: {
-    success: true,
-    data: [
-      { id: "P1", nama_prodi: "D3 Keperawatan" },
-      { id: "P2", nama_prodi: "S1 Profesi Ners" },
-    ],
-  },
-  getTempat: {
-    success: true,
-    data: [
-      { id: "T1", nama_tempat: "RSUD Kota Provinsi" },
-      { id: "T2", nama_tempat: "Puskesmas Harapan Bangsa" },
-    ],
-  },
-  getKompetensiAll: {
-    success: true,
-    data: [
-      {
-        id: "K1",
-        nama_skill: "Pemasangan Infus Perifer",
-        target_minimal: "20",
-      },
-      {
-        id: "K2",
-        nama_skill: "Perawatan Luka Dasar/Lanjut",
-        target_minimal: "15",
-      },
-    ],
-  },
-  getJadwal: { success: true, data: [] },
-  getDashboardStats: {
-    success: true,
-    data: {
-      totalMhs: 45,
-      totalKelompok: 5,
-      totalPreKlinik: 12,
-      totalPreAkademik: 8,
-      totalTempat: 4,
-      totalKompetensi: 35,
-      mhsDinilai: 40,
-      mhsBelumDinilai: 5,
-      logbookDiisi: 12,
-      logbookBelumDiisi: 8,
-      presensiHariIni: true,
-    },
-  },
-};
-
 window.supabaseFetchAPI = async (action, payload) => {
-  // 1. JALUR MOCK (Jika Supabase belum diset)
   if (!supabaseClient) {
-    await new Promise((r) => setTimeout(r, 600)); // Simulasi network delay
-
+    await new Promise((r) => setTimeout(r, 600));
     if (action === "login") return MOCK_DATA.login(payload);
     if (MOCK_DATA[action]) return MOCK_DATA[action];
-
     return { success: false, message: "Endpoint ditiadakan pada mode demo." };
   }
 
-  // 2. JALUR DATABASE (Jika Supabase sudah diset)
   try {
     switch (action) {
       case "login": {
@@ -213,10 +19,10 @@ window.supabaseFetchAPI = async (action, payload) => {
           throw new Error("User/pass salah atau tidak ditemukan");
         return { success: true, user: data };
       }
+
       case "getDashboardStats": {
-        // Query as Admin
         if (payload.role === "admin") {
-          const [mhs, kel, preK, preA, tmp, komp] = await Promise.all([
+          const [mhs, kel, preK, preA, tmp, komp, rated] = await Promise.all([
             supabaseClient
               .from("users")
               .select("*", { count: "exact", head: true })
@@ -238,6 +44,9 @@ window.supabaseFetchAPI = async (action, payload) => {
             supabaseClient
               .from("kompetensi")
               .select("*", { count: "exact", head: true }),
+            supabaseClient
+              .from("penilaian_akhir")
+              .select("*", { count: "exact", head: true }),
           ]);
 
           return {
@@ -249,14 +58,17 @@ window.supabaseFetchAPI = async (action, payload) => {
               totalPreAkademik: preA.count || 0,
               totalTempat: tmp.count || 0,
               totalKompetensi: komp.count || 0,
-              mhsDinilai: 0, // Logic for this would require check on nilais/grading table
-              mhsBelumDinilai: mhs.count || 0,
+              mhsDinilai: rated.count || 0,
+              mhsBelumDinilai: Math.max(
+                0,
+                (mhs.count || 0) - (rated.count || 0),
+              ),
             },
           };
         }
 
-        // Query as Mahasiswa
         if (payload.role === "mahasiswa") {
+          const today = new Date().toISOString().split("T")[0];
           const [logs, pres] = await Promise.all([
             supabaseClient
               .from("logbook")
@@ -266,21 +78,19 @@ window.supabaseFetchAPI = async (action, payload) => {
               .from("presensi")
               .select("*")
               .eq("user_id", payload.user_id)
-              .eq("tanggal", new Date().toISOString().split("T")[0])
+              .eq("tanggal", today)
               .limit(1),
           ]);
-
           return {
             success: true,
             data: {
               logbookDiisi: logs.count || 0,
-              logbookBelumDiisi: 0, // Should be calculated from target minimal
+              logbookBelumDiisi: 0,
               presensiHariIni: pres.data && pres.data.length > 0,
             },
           };
         }
 
-        // Query as Preceptor
         const [pending] = await Promise.all([
           supabaseClient
             .from("logbook")
@@ -296,173 +106,258 @@ window.supabaseFetchAPI = async (action, payload) => {
           },
         };
       }
-      case "getPresensi": {
+
+      case "getUsers": {
         const { data, error } = await supabaseClient
-          .from("presensi")
-          .select("*")
-          .eq("user_id", payload.user_id);
+          .from("users")
+          .select(
+            "id, username, nama, role, prodi, kelompok_id, tempat_id, angkatan, no_telp",
+          )
+          .order("nama", { ascending: true });
         if (error) throw error;
-        return { success: true, data: data || [] };
+        return {
+          success: true,
+          data: (data || []).map((u) => ({
+            ...u,
+            kelompok: u.kelompok_id,
+            tempat_id: u.tempat_id || "-",
+          })),
+        };
       }
-      case "getLogbook": {
+
+      case "getPendingLogs": {
         const { data, error } = await supabaseClient
           .from("logbook")
-          .select("*")
-          .eq("user_id", payload.user_id);
+          .select("*, users!inner(nama)")
+          .eq("status", "Menunggu Validasi")
+          .order("tanggal", { ascending: true });
         if (error) throw error;
-        return { success: true, data: data || [] };
+        return {
+          success: true,
+          data: data.map((l) => ({ ...l, nama_mahasiswa: l.users.nama })),
+        };
       }
-      case "getKompetensi": {
-        const { data, error } = await supabaseClient
-          .from("kompetensi")
-          .select("*");
-        if (error) throw error;
-        return { success: true, data: data || [] };
-      }
-      case "getJadwal": {
-        const { data, error } = await supabaseClient.from("jadwal").select("*");
-        if (error) throw error;
-        return { success: true, data: data || [] };
-      }
-      case "getUsers": {
-        const { data, error } = await supabaseClient.from("users").select("*");
-        if (error) throw error;
-        return { success: true, data: data || [] };
-      }
-      case "getTempat": {
-        const { data, error } = await supabaseClient
-          .from("tempat_praktik")
-          .select("*");
-        if (error) throw error;
-        return { success: true, data: data || [] };
-      }
-      case "getProdi": {
-        const { data, error } = await supabaseClient.from("prodi").select("*");
-        if (error) throw error;
-        return { success: true, data: data || [] };
-      }
+
       case "getAllPresensi": {
-        // Join users & presensi would usually be handled manually or with related tables
         const { data, error } = await supabaseClient
           .from("presensi")
-          .select("*, users!inner(nama)");
+          .select("*, users!inner(nama, prodi)");
         if (error) throw error;
-        return { success: true, data: data || [] };
+        return {
+          success: true,
+          data: (data || []).map((p) => ({
+            ...p,
+            nama: p.users.nama,
+            prodi: p.users.prodi,
+          })),
+        };
       }
 
-      case "getLaporan": {
-        const { data, error } = await supabaseClient
-          .from("laporan")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        return { success: true, data: data || [] };
+      case "getRekapLogbook": {
+        const [{ data: mhs }, { data: logs }, { data: komp }] =
+          await Promise.all([
+            supabaseClient
+              .from("users")
+              .select("id, nama, prodi")
+              .eq("role", "mahasiswa"),
+            supabaseClient
+              .from("logbook")
+              .select("user_id, kompetensi")
+              .eq("status", "Disetujui"),
+            supabaseClient
+              .from("kompetensi")
+              .select("nama_skill, target_minimal, kategori"),
+          ]);
+
+        const rekap = (mhs || []).map((u) => ({
+          user_id: u.id,
+          nama: u.nama,
+          prodi: u.prodi,
+          rekap: (komp || []).map((k) => {
+            const achieved = (logs || []).filter(
+              (l) => l.user_id === u.id && l.kompetensi === k.nama_skill,
+            ).length;
+            return {
+              nama_skill: k.nama_skill,
+              kategori: k.kategori,
+              target: k.target_minimal,
+              capaian: achieved,
+              status: achieved >= k.target_minimal ? "Tercapai" : "Belum",
+            };
+          }),
+        }));
+        return { success: true, data: rekap };
       }
-      case "getSettings": {
+
+      case "getPenilaianAkhir": {
         const { data, error } = await supabaseClient
-          .from("settings")
-          .select("*");
+          .from("penilaian_akhir")
+          .select("*, users!inner(nama, prodi, angkatan)");
         if (error) throw error;
-        // Convert to object
-        const settings = {};
-        data.forEach((s) => (settings[s.key] = s.value));
-        return { success: true, data: settings };
+        return {
+          success: true,
+          data: data.map((p) => ({
+            ...p,
+            nama: p.users.nama,
+            prodi: p.users.prodi,
+            angkatan: p.users.angkatan,
+          })),
+        };
       }
+
+      case "getJadwal": {
+        const { data, error } = await supabaseClient
+          .from("jadwal")
+          .select(
+            "*, users!inner(nama, kelompok_id), tempat_praktik!inner(nama_tempat)",
+          );
+        if (error) throw error;
+        return {
+          success: true,
+          data: data.map((j) => ({
+            ...j,
+            nama: j.users.nama,
+            kelompok_id: j.users.kelompok_id,
+            nama_tempat: j.tempat_praktik.nama_tempat,
+          })),
+        };
+      }
+
       case "getKelompok": {
-        const { data, error } = await supabaseClient
-          .from("kelompok")
-          .select("*");
+        const [{ data: groups }, { data: users }] = await Promise.all([
+          supabaseClient
+            .from("kelompok")
+            .select("id, nama_kelompok, pembimbing_id"),
+          supabaseClient
+            .from("users")
+            .select("kelompok_id")
+            .eq("role", "mahasiswa"),
+        ]);
+        return {
+          success: true,
+          data: (groups || []).map((g) => ({
+            ...g,
+            jumlah_anggota: (users || []).filter((u) => u.kelompok_id == g.id)
+              .length,
+          })),
+        };
+      }
+
+      case "backupData": {
+        const tables = [
+          "users",
+          "presensi",
+          "logbook",
+          "kompetensi",
+          "tempat_praktik",
+          "prodi",
+          "jadwal",
+          "settings",
+          "kelompok",
+          "penilaian_akhir",
+          "penilaian_komponen",
+          "bimb_praktikum",
+          "bimb_askep",
+          "sikap_perilaku",
+        ];
+        const backup = {};
+        await Promise.all(
+          tables.map(async (tbl) => {
+            const { data } = await supabaseClient.from(tbl).select("*");
+            backup[tbl] = data || [];
+          }),
+        );
+        return { success: true, data: backup };
+      }
+
+      default: {
+        const tableMap = {
+          tempat: "tempat_praktik",
+          prodi: "prodi",
+          kompetensi: "kompetensi",
+          kompetensiall: "kompetensi",
+          kelompok: "kelompok",
+          laporan: "laporan",
+          presensi: "presensi",
+          logbook: "logbook",
+          bimb_praktikum: "bimb_praktikum",
+          bimbpraktikum: "bimb_praktikum",
+          bimb_askep: "bimb_askep",
+          bimbaskep: "bimb_askep",
+          sikap_perilaku: "sikap_perilaku",
+          sikapperilaku: "sikap_perilaku",
+          allpresensi: "presensi",
+          getallpresensi: "presensi",
+        };
+        const actionTable = action.replace("get", "").toLowerCase();
+        const tbl =
+          tableMap[actionTable] ||
+          tableMap[action.toLowerCase()] ||
+          actionTable;
+        const { data, error } = await supabaseClient.from(tbl).select("*");
         if (error) throw error;
         return { success: true, data: data || [] };
       }
-
-      // Default fallback mapper
-      // Default fallback mapper
-      default:
-        try {
-          // Normalize action names (e.g., getTempat -> tempat_praktik or similar)
-          let tableName = action.replace("get", "").toLowerCase();
-
-          // Custom mapping for tables with different plurals/names
-          const tableMap = {
-            tempat: "tempat_praktik",
-            prodi: "prodi",
-            kompetensi: "kompetensi",
-            users: "users",
-            jadwal: "jadwal",
-            kelompok: "kelompok",
-            laporan: "laporan",
-            presensi: "presensi",
-            logbook: "logbook",
-          };
-
-          tableName = tableMap[tableName] || tableName;
-
-          const { data, error } = await supabaseClient
-            .from(tableName)
-            .select("*");
-          if (!error) return { success: true, data: data };
-        } catch (e) {}
-
-        return { success: true, data: [] };
     }
   } catch (err) {
-    console.error("Supabase Fetch Error:", err);
+    console.error(`Supabase Fetch Error [${action}]:`, err);
     return { success: false, message: err.message };
   }
 };
 
 window.supabasePostAPI = async (action, payload) => {
-  // 1. JALUR MOCK
   if (!supabaseClient) {
-    await new Promise((r) => setTimeout(r, 600)); // Simulasi statis
-    return { success: true, message: "Berhasil divalidasi (Demo Mode)" };
+    await new Promise((r) => setTimeout(r, 600));
+    return { success: true, message: "Berhasil (Demo Mode)" };
   }
 
-  // 2. JALUR DATABASE
   try {
     switch (action) {
       case "checkIn": {
         const row = {
           user_id: payload.user_id,
           tanggal: new Date().toISOString().split("T")[0],
-          jam_masuk: new Date().toISOString().split("T")[1].substring(0, 5),
+          jam_masuk: new Date().toLocaleTimeString("id-id", {
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
           lahan: payload.lahan,
+          foto: payload.foto || null,
         };
         const { error } = await supabaseClient.from("presensi").insert([row]);
         if (error) throw error;
         return { success: true, message: "Berhasil Check-In" };
       }
-      case "checkOut": {
-        const tgt = new Date().toISOString().split("T")[0];
-        const jam_keluar = new Date()
-          .toISOString()
-          .split("T")[1]
-          .substring(0, 5);
 
-        // Cari presensi terbaru untuk check-out
-        const { data, error: errFetch } = await supabaseClient
+      case "checkOut": {
+        const today = new Date().toISOString().split("T")[0];
+        const now = new Date().toLocaleTimeString("id-id", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const { data, error: errF } = await supabaseClient
           .from("presensi")
           .select("*")
           .eq("user_id", payload.user_id)
-          .eq("tanggal", tgt)
+          .eq("tanggal", today)
           .is("jam_keluar", null)
+          .order("created_at", { ascending: false })
           .limit(1)
           .single();
-
-        if (errFetch || !data)
-          throw new Error("Tidak menemukan presensi aktif untuk check-out");
-
-        // Asumsi durasi sederhana
-        const durasi = 8;
-
+        if (errF || !data) throw new Error("Tidak menemukan presensi aktif");
+        const t1 = new Date(`${today}T${data.jam_masuk}`);
+        const t2 = new Date(`${today}T${now}`);
+        const durasi = Math.abs(t2 - t1) / 36e5;
         const { error } = await supabaseClient
           .from("presensi")
-          .update({ jam_keluar, durasi })
+          .update({ jam_keluar: now, durasi })
           .eq("id", data.id);
         if (error) throw error;
         return { success: true, message: "Berhasil Check-Out" };
       }
+
       case "addLogbook": {
         const { error } = await supabaseClient.from("logbook").insert([
           {
@@ -478,32 +373,38 @@ window.supabasePostAPI = async (action, payload) => {
         if (error) throw error;
         return { success: true };
       }
+
       case "validasiLog": {
         const { error } = await supabaseClient
           .from("logbook")
           .update({
             status: payload.status,
             nilai: payload.nilai,
-            feedback: payload.feedback,
+            feedback: payload.catatan || payload.feedback,
           })
-          .eq("id", payload.id);
+          .eq("id", payload.log_id || payload.id);
         if (error) throw error;
         return { success: true };
       }
+
       case "addLaporan": {
         const { error } = await supabaseClient.from("laporan").insert([
           {
-            user_id: payload.user_id,
-            kategori: payload.kategori,
-            kejadian: payload.kejadian,
-            lokasi: payload.lokasi,
-            tanggal: payload.tanggal,
-            status: "Terbuka",
+            user_id_pelapor: payload.user_id,
+            nama_pelapor: payload.nama_pelapor,
+            role_pelapor: payload.role_pelapor,
+            tipe_kejadian: payload.tipe_kejadian,
+            nama_terlapor: payload.nama_terlapor,
+            deskripsi: payload.deskripsi,
+            student_id: payload.student_id,
+            tanggal: new Date().toISOString(),
+            status: "Baru",
           },
         ]);
         if (error) throw error;
         return { success: true };
       }
+
       case "updateLaporanStatus": {
         const { error } = await supabaseClient
           .from("laporan")
@@ -512,8 +413,17 @@ window.supabasePostAPI = async (action, payload) => {
         if (error) throw error;
         return { success: true };
       }
+
+      case "deleteLaporan": {
+        const { error } = await supabaseClient
+          .from("laporan")
+          .delete()
+          .eq("id", payload.id);
+        if (error) throw error;
+        return { success: true };
+      }
+
       case "saveSettings": {
-        // payload is { key1: val1, key2: val2 }
         const updates = Object.entries(payload).map(([k, v]) => ({
           key: k,
           value: v.toString(),
@@ -524,6 +434,17 @@ window.supabasePostAPI = async (action, payload) => {
         if (error) throw error;
         return { success: true };
       }
+
+      case "addUser":
+      case "editUser":
+      case "updateUser": {
+        const { error } = await supabaseClient
+          .from("users")
+          .upsert(payload, { onConflict: "id" });
+        if (error) throw error;
+        return { success: true, message: "Berhasil diperbarui" };
+      }
+
       case "deleteUser": {
         const { error } = await supabaseClient
           .from("users")
@@ -532,52 +453,77 @@ window.supabasePostAPI = async (action, payload) => {
         if (error) throw error;
         return { success: true };
       }
+
+      case "clearUsersByRole": {
+        const { error } = await supabaseClient
+          .from("users")
+          .delete()
+          .eq("role", payload.role);
+        if (error) throw error;
+        return {
+          success: true,
+          message: `Berhasil menghapus data ${payload.role}`,
+        };
+      }
+
       case "setKelompokBulk": {
         const { error } = await supabaseClient
           .from("users")
-          .update({ kelompok: payload.kelompok_id })
+          .update({ kelompok_id: payload.kelompok_id })
           .in("id", payload.member_ids);
         if (error) throw error;
         return { success: true };
       }
-      // Generic CRUD Add/Update Users
-      case "addUser":
-      case "updateUser": {
-        const { error } = await supabaseClient
-          .from("users")
-          .upsert(payload, { onConflict: "id" });
+
+      case "addMaster":
+      case "editMaster": {
+        const tableMap = {
+          tempat: "tempat_praktik",
+          prodi: "prodi",
+          kompetensi: "kompetensi",
+          kelompok: "kelompok",
+          bimb_praktikum: "bimb_praktikum",
+          bimb_askep: "bimb_askep",
+          sikap_perilaku: "sikap_perilaku",
+        };
+        let tbl = tableMap[payload.type] || payload.type;
+        let data = { id: payload.id || undefined };
+        if (payload.type === "tempat") data.nama_tempat = payload.nama;
+        else if (payload.type === "prodi") data.nama_prodi = payload.nama;
+        else if (payload.type === "kompetensi") {
+          data.nama_skill = payload.nama;
+          data.target_minimal = payload.target;
+          data.kategori = payload.kategori;
+          data.angkatan = payload.angkatan;
+        } else if (payload.type === "kelompok")
+          data.nama_kelompok = payload.nama;
+        else if (
+          payload.type === "bimb_praktikum" ||
+          payload.type === "sikap_perilaku"
+        ) {
+          data.nama_komponen = payload.nama;
+          data.nilai_maksimal = payload.nilai_maksimal;
+        } else if (payload.type === "bimb_askep") {
+          data.nama_komponen = payload.nama;
+          data.bobot = payload.bobot;
+          data.skor_maks = payload.skor_maks || 100;
+        }
+        const { error } = await supabaseClient.from(tbl).upsert(data);
         if (error) throw error;
-        return { success: true };
+        return { success: true, message: "Berhasil disimpan" };
       }
 
-      // Master Data CRUD
-      case "addTempat":
-      case "updateTempat": {
-        const { error } = await supabaseClient
-          .from("tempat_praktik")
-          .upsert(payload, { onConflict: "id" });
-        if (error) throw error;
-        return { success: true };
-      }
-      case "addProdi":
-      case "updateProdi": {
-        const { error } = await supabaseClient
-          .from("prodi")
-          .upsert(payload, { onConflict: "id" });
-        if (error) throw error;
-        return { success: true };
-      }
-      case "addKompetensi":
-      case "updateKompetensi": {
-        const { error } = await supabaseClient
-          .from("kompetensi")
-          .upsert(payload, { onConflict: "id" });
-        if (error) throw error;
-        return { success: true };
-      }
       case "deleteMaster": {
-        let tbl = payload.type;
-        if (tbl === "tempat") tbl = "tempat_praktik";
+        const tableMap = {
+          tempat: "tempat_praktik",
+          prodi: "prodi",
+          kompetensi: "kompetensi",
+          kelompok: "kelompok",
+          bimb_praktikum: "bimb_praktikum",
+          bimb_askep: "bimb_askep",
+          sikap_perilaku: "sikap_perilaku",
+        };
+        const tbl = tableMap[payload.type] || payload.type;
         const { error } = await supabaseClient
           .from(tbl)
           .delete()
@@ -586,33 +532,191 @@ window.supabasePostAPI = async (action, payload) => {
         return { success: true };
       }
 
-      case "updatePassword": {
-        // Verify old password
-        const { data: user, error: fetchErr } = await supabaseClient
+      case "clearMaster": {
+        const tableMap = {
+          tempat: "tempat_praktik",
+          prodi: "prodi",
+          kompetensi: "kompetensi",
+          kelompok: "kelompok",
+          bimb_praktikum: "bimb_praktikum",
+          bimb_askep: "bimb_askep",
+          sikap_perilaku: "sikap_perilaku",
+        };
+        const tbl = tableMap[payload.type] || payload.type;
+        const { error } = await supabaseClient
+          .from(tbl)
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000");
+        if (error) throw error;
+        return {
+          success: true,
+          message: `Berhasil hapus data ${payload.type}`,
+        };
+      }
+
+      case "importKelompokAssignment": {
+        for (const item of payload.assignments) {
+          const { data: g } = await supabaseClient
+            .from("kelompok")
+            .select("id")
+            .eq("nama_kelompok", item.kelompok)
+            .single();
+          if (g)
+            await supabaseClient
+              .from("users")
+              .update({ kelompok_id: g.id })
+              .eq("username", item.username);
+        }
+        return { success: true, message: "Import assignment selesai" };
+      }
+
+      case "generateJadwalKelompok": {
+        if (payload.clearExisting)
+          await supabaseClient
+            .from("jadwal")
+            .delete()
+            .neq("id", "00000000-0000-0000-0000-000000000000");
+        const { data: users } = await supabaseClient
           .from("users")
-          .select("password")
-          .eq("id", payload.user_id)
-          .single();
+          .select("id, kelompok_id");
+        const rows = [];
+        (payload.assignments || []).forEach((a) => {
+          const members = (users || []).filter(
+            (u) => u.kelompok_id === a.kelompok_id,
+          );
+          members.forEach((m) => {
+            let curr = new Date(a.tgl_mulai);
+            let end = new Date(a.tgl_selesai);
+            while (curr <= end) {
+              for (let s = 1; s <= (payload.shiftCount || 3); s++) {
+                rows.push({
+                  user_id: m.id,
+                  tempat_id: a.tempat_id,
+                  tanggal: curr.toISOString().split("T")[0],
+                  shift: s,
+                });
+              }
+              curr.setDate(curr.getDate() + 1);
+            }
+          });
+        });
+        if (rows.length > 0) await supabaseClient.from("jadwal").insert(rows);
+        return { success: true, message: "Jadwal kelompok berhasil disusun" };
+      }
 
-        if (fetchErr || !user) throw new Error("Pengguna tidak ditemukan");
-        if (user.password !== payload.oldPassword)
-          throw new Error("Password lama salah");
-
-        // Update to new password
-        const { error: updErr } = await supabaseClient
+      case "generateJadwal": {
+        if (payload.clearExisting)
+          await supabaseClient
+            .from("jadwal")
+            .delete()
+            .neq("id", "00000000-0000-0000-0000-000000000000");
+        const { data: mhs } = await supabaseClient
           .from("users")
-          .update({ password: payload.newPassword })
-          .eq("id", payload.user_id);
+          .select("id")
+          .eq("role", "mahasiswa");
+        const rows = [];
+        let curr = new Date(payload.startDate);
+        let end = new Date(payload.endDate);
+        let locIdx = 0;
+        while (curr <= end) {
+          (mhs || []).forEach((m) => {
+            const locId =
+              payload.locationIds[locIdx % payload.locationIds.length];
+            for (let s = 1; s <= (payload.shiftCount || 3); s++) {
+              rows.push({
+                user_id: m.id,
+                tempat_id: locId,
+                tanggal: curr.toISOString().split("T")[0],
+                shift: s,
+              });
+            }
+            locIdx++;
+          });
+          curr.setDate(curr.getDate() + 1);
+        }
+        if (rows.length > 0) await supabaseClient.from("jadwal").insert(rows);
+        return { success: true, message: "Jadwal massal berhasil disusun" };
+      }
 
-        if (updErr) throw updErr;
+      case "saveGrades": {
+        const { student_id, grader_role, results } = payload;
+        const preseptor_id = results[0]?.preseptor_id || "System";
+        await supabaseClient.from("penilaian_komponen").upsert(
+          results.map((r) => ({
+            student_id,
+            preseptor_id,
+            role_pemberi: grader_role,
+            type: r.type,
+            component_id: r.component_id,
+            nilai: r.nilai,
+          })),
+        );
+
+        const { data: allG } = await supabaseClient
+          .from("penilaian_komponen")
+          .select("*")
+          .eq("student_id", student_id);
+        const { data: s } = await supabaseClient.from("settings").select("*");
+        const sets = {};
+        (s || []).forEach((x) => (sets[x.key] = parseFloat(x.value)));
+
+        const summary = { id: student_id };
+        let final = 0;
+        ["preseptor", "preseptor_akademik"].forEach((role) => {
+          let roleScore = 0;
+          ["praktikum", "askep", "sikap"].forEach((type) => {
+            const g = (allG || []).filter(
+              (x) => x.role_pemberi === role && x.type === type,
+            );
+            if (g.length) {
+              const avg =
+                g.reduce((a, b) => a + parseFloat(b.nilai), 0) / g.length;
+              const weight =
+                type === "praktikum"
+                  ? sets.w_prak || 40
+                  : type === "askep"
+                    ? sets.w_askep || 40
+                    : sets.w_sikap || 20;
+              roleScore += (avg * weight) / 100;
+              summary[
+                `${role === "preseptor" ? "klinik" : "akademik"}_${type === "praktikum" ? "prak" : type}`
+              ] = avg;
+            }
+          });
+          summary[`${role === "preseptor" ? "klinik" : "akademik"}_total`] =
+            roleScore;
+          final +=
+            (roleScore *
+              (role === "preseptor"
+                ? sets.w_klinik || 50
+                : sets.w_akademik || 50)) /
+            100;
+        });
+        summary.total = final;
+        summary.status = final >= (sets.batas_lulus || 75) ? "LULUS" : "REMIDI";
+        await supabaseClient.from("penilaian_akhir").upsert(summary);
         return { success: true };
+      }
+
+      case "importMaster": {
+        const tableMap = {
+          tempat: "tempat_praktik",
+          prodi: "prodi",
+          kompetensi: "kompetensi",
+        };
+        const tbl = tableMap[payload.type] || payload.type;
+        const { error } = await supabaseClient.from(tbl).upsert(payload.data);
+        if (error) throw error;
+        return {
+          success: true,
+          message: `Berhasil impor ${payload.data.length} data`,
+        };
       }
 
       case "importUsers": {
         const { error } = await supabaseClient
           .from("users")
           .upsert(payload.users, { onConflict: "id" });
-
         if (error) throw error;
         return {
           success: true,
@@ -624,74 +728,65 @@ window.supabasePostAPI = async (action, payload) => {
         };
       }
 
-      case "clearUsersByRole": {
+      case "updatePassword": {
+        const { data: user } = await supabaseClient
+          .from("users")
+          .select("password")
+          .eq("id", payload.user_id)
+          .single();
+        if (!user || user.password !== payload.oldPassword)
+          throw new Error("Password lama salah");
         const { error } = await supabaseClient
           .from("users")
-          .delete()
-          .eq("role", payload.role);
-        if (error) throw error;
-        return {
-          success: true,
-          message: `Berhasil menghapus seluruh data user`,
-        };
-      }
-      case "clearMasterData": {
-        let tbl = payload.type;
-        if (tbl === "tempat") tbl = "tempat_praktik";
-        // Filter dummy untuk menghapus semua baris (PostgREST butuh filter untuk delete)
-        const { error } = await supabaseClient
-          .from(tbl)
-          .delete()
-          .neq("id", "00000000-0000-0000-0000-000000000000");
+          .update({ password: payload.newPassword })
+          .eq("id", payload.user_id);
         if (error) throw error;
         return { success: true };
       }
 
-      case "saveGrades": {
-        const rows = payload.results.map((r) => ({
-          user_id: r.user_id,
-          pemberi_nilai_id: "A1",
-          role_pemberi: payload.grader_role,
-          prak_klinik: r.prak_klinik,
-          askep: r.askep,
-          sikap: r.sikap,
-          total_nilai: r.total_nilai,
-          keterangan: r.keterangan || "",
-        }));
-        const { error } = await supabaseClient.from("penilaian").upsert(rows);
-        if (error) throw error;
-        return { success: true };
+      case "repairUsers": {
+        const { data } = await supabaseClient.from("users").select("*");
+        for (const u of data || []) {
+          const cleaned = {
+            id: u.id.trim(),
+            nama: u.nama.trim(),
+            prodi: u.prodi ? u.prodi.trim() : "-",
+            angkatan: u.angkatan ? u.angkatan.trim() : "-",
+          };
+          await supabaseClient.from("users").update(cleaned).eq("id", u.id);
+        }
+        return { success: true, message: "Database user berhasil dirapikan" };
       }
+
+      case "restoreData": {
+        const tables = Object.keys(payload.backup);
+        for (const tbl of tables) {
+          if (payload.backup[tbl] && payload.backup[tbl].length > 0) {
+            await supabaseClient.from(tbl).upsert(payload.backup[tbl]);
+          }
+        }
+        return { success: true, message: "Restorasi data berhasil dilakukan" };
+      }
+
       case "clearAllGrades": {
-        const { error } = await supabaseClient
-          .from("penilaian")
-          .delete()
-          .neq("id", "00000000-0000-0000-0000-000000000000");
-        if (error) throw error;
-        return { success: true };
-      }
-      case "generateJadwal": {
-        return { success: true, message: "Jadwal disusun otomatis" };
-      }
-      case "importMaster": {
-        let tbl = payload.type;
-        if (tbl === "tempat") tbl = "tempat_praktik";
-        const { error } = await supabaseClient.from(tbl).upsert(payload.data);
-        if (error) throw error;
+        await Promise.all([
+          supabaseClient.from("penilaian_akhir").delete().neq("id", "00-00"),
+          supabaseClient
+            .from("penilaian_komponen")
+            .delete()
+            .neq("id", "00000000-0000-0000-0000-000000000000"),
+        ]);
         return {
           success: true,
-          message: `Berhasil impor ${payload.data.length} data`,
+          message: "Seluruh data penilaian berhasil dibersihkan",
         };
       }
 
       default:
-        return {
-          success: true,
-          message: "Aksi sukses, metode generic diaktifkan",
-        };
+        return { success: false, message: `Aksi ${action} tidak dikenali` };
     }
   } catch (err) {
-    console.error("Supabase Post Error:", err);
+    console.error(`Supabase Post Error [${action}]:`, err);
     return { success: false, message: err.message };
   }
 };

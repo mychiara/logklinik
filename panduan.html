@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panduan Instalasi E-Klinik Supabase</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Outfit', sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        header { 
+            text-align: center; 
+            margin-bottom: 50px; 
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            padding: 60px 20px;
+            border-radius: 24px;
+            color: white;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        h1 { font-size: 2.5rem; margin-bottom: 15px; font-weight: 700; }
+        .subtitle { font-size: 1.1rem; opacity: 0.9; }
+
+        .step-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 35px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+            position: relative;
+            transition: transform 0.3s ease;
+        }
+
+        .step-card:hover { transform: translateY(-5px); }
+
+        .step-number {
+            position: absolute;
+            top: -15px;
+            left: 30px;
+            background: var(--primary);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.4);
+        }
+
+        h2 { margin-bottom: 20px; font-size: 1.5rem; display: flex; align-items: center; gap: 12px; }
+        h2 i { color: var(--primary); }
+
+        h3 { margin: 20px 0 10px; font-size: 1.1rem; color: var(--primary-dark); }
+
+        p, ul { margin-bottom: 15px; color: var(--text-light); }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 8px; }
+
+        code {
+            background: #f1f5f9;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .alert-info { background: #e0e7ff; color: #3730a3; border-left: 5px solid var(--primary); }
+        .alert-warning { background: #fff7ed; color: #9a3412; border-left: 5px solid var(--warning); }
+
+        .btn-copy {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .btn-copy:hover { background: rgba(255,255,255,0.2); }
+
+        footer { text-align: center; margin-top: 50px; color: var(--text-light); font-size: 0.9rem; }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            header { padding: 40px 15px; border-radius: 0; margin: -40px -20px 30px; }
+            h1 { font-size: 1.8rem; }
+            .step-card { padding: 25px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Panduan Instalasi E-Klinik</h1>
+        <p class="subtitle">Migrasi dari Google Sheets ke Database Supabase (Full PWA)</p>
+    </header>
+
+    <!-- STEP 1 -->
+    <div class="step-card">
+        <div class="step-number">1</div>
+        <h2><i class="fa-solid fa-cloud"></i> Persiapan Proyek Supabase</h2>
+        <p>Langkah pertama adalah membuat "rumah" baru untuk database Anda.</p>
+        <ul>
+            <li>Masuk ke <a href="https://supabase.com" target="_blank">supabase.com</a> dan Login/Daftar.</li>
+            <li>Klik <b>New Project</b>. Pilih nama (misal: E-Klinik) dan tentukan Password Database.</li>
+            <li>Tunggu hingga proses <i>Setting Up Project</i> selesai (biasanya 2-3 menit).</li>
+        </ul>
+        <div class="alert alert-info">
+            <i class="fa-solid fa-info-circle"></i>
+            <div>Pilih Region yang terdekat dengan pengguna (misal: <b>Singapore</b>) agar akses aplikasi lebih cepat.</div>
+        </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step-card">
+        <div class="step-number">2</div>
+        <h2><i class="fa-solid fa-database"></i> Membuat Struktur Tabel (SQL)</h2>
+        <p>Agar database siap menampung data Mahasiswa, Preseptor, dan Logbook, kita harus menjalankan skema SQL.</p>
+        <ul>
+            <li>Di dashboard Supabase, klik menu <b>SQL Editor</b> (ikon terminal di kiri).</li>
+            <li>Klik <b>New Query</b>.</li>
+            <li>Buka file <code>supabase-schema.sql</code> dari folder proyek Anda, lalu Copy dan Paste semua isinya ke editor.</li>
+            <li>Klik tombol <b>Run</b>.</li>
+        </ul>
+        <div class="alert alert-warning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <div>Jika muncul error <i>"relation users already exists"</i>, berarti tabel sudah ada. Tambahkan perintah <code>DROP TABLE IF EXISTS...</code> di awal atau abaikan saja jika tabel sudah terbuat.</div>
+        </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step-card">
+        <div class="step-number">3</div>
+        <h2><i class="fa-solid fa-shield-halved"></i> Matikan RLS (Row Level Security)</h2>
+        <p>Supabase secara default mengunci akses tabel secara ketat. Kita perlu memberi izin akses agar aplikasi bisa login.</p>
+        <h3>Jalankan kueri berikut di SQL Editor:</h3>
+        <div class="code-block">
+            -- Matikan proteksi (RLS) sementara agar API bisa diakses publik
+            ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE presensi DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE logbook DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE kompetensi DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE tempat_praktik DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE prodi DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE jadwal DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE laporan DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE settings DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE kelompok DISABLE ROW LEVEL SECURITY;
+        </div>
+        <p>Langkah ini memastikan error <code>406 Not Acceptable</code> pada login tidak muncul lagi.</p>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step-card">
+        <div class="step-number">4</div>
+        <h2><i class="fa-solid fa-gear"></i> Konfigurasi API di Aplikasi</h2>
+        <p>Hubungkan file proyek Anda dengan URL dan Kunci API dari Supabase.</p>
+        <ul>
+            <li>Buka menu <b>Project Settings</b> (ikon gir) > Pilih <b>API</b>.</li>
+            <li>Salin <b>Project URL</b> dan <b>anon public key</b>.</li>
+            <li>Buka file <code>js/supabase-config.js</code> di folder proyek Anda.</li>
+            <li>Tempelkan kedua nilai tersebut ke dalam variabel yang tersedia:</li>
+        </ul>
+        <div class="code-block">
+            const SUPABASE_URL = "https://xyz.supabase.co";<br>
+            const SUPABASE_ANON_KEY = "eyJhbGc...k0M2Y";
+        </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step-card">
+        <div class="step-number">5</div>
+        <h2><i class="fa-solid fa-globe"></i> Hosting & Anti-Pause (GitHub)</h2>
+        <p>Karena Supabase Free Plan bisa mati otomatis jika tidak ada aktivitas selama 1 minggu, kita pasang Robot GitHub.</p>
+        <ul>
+            <li>Upload proyek Anda ke <b>GitHub</b>.</li>
+            <li>Masuk ke tab <b>Settings</b> > <b>Secrets</b> > <b>Actions</b> di GitHub Anda.</li>
+            <li>Daftarkan Secret: <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code>.</li>
+            <li>Robot otomatis akan berjalan setiap hari Senin berdasarkan file di folder <code>.github/workflows/</code>.</li>
+        </ul>
+    </div>
+
+    <!-- FINISH -->
+    <div class="step-card" style="border: 2px solid var(--success); background: #f0fdf4;">
+        <div class="step-number" style="background: var(--success);"><i class="fa-solid fa-check"></i></div>
+        <h2 style="color: var(--success);">Instalasi Selesai!</h2>
+        <p>Coba buka aplikasi Anda dan login menggunakan Akun Demo:</p>
+        <ul>
+            <li><b>Admin:</b> <code>adm</code> / <code>123</code></li>
+            <li><b>Mahasiswa:</b> <code>mhs</code> / <code>123</code></li>
+            <li><b>Preseptor:</b> <code>pre</code> / <code>123</code></li>
+        </ul>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 E-Klinik Management System | PWA & Supabase Edition</p>
+    </footer>
+</div>
+
+</body>
+</html>

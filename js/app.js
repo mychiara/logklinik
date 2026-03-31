@@ -1,3 +1,11 @@
+// XSS Prevention Utility
+function escapeHTML(str) {
+  if (!str) return "";
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 const GAS_URL =
   "https://script.google.com/macros/s/AKfycbxkVfL_dirGxL0_MK3J3vBButwz2oRIVVGHHWqJfA9zmvFDBuJOGHdPAkVc4Mr7Lot5/exec"; // GANTI DENGAN URL WEB APP GAS ANDA
 let currentUser = null;
@@ -181,6 +189,18 @@ function initDashboard() {
         view: "dashboardView",
       },
       {
+        id: "nav-prodi",
+        icon: "fa-graduation-cap",
+        text: "Data Prodi",
+        view: "prodiAdminView",
+      },
+      {
+        id: "nav-tempat",
+        icon: "fa-hospital",
+        text: "Tempat Praktik",
+        view: "tempatAdminView",
+      },
+      {
         id: "nav-semua",
         icon: "fa-database",
         text: "Semua Data",
@@ -211,22 +231,10 @@ function initDashboard() {
         view: "preseptorAkademikAdminView",
       },
       {
-        id: "nav-tempat",
-        icon: "fa-hospital",
-        text: "Tempat Praktik",
-        view: "tempatAdminView",
-      },
-      {
         id: "nav-komp",
         icon: "fa-list-check",
         text: "Kompetensi / Skill",
         view: "kompetensiAdminView",
-      },
-      {
-        id: "nav-prodi",
-        icon: "fa-graduation-cap",
-        text: "Data Prodi",
-        view: "prodiAdminView",
       },
       {
         id: "nav-bpr",
@@ -253,16 +261,16 @@ function initDashboard() {
         view: "penilaianAkhirView",
       },
       {
-        id: "nav-jadwal",
-        icon: "fa-table",
-        text: "Daftar Jadwal Praktik",
-        view: "jadwalAdminView",
-      },
-      {
         id: "nav-gen-kelompok",
         icon: "fa-calendar-days",
         text: "Generate Per Kelompok",
         view: "generatorKelompokView",
+      },
+      {
+        id: "nav-jadwal",
+        icon: "fa-table",
+        text: "Daftar Jadwal Praktik",
+        view: "jadwalAdminView",
       },
       {
         id: "nav-laporan-admin",
@@ -397,15 +405,25 @@ function loadView(viewName) {
 // DASHBOARD VIEW (ALL ROLES)
 async function dashboardView(area) {
   area.innerHTML = `
-        <div class="animate-fade-up">
-            <h2 style="margin-bottom: 20px; color: var(--primary-dark);">Selamat Datang, ${currentUser.nama}</h2>
-            
-            <div id="dashboard-widgets" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
-                <!-- Skeleton Loading -->
-                <div style="background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:center;">
-                    <i class="fa-solid fa-spinner fa-spin fa-2x text-muted mb-2"></i>
-                    <div class="text-muted">Memuat data statistik...</div>
+        <div class="animate-fade">
+            <div class="d-flex justify-between align-center mb-3">
+                <div>
+                   <h2 style="color: var(--primary-dark); font-weight: 800; font-size: 1.8rem; letter-spacing: -0.5px;">Dashboard</h2>
+                   <p class="text-muted">Selamat datang kembali, <span class="text-primary" style="font-weight: 600;">${escapeHTML(currentUser.nama)}</span></p>
                 </div>
+                <div class="pulse-dot" title="Sistem Aktif"></div>
+            </div>
+            
+            <div id="dashboard-widgets" class="grid-cards">
+                <!-- Skeleton Loading -->
+                ${Array(4)
+                  .fill(0)
+                  .map(
+                    () => `
+                    <div class="card animate-pulse" style="height: 120px; background: #fff; border-radius: 16px;"></div>
+                `,
+                  )
+                  .join("")}
             </div>
         </div>
     `;
@@ -413,7 +431,6 @@ async function dashboardView(area) {
   const res = await fetchAPI("getDashboardStats", {
     user_id: currentUser.id,
     role: currentUser.role,
-    tempat_id: currentUser.tempat_id || "",
   });
   const container = document.getElementById("dashboard-widgets");
 
@@ -425,14 +442,15 @@ async function dashboardView(area) {
   const d = res.data;
   let html = "";
 
-  const createWidget = (icon, title, value, colorClass, bgColor) => `
-        <div style="background:#fff; border-radius:12px; padding:24px 20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); display:flex; align-items:center; transition: transform 0.2s; border-left: 5px solid ${bgColor};">
-            <div style="background:${bgColor}20; width:60px; height:60px; border-radius:12px; display:flex; justify-content:center; align-items:center; font-size:1.75rem; color:${bgColor}; margin-right:20px;">
-                <i class="${icon}"></i>
+  const createWidget = (icon, title, value, color, viewLink = null) => `
+        <div class="stat-card stat-card-premium" style="border-left: 5px solid ${color};">
+            <div class="stat-info">
+                <h5>${title}</h5>
+                <h2>${value}</h2>
+                ${viewLink ? `<button class="btn btn-xs mt-1 btn-outline" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;" onclick="loadView('${viewLink}')">Kelola <i class="fa-solid fa-arrow-right ml-1"></i></button>` : ""}
             </div>
-            <div>
-                <div style="font-size:0.9rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px;">${title}</div>
-                <div style="font-size:2rem; font-weight:800; color:#1e293b; line-height:1;">${value}</div>
+            <div class="stat-icon" style="color: ${color}; opacity: 0.1;">
+                <i class="${icon}"></i>
             </div>
         </div>
     `;
@@ -442,116 +460,95 @@ async function dashboardView(area) {
       "fa-solid fa-user-graduate",
       "Total Mahasiswa",
       d.totalMhs,
-      "text-primary",
       "#6366f1",
+      "mahasiswaAdminView",
     );
     html += createWidget(
       "fa-solid fa-users-rectangle",
       "Kelompok",
       d.totalKelompok,
-      "text-success",
       "#10b981",
+      "kelompokAdminView",
     );
     html += createWidget(
       "fa-solid fa-user-doctor",
       "Preseptor Klinik",
       d.totalPreKlinik,
-      "text-info",
       "#0ea5e9",
+      "preseptorAdminView",
     );
     html += createWidget(
       "fa-solid fa-chalkboard-teacher",
       "Preseptor Akademik",
       d.totalPreAkademik,
-      "text-warning",
       "#f59e0b",
+      "preseptorAkademikAdminView",
     );
     html += createWidget(
       "fa-solid fa-hospital",
-      "Tempat Praktik",
+      "Lahan Praktik",
       d.totalTempat,
-      "text-secondary",
       "#8b5cf6",
+      "tempatAdminView",
     );
     html += createWidget(
       "fa-solid fa-list-check",
-      "Target Kompetensi",
+      "Target Skill",
       d.totalKompetensi,
-      "text-dark",
       "#475569",
+      "kompetensiAdminView",
     );
     html += createWidget(
       "fa-solid fa-clipboard-check",
       "Sudah Dinilai",
       d.mhsDinilai,
-      "text-success",
       "#22c55e",
+      "penilaianAkhirView",
     );
     html += createWidget(
       "fa-solid fa-clipboard-question",
       "Belum Dinilai",
       d.mhsBelumDinilai,
-      "text-danger",
       "#ef4444",
+      "penilaianAkhirView",
     );
-  } else if (
-    currentUser.role === "preseptor" ||
-    currentUser.role === "preseptor_akademik"
-  ) {
+  } else if (currentUser.role.includes("preseptor")) {
     html += createWidget(
       "fa-solid fa-user-check",
-      "Mahasiswa Dinilai",
+      "Sudah Dinilai",
       d.mhsDinilai,
-      "text-success",
       "#22c55e",
+      "mahasiswaView",
     );
     html += createWidget(
       "fa-solid fa-user-clock",
       "Belum Dinilai",
       d.mhsBelumDinilai,
-      "text-danger",
       "#ef4444",
+      "mahasiswaView",
     );
     html += createWidget(
       "fa-solid fa-file-circle-exclamation",
-      "Validasi Tertunda",
+      "Antrian Validasi",
       d.logbookPending,
-      "text-warning",
       "#f59e0b",
+      "validasiView",
     );
   } else if (currentUser.role === "mahasiswa") {
     html += createWidget(
       "fa-solid fa-book-medical",
-      "Logbook Terisi",
+      "Tindakan Terisi",
       d.logbookDiisi,
-      "text-primary",
       "#6366f1",
+      "logbookView",
     );
     html += createWidget(
-      "fa-solid fa-book-open",
-      "Target Tersisa",
-      d.logbookBelumDiisi,
-      "text-warning",
-      "#f59e0b",
+      "fa-solid fa-calendar-alt",
+      "Status Presensi",
+      d.presensiHariIni ? "HADIR" : "BELUM",
+      d.presensiHariIni ? "#22c55e" : "#ef4444",
+      "presensiView",
     );
-
-    if (d.presensiHariIni) {
-      html += createWidget(
-        "fa-solid fa-calendar-check",
-        "Presensi Harian",
-        "Hadir",
-        "text-success",
-        "#22c55e",
-      );
-    } else {
-      html += createWidget(
-        "fa-solid fa-calendar-xmark",
-        "Presensi Harian",
-        "Belum",
-        "text-danger",
-        "#ef4444",
-      );
-    }
   }
 
   container.innerHTML = html;
@@ -2916,8 +2913,8 @@ async function kelompokAdminView(area) {
                 <td><span class="badge bg-primary" style="font-size:0.95em">${k.jumlah_anggota || 0} mahasiswa</span></td>
                 <td style="text-align:right">
                     <button class="btn btn-icon-ghost" onclick="aturAnggotaKelompok('${k.id}', '${k.nama_kelompok}')"><i class="fa-solid fa-user-plus" title="Atur Anggota"></i></button>
-                    <button class="btn btn-icon-ghost" onclick="bukaModalKelompok('${k.id}')"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="btn btn-icon-ghost text-danger" onclick="hapusMaster('kelompok','${k.id}')"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-icon-ghost" onclick="bukaModalKelompok('${k.id}', '${k.nama_kelompok}')"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('kelompok','${k.id}')"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `,
@@ -2928,11 +2925,7 @@ async function kelompokAdminView(area) {
   }
 }
 
-window.bukaModalKelompok = (id = null) => {
-  let nama = "";
-  if (id && window.kelompokData) {
-    // not available from renderMasterData, fetch inline
-  }
+window.bukaModalKelompok = (id = null, currentNama = "") => {
   const isEdit = !!id;
   openModal(
     isEdit ? "Edit Kelompok" : "Tambah Kelompok Baru",
@@ -2942,7 +2935,7 @@ window.bukaModalKelompok = (id = null) => {
                 <label>Nama Kelompok</label>
                 <div class="input-with-icon">
                     <i class="fa-solid fa-users-rectangle"></i>
-                    <input type="text" id="kelompok-nama" required class="form-control" placeholder="Contoh: Kelompok A">
+                    <input type="text" id="kelompok-nama" required class="form-control" placeholder="Contoh: Kelompok A" value="${currentNama}">
                 </div>
             </div>
             <button type="submit" class="btn btn-primary btn-block mt-3"><i class="fa-solid fa-save"></i> ${isEdit ? "Simpan Perubahan" : "Buat Kelompok"}</button>
@@ -2977,9 +2970,9 @@ window.aturAnggotaKelompok = async (kelompokId, namaKelompok) => {
 
   const checkboxes = mahasiswa
     .map((m) => {
-      const checked = m.kelompok_id == kelompokId ? "checked" : "";
+      const checked = m.kelompok == kelompokId ? "checked" : "";
       const otherGroup =
-        m.kelompok_id && m.kelompok_id !== "-" && m.kelompok_id !== kelompokId
+        m.kelompok && m.kelompok !== "-" && m.kelompok !== kelompokId
           ? `<span class="badge bg-warning" style="font-size:0.7em; margin-left:6px">di kelompok lain</span>`
           : "";
       return `
@@ -3510,16 +3503,25 @@ window.handleImportCSV = (e, roleFilter) => {
       let u = { role: roleFilter };
       for (let j = 0; j < headers.length; j++) {
         if (cols[j] !== undefined && headers[j]) {
-          u[headers[j]] = cols[j].replace(/(^"|"$)/g, "").trim();
+          let val = cols[j].replace(/(^"|"$)/g, "").trim();
+          let h = headers[j];
+
+          // Mapping alias header
+          if (h.includes("username") || h.includes("id") || h === "nim") {
+            u.username = val;
+            u.id = val; // Gunakan ini sebagai ID primer
+          } else {
+            u[h] = val;
+          }
         }
       }
 
-      // Pastikan ID terisi (Gunakan NIM/Username sebagai ID jika kolom id kosong)
-      if (!u.id && u.username) {
-        u.id = u.username;
-      }
+      // Final Check logic
+      if (!u.id && u.username) u.id = u.username;
+      if (!u.username && u.id) u.username = u.id;
+      if (!u.password) u.password = "123"; // Default password jika kosong
 
-      mappedUsers.push(u);
+      if (u.id) mappedUsers.push(u);
     }
 
     if (
@@ -3921,7 +3923,7 @@ async function renderMasterData(
             k === "nama_skill" ||
             k === "nama_komponen"
           ) {
-            let text = row[k] || "";
+            let text = escapeHTML(row[k]) || "";
             // Temukan titik pertama yang didahului angka untuk memisahkan Title dan List
             let firstNumIdx = text.search(/[0-9]+\./);
             let titlePart = text;
@@ -3954,7 +3956,7 @@ async function renderMasterData(
           // Gunakan check null/undefined agar angka 0 tetap muncul
           let val =
             row[k] !== undefined && row[k] !== null && row[k] !== ""
-              ? row[k]
+              ? escapeHTML(row[k])
               : "-";
           return `<td><span class="badge bg-primary" style="font-size:0.9em; padding: 0.4rem 0.8rem;">${val}${k === "bobot" ? "%" : ""}</span></td>`;
         })
@@ -4193,6 +4195,7 @@ window.deleteMaster = async (type, id) => {
     if (res.success) {
       showToast("Terhapus", "Data berhasil dihapus dari sistem", "success");
       const views = {
+        kelompok: "kelompokAdminView",
         tempat: "tempatAdminView",
         prodi: "prodiAdminView",
         kompetensi: "kompetensiAdminView",
@@ -4217,9 +4220,16 @@ window.clearMasterData = async (type, title) => {
       showLoader(false);
       if (res.success) {
         showToast("Berhasil", res.message, "success");
-        loadView(
-          type === "kompetensi" ? "kompetensiAdminView" : type + "AdminView",
-        );
+        const views = {
+          kelompok: "kelompokAdminView",
+          tempat: "tempatAdminView",
+          prodi: "prodiAdminView",
+          kompetensi: "kompetensiAdminView",
+          bimb_praktikum: "bimbPraktikumAdminView",
+          bimb_askep: "bimbAskepAdminView",
+          sikap_perilaku: "sikapPerilakuAdminView",
+        };
+        loadView(views[type]);
       }
     }
   }
