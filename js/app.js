@@ -43,14 +43,24 @@ let currentUser = null;
 let html5QrcodeScanner = null;
 window.EKLINIK_CACHE = {};
 
-// Cache Helper
+// Cache Helper with Session Storage Persistence
 async function fetchCachedAPI(action, payload = {}) {
+  const cacheKey = `EKLINIK_CACHE_${action}`;
+
   if (
     Object.keys(payload).length === 0 &&
     ["getProdi", "getTempat", "getKelompok", "getKompetensi"].includes(action)
   ) {
+    // Check in-memory first
     if (window.EKLINIK_CACHE[action]) {
       return { success: true, data: window.EKLINIK_CACHE[action] };
+    }
+    // Check session storage
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      const data = JSON.parse(cached);
+      window.EKLINIK_CACHE[action] = data;
+      return { success: true, data };
     }
   }
 
@@ -63,6 +73,7 @@ async function fetchCachedAPI(action, payload = {}) {
     ["getProdi", "getTempat", "getKelompok", "getKompetensi"].includes(action)
   ) {
     window.EKLINIK_CACHE[action] = res.data;
+    sessionStorage.setItem(cacheKey, JSON.stringify(res.data));
   }
 
   return res;
@@ -125,10 +136,17 @@ function checkAuth() {
 
 function initDashboard() {
   document.getElementById("user-name-display").textContent = currentUser.nama;
-  let roleText = `<i class="fa-solid fa-shield-halved fa-sm"></i> ${currentUser.role}`;
+
+  const displayRoles = {
+    mahasiswa: "Mahasiswa",
+    preseptor: "Preseptor Klinik",
+    preseptor_akademik: "Preseptor Akademik",
+    admin: "Administrator",
+  };
+  const roleName = displayRoles[currentUser.role] || currentUser.role;
+
+  let roleText = `<i class="fa-solid fa-shield-halved fa-sm"></i> ${roleName}`;
   if (currentUser.tempat_id && currentUser.tempat_id !== "-") {
-    // We'll fetch the location name if needed, but for now just show the ID or placeholder
-    // Actually, let's just use a generic workplace icon if it's a preceptor/mhs with location
     roleText += ` <span class="badge bg-primary-soft text-primary" style="margin-left:5px; font-size:0.7rem; text-transform:none;"><i class="fa-solid fa-hospital"></i> Lahan Aktif</span>`;
   }
   document.getElementById("user-role-display").innerHTML = roleText;
@@ -170,6 +188,12 @@ function initDashboard() {
         icon: "fa-graduation-cap",
         text: "Nilai Saya",
         view: "nilaiMahasiswaView",
+      },
+      {
+        id: "nav-info-praktik",
+        icon: "fa-circle-info",
+        text: "Informasi Praktik",
+        view: "informasiPraktikView",
       },
     ],
     preseptor: [
@@ -234,7 +258,7 @@ function initDashboard() {
       {
         id: "nav-semua",
         icon: "fa-database",
-        text: "Semua Data",
+        text: "Semua Data QR",
         view: "adminView",
       },
       {
@@ -415,6 +439,149 @@ function initDashboard() {
   }
 }
 
+// MAHASISWA: INFORMASI PRAKTIK (Lahan & Preseptor)
+async function informasiPraktikView(area) {
+  area.innerHTML = `
+        <div class="animate-fade-up">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="m-0"><i class="fa-solid fa-circle-info text-primary"></i> Detail Lokasi & Pembimbing Praktik</h3>
+                    <p class="text-sm text-muted mt-1">Gunakan halaman ini untuk melihat detail lahan praktik dan preseptor yang bertanggung jawab atas penilaian Anda.</p>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="table-info-praktik" class="table-compact">
+                            <thead>
+                                <tr>
+                                    <th>Tempat Praktik</th>
+                                    <th>Periode Rotasi</th>
+                                    <th>Preseptor Klinik (Lahan)</th>
+                                    <th>Preseptor Akademik (Kampus)</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="4" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat informasi jadwal bimbingan...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  const [resJadwal, resUsers, resTempat, resKelompok] = await Promise.all([
+    fetchAPI("getJadwal", { user_id: currentUser.id }),
+    fetchCachedAPI("getUsers"),
+    fetchCachedAPI("getTempat"),
+    fetchCachedAPI("getKelompok"),
+  ]);
+
+  const tableBody = document.querySelector("#table-info-praktik tbody");
+  if (!tableBody) return;
+
+  if (
+    resJadwal.success &&
+    resUsers.success &&
+    resTempat.success &&
+    resKelompok.success
+  ) {
+    // 2. Kelompokkan Jadwal berdasarkan tempat_id
+    const gJadwal = {};
+    resJadwal.data.forEach((j) => {
+      const tid = String(j.tempat_id);
+      if (!gJadwal[tid]) gJadwal[tid] = [];
+      gJadwal[tid].push(j);
+    });
+
+    const rows = Object.keys(gJadwal).map((tId) => {
+      const list = gJadwal[tId];
+      const tempat = resTempat.data.find((t) => t.id == tId);
+      const namaTempat = tempat ? tempat.nama_tempat : "-";
+
+      // Hitung start & end date
+      const datesInMs = list.map((l) => new Date(l.tanggal).getTime());
+      const minD = new Date(Math.min(...datesInMs));
+      const maxD = new Date(Math.max(...datesInMs));
+
+      const tglRange =
+        minD.getTime() === maxD.getTime()
+          ? formatDateIndo(list[0].tanggal)
+          : `${formatDateIndo(minD.toISOString().split("T")[0])} s/d ${formatDateIndo(maxD.toISOString().split("T")[0])}`;
+
+      // Cari Preseptor Klinik & Akademik di lahan ini
+      const klinikPreseptors = resUsers.data.filter(
+        (u) =>
+          u.role === "preseptor" &&
+          u.tempat_id &&
+          u.tempat_id.split(",").includes(String(tId)),
+      );
+
+      const akademikPreseptors = resUsers.data.filter(
+        (u) =>
+          u.role === "preseptor_akademik" &&
+          u.tempat_id &&
+          u.tempat_id.split(",").includes(String(tId)),
+      );
+
+      return `
+                <tr>
+                    <td>
+                        <div class="d-flex align-center gap-2">
+                             <div style="background:var(--primary-light); color:var(--primary); width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center;">
+                                <i class="fa-solid fa-hospital"></i>
+                             </div>
+                             <strong>${namaTempat}</strong>
+                        </div>
+                    </td>
+                    <td><div class="badge bg-light text-dark border" style="font-weight:normal;">${tglRange}</div></td>
+                    <td>
+                        <div class="d-flex flex-column gap-1">
+                            ${
+                              klinikPreseptors.length > 0
+                                ? klinikPreseptors
+                                    .map(
+                                      (p) => `
+                                <div class="d-flex align-center gap-2 text-sm" style="background:#f1f5f9; padding:4px 10px; border-radius:15px; border-left:3px solid var(--primary);">
+                                    <i class="fa-solid fa-user-doctor text-primary" style="font-size:0.8rem"></i> 
+                                    <span class="font-bold">${p.nama}</span>
+                                </div>
+                            `,
+                                    )
+                                    .join("")
+                                : '<span class="text-muted text-xs italic">Belum tersedia</span>'
+                            }
+                        </div>
+                    </td>
+                    <td>
+                        <div class="d-flex flex-column gap-1">
+                        ${
+                          akademikPreseptors.length > 0
+                            ? akademikPreseptors
+                                .map(
+                                  (p) => `
+                            <div class="d-flex align-center gap-2 text-sm" style="background:var(--success-light); padding:4px 10px; border-radius:15px; border-left:3px solid var(--success);">
+                                <i class="fa-solid fa-chalkboard-user text-success" style="font-size:0.8rem"></i> 
+                                <span class="font-bold text-success-dark">${p.nama}</span>
+                            </div>
+                        `,
+                                )
+                                .join("")
+                            : '<span class="text-muted text-xs italic">Belum ada pembimbing</span>'
+                        }
+                        </div>
+                    </td>
+                </tr>
+            `;
+    });
+
+    if (rows.length > 0) {
+      tableBody.innerHTML = rows.join("");
+    } else {
+      tableBody.innerHTML = `<tr><td colspan="4" class="empty-table">Belum ada rotasi tempat praktik yang terjadwal.</td></tr>`;
+    }
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="4" class="empty-table text-danger">Gagal menyinkronkan data praktik.</td></tr>`;
+  }
+}
+
 // Router Simple
 function loadView(viewName) {
   const area = document.getElementById("content-area");
@@ -442,9 +609,14 @@ async function dashboardView(area) {
                    <h2 style="color: var(--primary-dark); font-weight: 800; font-size: 1.8rem; letter-spacing: -0.5px;">Dashboard</h2>
                    <p class="text-muted">Selamat datang kembali, <span class="text-primary" style="font-weight: 600;">${escapeHTML(currentUser.nama)}</span></p>
                 </div>
-                <div class="pulse-dot" title="Sistem Aktif"></div>
+                <div class="d-flex align-center gap-2">
+                    ${currentUser.role.includes("preseptor") ? `<button class="btn btn-primary btn-sm" onclick="bukaModalScanMhs()"><i class="fa-solid fa-qrcode"></i> Scan Mahasiswa</button>` : ""}
+                    <div class="pulse-dot" title="Sistem Aktif"></div>
+                </div>
             </div>
             
+            <div id="urgent-notif-container"></div>
+
             <div id="dashboard-widgets" class="grid-cards">
                 <!-- Skeleton Loading -->
                 ${Array(4)
@@ -456,36 +628,234 @@ async function dashboardView(area) {
                   )
                   .join("")}
             </div>
+
+            <div id="preseptor-extra-area" class="mt-4"></div>
+            <div id="preseptor-live-area" class="mt-4"></div>
         </div>
     `;
 
-  const res = await fetchAPI("getDashboardStats", {
-    user_id: currentUser.id,
-    role: currentUser.role,
-  });
-  updateNotifBadge(); // Also update notif badge here
-  const container = document.getElementById("dashboard-widgets");
+  const [resStats, resMendesak, resLive, resGap, resBoard, resAdminAn, resS] =
+    await Promise.all([
+      fetchAPI("getDashboardStats", {
+        user_id: currentUser.id,
+        role: currentUser.role,
+      }),
+      currentUser.role.includes("preseptor")
+        ? fetchAPI("getMendesakLogs", { tempat_id: currentUser.tempat_id })
+        : Promise.resolve({ success: false }),
+      currentUser.role.includes("preseptor")
+        ? fetchAPI("getLiveAttendance", { tempat_id: currentUser.tempat_id })
+        : Promise.resolve({ success: false }),
+      currentUser.role.includes("preseptor")
+        ? fetchAPI("getCompetencyGap", { tempat_id: currentUser.tempat_id })
+        : Promise.resolve({ success: false }),
+      currentUser.role.includes("preseptor")
+        ? fetchAPI("getSkillLeaderboard")
+        : Promise.resolve({ success: false }),
+      currentUser.role === "admin"
+        ? fetchAPI("getAdminAnalytics")
+        : Promise.resolve({ success: false }),
+      fetchAPI("getSettings"),
+    ]);
 
-  if (!res.success || !res.data) {
+  updateNotifBadge();
+  const container = document.getElementById("dashboard-widgets");
+  const urgentContainer = document.getElementById("urgent-notif-container");
+  const liveArea = document.getElementById("preseptor-live-area");
+  const extraArea = document.getElementById("preseptor-extra-area");
+
+  // Broadcast Message
+  const bMsg =
+    resS.success && resS.data
+      ? resS.data.find((s) => s.key === "broadcast_message")?.value || ""
+      : "";
+  if (bMsg) {
+    urgentContainer.innerHTML =
+      `
+        <div class="alert bg-primary text-white animate-fade-in mb-4 d-flex align-center gap-3" style="border-radius:12px; border:none; box-shadow:0 10px 15px -3px rgba(37,99,235,0.2);">
+            <div style="background:rgba(255,255,255,0.2); width:35px; height:35px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i class="fa-solid fa-bullhorn fa-sm"></i>
+            </div>
+            <div style="flex:1; font-size:0.9rem; font-weight:500;">
+                <span style="opacity:0.8; font-size:0.75rem; display:block; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Pengumuman Sistem</span>
+                ${escapeHTML(bMsg)}
+            </div>
+        </div>
+      ` + urgentContainer.innerHTML;
+  }
+
+  if (!resStats.success || !resStats.data) {
     container.innerHTML = `<div class="alert alert-danger">Gagal memuat statistik.</div>`;
     return;
   }
 
-  const d = res.data;
+  // Handle Urgent Notifications
+  if (resMendesak.success && resMendesak.data.length > 0) {
+    urgentContainer.innerHTML = `
+            <div class="alert bg-danger-soft animate-bounce-subtle" style="border-radius:12px; border:1px solid #fee2e2; margin-bottom:1.5rem; display:flex; align-items:center; gap:12px;">
+                <div style="background:#ef4444; color:white; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <i class="fa-solid fa-bell-exclamation fa-lg"></i>
+                </div>
+                <div style="flex:1">
+                    <strong style="color:#991b1b">Peringatan Validasi!</strong>
+                    <div style="font-size:0.85rem; color:#b91c1c">Terdapat <strong>${resMendesak.data.length} logbook</strong> yang telah menunggu lebih dari 24 jam. Mohon segera divalidasi.</div>
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="loadView('validasiView')">Lihat Antrean</button>
+            </div>
+        `;
+  }
+
+  // Handle Gap Analysis & Leaderboard
+  if (currentUser.role.includes("preseptor")) {
+    let gapHtml = "";
+    if (resGap.success && resGap.data) {
+      gapHtml = `
+                <div class="card shadow-sm border-0" style="border-radius:16px;">
+                    <div class="card-header bg-white">
+                        <h4 class="mb-0 font-bold"><i class="fa-solid fa-chart-line text-primary"></i> Gap Analysis Kompetensi</h4>
+                        <p class="text-xs text-muted mb-0">Kompetensi yang paling jarang dilakukan di lahan ini</p>
+                    </div>
+                    <div class="card-body" style="padding:1rem;">
+                        ${resGap.data
+                          .map(
+                            (g) => `
+                            <div class="mb-2">
+                                <div class="d-flex justify-between text-xs mb-1">
+                                    <span class="text-truncate" style="max-width:180px">${g.nama}</span>
+                                    <span class="font-bold">${g.count}x</span>
+                                </div>
+                                <div style="height:4px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
+                                    <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.6"></div>
+                                </div>
+                            </div>
+                        `,
+                          )
+                          .join("")}
+                    </div>
+                </div>
+            `;
+    }
+
+    let boardHtml = "";
+    if (resBoard.success && resBoard.data) {
+      boardHtml = `
+                <div class="card shadow-sm border-0" style="border-radius:16px; background: linear-gradient(135deg, #4f46e5, #3b82f6); color:white;">
+                    <div class="card-header border-0" style="background:transparent; color:white;">
+                        <h4 class="mb-0 font-bold"><i class="fa-solid fa-crown text-warning"></i> Skill of The Week</h4>
+                        <p class="text-xs mb-0" style="opacity:0.8">Mahasiswa paling aktif (Logbook Disetujui 7 Hari Terakhir)</p>
+                    </div>
+                    <div class="card-body" style="padding:1rem;">
+                        ${resBoard.data
+                          .map(
+                            (b, idx) => `
+                            <div class="d-flex align-center gap-3 mb-3">
+                                <div style="width:24px; height:24px; background:rgba(255,255,255,0.2); border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.7rem">
+                                    ${idx + 1}
+                                </div>
+                                <div style="flex:1">
+                                    <div class="font-bold" style="font-size:0.85rem">${b.nama}</div>
+                                    <div style="font-size:0.7rem; opacity:0.8">${b.count} Tindakan</div>
+                                </div>
+                                ${idx === 0 ? '<i class="fa-solid fa-trophy text-warning"></i>' : ""}
+                            </div>
+                        `,
+                          )
+                          .join("")}
+                    </div>
+                </div>
+            `;
+    }
+
+    extraArea.innerHTML = `
+            <div class="grid-cards" style="grid-template-columns: 2fr 1fr">
+                ${gapHtml}
+                ${boardHtml}
+            </div>
+        `;
+  }
+
+  // Handle Live Attendance
+  if (resLive.success && resLive.data) {
+    liveArea.innerHTML = `
+            <div class="card shadow-sm border-0" style="border-radius:16px; overflow:hidden;">
+                <div class="card-header bg-white d-flex align-center justify-between" style="padding:1.2rem 1.5rem;">
+                    <div class="d-flex align-center gap-3">
+                        <div style="background:var(--success-light); color:var(--success); width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center;">
+                            <i class="fa-solid fa-users-viewfinder fa-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 font-bold" style="color:var(--text-strong)">Live: Kehadiran Hari Ini</h4>
+                            <p class="text-xs text-muted mb-0">Mahasiswa yang sedang berada di lahan bimbingan Anda</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-success-soft text-success"><i class="fa-solid fa-circle fa-2xs animate-pulse"></i> LIVE MONITOR</span>
+                </div>
+                <div class="card-body" style="background:#f8fafc; padding:1.5rem;">
+                    <div class="table-responsive" style="background:white; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                        <table class="table mb-0" style="font-size:0.9rem;">
+                            <thead style="background:#f1f5f9;">
+                                <tr>
+                                    <th>Mahasiswa</th>
+                                    <th>C-In (WITA)</th>
+                                    <th>C-Out (WITA)</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${
+                                  resLive.data.length > 0
+                                    ? resLive.data
+                                        .map(
+                                          (p) => `
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-center gap-2">
+                                                <div style="width:30px; height:30px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.75rem">
+                                                    ${p.users.nama.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div class="font-bold">${p.users.nama}</div>
+                                                    <div class="text-xs text-muted">${p.users.nim}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class="badge bg-light text-dark">${p.jam_masuk}</span></td>
+                                        <td><span class="badge bg-light text-dark">${p.jam_pulang || "-"}</span></td>
+                                        <td>
+                                            ${p.jam_pulang ? '<span class="badge bg-info-soft text-info">Selesai</span>' : '<span class="badge bg-success">ON SITE</span>'}
+                                        </td>
+                                    </tr>
+                                `,
+                                        )
+                                        .join("")
+                                    : '<tr><td colspan="4" class="text-center p-4 text-muted">Belum ada mahasiswa yang check-in hari ini</td></tr>'
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+  }
+
+  const d = resStats.data;
   let html = "";
 
-  const createWidget = (icon, title, value, color, viewLink = null) => `
-        <div class="stat-card stat-card-premium" style="border-left: 5px solid ${color};">
+  const createWidget = (icon, title, value, color, viewLink = null) => {
+    const lightBg = color + "0a";
+    return `
+        <div class="stat-card stat-card-premium" style="background: ${lightBg}; border-top: 3px solid ${color};">
+            <div class="stat-icon-box" style="background: ${color}; color: white; box-shadow: 0 8px 16px -4px ${color}60;">
+                <i class="${icon}"></i>
+            </div>
             <div class="stat-info">
                 <h5>${title}</h5>
                 <h2>${value}</h2>
-                ${viewLink ? `<button class="btn btn-xs mt-1 btn-outline" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;" onclick="loadView('${viewLink}')">Kelola <i class="fa-solid fa-arrow-right ml-1"></i></button>` : ""}
-            </div>
-            <div class="stat-icon" style="color: ${color}; opacity: 0.1;">
-                <i class="${icon}"></i>
+                ${viewLink ? `<button class="btn-kelola" style="color:${color}; background:${color}15" onclick="loadView('${viewLink}')">Kelola <i class="fa-solid fa-arrow-right"></i></button>` : ""}
             </div>
         </div>
     `;
+  };
 
   if (currentUser.role === "admin") {
     html += createWidget(
@@ -544,6 +914,142 @@ async function dashboardView(area) {
       "#ef4444",
       "penilaianAkhirView",
     );
+
+    // ADMIN EXTRA: ANALYTICS & TOOLS (PREMIUM DESIGN)
+    if (resAdminAn.success && resAdminAn.data) {
+      const an = resAdminAn.data;
+      const attRate = Math.round((an.activeToday / an.totalMhs) * 100) || 0;
+
+      html += `
+            <div class="card border-0 mt-5 animate-fade-up" style="grid-column: 1 / -1; border-radius:24px; background:white; box-shadow:0 20px 40px -10px rgba(79, 70, 229, 0.1); overflow:hidden;">
+                 <div class="card-header border-0 py-4 px-5 d-flex justify-between align-center" style="background: linear-gradient(90deg, #4f46e5, #7c3aed); color:white;">
+                    <div class="d-flex align-center gap-3">
+                        <div style="background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;">
+                            <i class="fa-solid fa-chart-line fa-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 font-bold" style="letter-spacing:-0.5px; font-size:1.2rem;">Executive Dashboard Analitik</h4>
+                            <p class="text-xs mb-0" style="opacity:0.8">Institutional Monitoring & Clinical Quality Analytics</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.15); font-size:0.75rem; padding:4px 12px; border-radius:20px; font-weight:600; border:1px solid rgba(255,255,255,0.2);">
+                        <i class="fa-solid fa-clock-rotate-left mr-1"></i> Real-time Update
+                    </div>
+                 </div>
+                 <div class="card-body p-4" style="background:#fafafa;">
+                    <div class="grid-cards" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1.25rem;">
+                        
+                        <!-- Attendance Stats (EMERALD VIBRANT) -->
+                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius:24px; border:1px solid #10b98133; box-shadow:0 10px 15px -3px rgba(16, 185, 129, 0.1); min-height:180px; text-align:center;">
+                            <div class="d-flex justify-between align-center mb-3 w-100">
+                                <div style="flex:1"></div>
+                                <div class="text-xs font-black" style="color:#065f46; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Presensi Real-Time</div>
+                                <div style="flex:1; display:flex; justify-content:flex-end">
+                                    <div class="badge bg-success text-white px-2" style="font-size:0.6rem; border-radius:30px; box-shadow:0 4px 6px -1px rgba(16, 185, 129, 0.4); font-weight:800;">LIVE</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex align-end justify-center gap-2 mb-1">
+                                    <span class="h1 font-black m-0" style="color:#064e3b; letter-spacing:-2px; line-height:1;">${an.activeToday}</span>
+                                    <span class="font-black mb-1" style="font-size:1.2rem; color:#059669">/ ${an.totalMhs}</span>
+                                </div>
+                                <div class="text-xs font-extrabold" style="color:#059669; text-transform:uppercase;">Mahasiswa Terdaftar</div>
+                            </div>
+                            <div class="mt-auto w-100">
+                                <div style="height:12px; background:rgba(6, 78, 59, 0.08); border-radius:10px; overflow:hidden; position:relative; border:1px solid rgba(16, 185, 129, 0.15); margin-bottom:12px;">
+                                    <div style="width:${attRate}%; height:100%; background:linear-gradient(90deg, #10b981, #34d399); border-radius:10px; box-shadow:0 0 15px rgba(16,185,129,0.4)"></div>
+                                </div>
+                                <div class="d-flex justify-center align-center gap-3">
+                                    <span class="text-xs font-black" style="color:#065f46; opacity:0.8; text-transform:uppercase;">Institutional Presence:</span>
+                                    <span class="text-sm font-black" style="color:#059669">${attRate}% <i class="fa-solid fa-arrow-trend-up ml-1"></i></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Activity Stats (AZURE BLUE) -->
+                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius:24px; border:1px solid #3b82f633; box-shadow:0 10px 15px -3px rgba(59, 130, 246, 0.1); min-height:180px; text-align:center;">
+                            <div class="d-flex justify-between align-center mb-3 w-100">
+                                <div style="flex:1"></div>
+                                <div class="text-xs font-black" style="color:#1e40af; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Kedisiplinan Logbook</div>
+                                <div style="flex:1; display:flex; justify-content:flex-end">
+                                    <div class="badge bg-primary text-white px-2" style="font-size:0.6rem; border-radius:30px; font-weight:800;">AKTIVITAS</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex align-end justify-center gap-2 mb-1">
+                                    <span class="h1 font-black m-0" style="color:#1e3a8a; letter-spacing:-2px; line-height:1;">${an.avgLogs}</span>
+                                    <span class="font-black mb-1" style="font-size:1.2rem; color:#2563eb">Log</span>
+                                </div>
+                                <div class="text-xs font-extrabold" style="color:#2563eb; text-transform:uppercase;">Avg Logbook Akhir</div>
+                            </div>
+                            <div class="d-flex gap-2 mt-auto w-100">
+                                <div style="flex:1; background:rgba(255,255,255,0.65); padding:10px; border-radius:16px; border:1px solid rgba(59, 130, 246, 0.15); backdrop-filter:blur(4px); display:flex; flex-direction: column; align-items:center; justify-content:center;">
+                                    <div class="text-xs font-black mb-1" style="color:#1e40af; font-size:0.65rem;">TOTAL DISIPLIN</div>
+                                    <div class="h4 m-0 font-black" style="color:var(--primary); line-height:1;">${an.totalLogs}</div>
+                                </div>
+                                <div style="flex:1; background:rgba(255,255,255,0.65); padding:10px; border-radius:16px; border:1px solid rgba(59, 130, 246, 0.15); backdrop-filter:blur(4px); display:flex; flex-direction: column; align-items:center; justify-content:center;">
+                                    <div class="text-xs font-black mb-1" style="color:#5b21b6; font-size:0.65rem;">PRODUKTIVITAS</div>
+                                    <div class="h5 m-0 font-black" style="color:#7c3aed; line-height:1; letter-spacing:0.5px;">TINGGI</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Prodi Performance List (LAVENDER PINK) -->
+                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%); border-radius:24px; border:1px solid #d946ef33; box-shadow:0 10px 15px -3px rgba(217, 70, 239, 0.1); grid-column: span 2; text-align:center;">
+                            <div class="text-xs font-black mb-4" style="color:#701a75; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Clinical Average Scoring per Prodi</div>
+                            <div class="d-flex gap-3 wrap justify-center">
+                                ${an.prodiStats
+                                  .map(
+                                    (p) => `
+                                    <div style="background:rgba(255,255,255,0.75); border:1px solid rgba(217, 70, 239, 0.2); border-radius:20px; padding:18px 24px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.03); min-width:220px; backdrop-filter:blur(10px); transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;" onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 20px 25px -5px rgba(217, 70, 239, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.03)';">
+                                        <div class="text-xs font-extrabold mb-3" style="color:#a21caf; letter-spacing:0.3px; text-transform:uppercase;">${p.nama}</div>
+                                        <div class="d-flex align-center justify-center gap-3">
+                                            <span class="h2 font-black m-0" style="color:#4a044e; letter-spacing:-1.5px; line-height:1;">${p.avg}</span>
+                                            <div style="width:42px; height:42px; border-radius:14px; background:linear-gradient(135deg, #d946ef, #a21caf); color:white; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 15px rgba(162, 28, 175, 0.3); transform: rotate(-5deg);">
+                                                <i class="fa-solid fa-trophy fa-sm"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `,
+                                  )
+                                  .join("")}
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- Broadcast Hub (Premium Glassy Design) -->
+            <div class="card border-0 mt-4 animate-fade-up" style="grid-column: 1 / -1; border-radius:24px; background:linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color:white; overflow:hidden; position:relative;">
+                 <div style="position:absolute; top:-50px; right:-50px; width:200px; height:200px; background:rgba(124, 58, 237, 0.2); border-radius:50%; filter:blur(60px);"></div>
+                 <div style="position:absolute; bottom:-40px; left:-40px; width:150px; height:150px; background:rgba(79, 70, 229, 0.3); border-radius:50%; filter:blur(50px);"></div>
+                 
+                 <div class="card-body d-flex align-center gap-1 py-5 px-5" style="position:relative; z-index:1;">
+                    <div style="flex:1">
+                        <div class="d-flex align-center gap-3 mb-2">
+                             <div style="width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.3)">
+                                <i class="fa-solid fa-bullhorn fa-sm text-white"></i>
+                             </div>
+                             <h4 class="m-0 font-bold" style="letter-spacing:-0.5px;">Broadcast Hub Central</h4>
+                        </div>
+                        <p class="text-sm mb-0" style="opacity:0.8; max-width:480px;">Kirim pengumuman vital ke layar Utama seluruh entitas (Mahasiswa & Preseptor) dalam satu klik.</p>
+                    </div>
+                    
+                    <div class="d-flex gap-3 align-center" style="background:rgba(255,255,255,0.1); padding:10px; border-radius:20px; border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(10px);">
+                        <input type="text" id="bc-message" class="form-control" style="width:340px; height:46px; border:none; border-radius:14px; background:rgba(255,255,255,0.1); color:white; padding-left:20px; font-size:0.95rem;" placeholder="Ketik pengumuman penting di sini...">
+                        <button class="btn" style="height:46px; width:100px; background:white; color:#1e1b4b; border-radius:14px; font-weight:800; border:none; box-shadow:0 10px 20px -5px rgba(255,255,255,0.3); transition:all 0.3s;" onclick="eksekusiBroadcast()">
+                            <i class="fa-solid fa-paper-plane mr-2"></i> KIRIM
+                        </button>
+                    </div>
+                 </div>
+            </div>
+            <style>
+                #bc-message::placeholder { color: rgba(255,255,255,0.5); }
+                #bc-message:focus { outline:none; background:rgba(255,255,255,0.15); }
+                .btn:active { transform: scale(0.95); }
+            </style>
+        `;
+    }
   } else if (currentUser.role.includes("preseptor")) {
     html += createWidget(
       "fa-solid fa-user-check",
@@ -567,6 +1073,44 @@ async function dashboardView(area) {
       "validasiView",
     );
   } else if (currentUser.role === "mahasiswa") {
+    const resRekap = await fetchAPI("getRekapLogbook", {
+      ids: [currentUser.id],
+    });
+    let trackerHtml = "";
+    if (resRekap.success && resRekap.data && Array.isArray(resRekap.data)) {
+      const myData = resRekap.data.find((x) => x.user_id === currentUser.id);
+      if (myData) {
+        const myRekap = myData.rekap || [];
+        const completed = myRekap.filter((r) => r.status === "Tercapai").length;
+        const total = myRekap.length;
+        const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        trackerHtml = `
+                    <div class="card animate-fade-up border-0 shadow-sm" style="grid-column: 1 / -1; border-radius:16px; background:white; overflow:hidden;">
+                        <div class="card-body d-flex align-center gap-4 py-4 px-5">
+                            <div style="flex-shrink:0;">
+                                <div style="width:70px; height:70px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.4rem; position:relative;">
+                                    ${pct}%
+                                    <svg style="position:absolute; width:100%; height:100%; transform:rotate(-90deg);">
+                                        <circle cx="35" cy="35" r="32" stroke="var(--primary)" stroke-width="4" fill="none" stroke-dasharray="201" stroke-dashoffset="${201 - (201 * pct) / 100}" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <div style="flex:1">
+                                <h4 class="mb-1 font-bold"><i class="fa-solid fa-bullseye text-primary"></i> Target Kompetensi</h4>
+                                <p class="text-sm text-muted mb-0">Anda telah mencapai <strong>${completed} dari ${total}</strong> target keterampilan di stase ini.</p>
+                            </div>
+                            <div class="d-flex align-center gap-3">
+                                <button class="btn btn-outline btn-sm" onclick="bukaModalMyQR()"><i class="fa-solid fa-address-card"></i> QR Saya</button>
+                                <button class="btn btn-primary btn-sm" onclick="loadView('logbookView')">Lihat Semua Target</button>
+                            </div>
+                        </div>
+                    </div>
+            `;
+      }
+    }
+
+    html += trackerHtml;
     html += createWidget(
       "fa-solid fa-book-medical",
       "Tindakan Terisi",
@@ -580,6 +1124,20 @@ async function dashboardView(area) {
       d.presensiHariIni ? "HADIR" : "BELUM",
       d.presensiHariIni ? "#22c55e" : "#ef4444",
       "presensiView",
+    );
+    html += createWidget(
+      "fa-solid fa-check-double",
+      "Jumlah Hadir",
+      d.jumlahHadir || 0,
+      "#10b981",
+      "presensiView",
+    );
+    html += createWidget(
+      "fa-solid fa-calendar-minus",
+      "Tidak Hadir",
+      d.jumlahAbsen || 0,
+      "#f43f5e",
+      "jadwalMahasiswaView",
     );
   }
 
@@ -653,7 +1211,7 @@ async function jadwalMahasiswaView(area) {
         </div>
     `;
 
-  const res = await fetchAPI("getJadwal");
+  const res = await fetchAPI("getJadwal", { user_id: currentUser.id });
   const container = document.getElementById("list-jadwal-mhs");
   if (res.success && res.data) {
     const myData = res.data.filter((j) => j.user_id == currentUser.id);
@@ -832,6 +1390,38 @@ async function presensiView(area) {
             .play()
             .catch((e) => console.log(e));
 
+          // VALIDASI JADWAL UNTUK CHECK-IN
+          if (type === "in") {
+            const today = new Date().toISOString().split("T")[0];
+            const scRes = await fetchAPI("getJadwal", {
+              user_id: currentUser.id,
+            });
+            const todaySched = (scRes.data || []).find(
+              (j) => j.tanggal === today,
+            );
+
+            if (!todaySched) {
+              return showToast(
+                "Gagal Check-In",
+                "Anda tidak memiliki jadwal praktik hari ini.",
+                "error",
+              );
+            }
+
+            // Periksa apakah QR Code cocok dengan nama tempat di jadwal
+            // decodedText biasanya nama tempat dari QR Code
+            if (
+              decodedText.toLowerCase().trim() !==
+              todaySched.nama_tempat.toLowerCase().trim()
+            ) {
+              return showToast(
+                "Lokasi Salah",
+                `Anda terjadwal di ${todaySched.nama_tempat}, bukan di ${decodedText}.`,
+                "error",
+              );
+            }
+          }
+
           showLoader(true);
           const actionTarget = type === "in" ? "checkIn" : "checkOut";
           const logRes = await postAPI(actionTarget, {
@@ -875,9 +1465,12 @@ async function logbookView(area) {
   area.innerHTML = `
         <div class="animate-fade-up">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-between align-center">
                     <h3><i class="fa-solid fa-book-medical text-primary"></i> Data Logbook Tindakan</h3>
-                    <button class="btn btn-primary btn-sm" id="btn-add-log"><i class="fa-solid fa-plus"></i> Tambah Tindakan</button>
+                    <div class="d-flex gap-2">
+                         <button class="btn btn-outline btn-sm" onclick="exportLogbookPDF()"><i class="fa-solid fa-file-pdf"></i> Ekspor PDF</button>
+                         <button class="btn btn-primary btn-sm" id="btn-add-log"><i class="fa-solid fa-plus"></i> Tambah Tindakan</button>
+                    </div>
                 </div>
                 <div class="card-body">
                      <div class="table-responsive">
@@ -902,9 +1495,10 @@ async function logbookView(area) {
 
   document.getElementById("btn-add-log").onclick = async () => {
     showLoader(true);
-    const [resKomp, resTemp] = await Promise.all([
+    const [resKomp, resTemp, resJadw] = await Promise.all([
       fetchAPI("getKompetensi", { user_id: currentUser.id }),
       fetchAPI("getTempat"),
+      fetchAPI("getJadwal", { user_id: currentUser.id }),
     ]);
     showLoader(false);
 
@@ -953,6 +1547,9 @@ async function logbookView(area) {
         .join("");
     }
 
+    const todayDate = new Date().toISOString().split("T")[0];
+    const userSchedules = resJadw && resJadw.data ? resJadw.data : [];
+
     openModal(
       "Tambah Logbook Tindakan",
       `
@@ -961,7 +1558,7 @@ async function logbookView(area) {
                     <label>Tanggal Pelaksanaan</label>
                     <div class="input-with-icon">
                         <i class="fa-regular fa-calendar"></i>
-                        <input type="date" id="log-tanggal" required class="form-control" value="${new Date().toISOString().split("T")[0]}">
+                        <input type="date" id="log-tanggal" required class="form-control" value="${todayDate}" onchange="autoFillLahan(this.value)">
                     </div>
                 </div>
                 <div class="form-group">
@@ -969,6 +1566,7 @@ async function logbookView(area) {
                     <select id="log-lahan" required class="form-control">
                         ${optTemp}
                     </select>
+                    <small id="lahan-helper" class="text-muted"></small>
                 </div>
                 <div class="form-group">
                     <label>Jenis Kompetensi</label>
@@ -992,6 +1590,23 @@ async function logbookView(area) {
             </form>
         `,
     );
+
+    window.autoFillLahan = (dateStr) => {
+      const found = userSchedules.find((j) => j.tanggal === dateStr);
+      const sel = document.getElementById("log-lahan");
+      const helper = document.getElementById("lahan-helper");
+      if (!sel || !helper) return;
+      if (found) {
+        sel.value = found.nama_tempat;
+        helper.innerHTML = `<i class="fa-solid fa-check-circle text-success"></i> Sesuai Jadwal: <strong>${found.nama_tempat}</strong>`;
+        sel.style.background = "#f0fdf4";
+      } else {
+        helper.innerHTML = `<i class="fa-solid fa-circle-exclamation text-warning"></i> Tidak ditemukan jadwal pada tanggal ini.`;
+        sel.style.background = "";
+      }
+    };
+
+    window.autoFillLahan(todayDate);
 
     document.getElementById("form-logbook").onsubmit = async (e) => {
       e.preventDefault();
@@ -1250,14 +1865,18 @@ async function validasiView(area) {
   area.innerHTML = `
         <div class="animate-fade-up">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-between align-center">
                     <h3><i class="fa-solid fa-check-double text-primary"></i> Antrean Validasi Logbook</h3>
+                    <div id="bulk-action-area" style="display:none">
+                        <button class="btn btn-success btn-sm" onclick="validasiBulk()"><i class="fa-solid fa-list-check"></i> Setujui Masal (<span id="bulk-count">0</span>)</button>
+                    </div>
                 </div>
                 <div class="card-body">
-                     <div class="table-responsive">
+                    <div class="table-responsive">
                         <table id="table-validasi">
                             <thead>
                                 <tr>
+                                    <th width="40"><input type="checkbox" id="chk-all-log" onclick="toggleAllLog(this)"></th>
                                     <th>Mahasiswa</th>
                                     <th>Tgl</th>
                                     <th>Kompetensi</th>
@@ -1266,7 +1885,7 @@ async function validasiView(area) {
                                     <th style="text-align:right">Tindakan Validasi</th>
                                 </tr>
                             </thead>
-                            <tbody><tr><td colspan="6" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Mengecek antrean...</td></tr></tbody>
+                            <tbody><tr><td colspan="7" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Mengecek antrean...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -1282,14 +1901,20 @@ async function validasiView(area) {
   if (res.success && res.data.length > 0) {
     tableBody.innerHTML = res.data
       .map((p, idx) => {
+        const isUrgent =
+          new Date(p.created_at) < new Date(Date.now() - 86400000);
         return `
             <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                <td style="vertical-align:middle"><input type="checkbox" class="chk-log" value="${p.id}" onclick="updateBulkUI()"></td>
                 <td>
                     <div class="d-flex align-center gap-2">
                         <div style="width:35px;height:35px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem">
                             ${p.nama_mahasiswa.charAt(0)}
                         </div>
-                        <strong>${p.nama_mahasiswa}</strong>
+                        <div>
+                            <strong>${p.nama_mahasiswa}</strong>
+                             ${isUrgent ? ' <span class="badge bg-danger" style="font-size:0.6rem">MENDESAK</span>' : ""}
+                        </div>
                     </div>
                 </td>
                 <td>${p.tanggal}</td>
@@ -1306,9 +1931,52 @@ async function validasiView(area) {
       })
       .join("");
   } else {
-    tableBody.innerHTML = `<tr><td colspan="5" class="empty-table"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color:var(--success);display:block"></i>Semua logbook telah divalidasi.<br>Tidak ada antrean logbook pending.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" class="empty-table"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color:var(--success);display:block"></i>Semua logbook telah divalidasi.<br>Tidak ada antrean logbook pending.</td></tr>`;
   }
 }
+
+window.toggleAllLog = (el) => {
+  document
+    .querySelectorAll(".chk-log")
+    .forEach((chk) => (chk.checked = el.checked));
+  updateBulkUI();
+};
+
+window.updateBulkUI = () => {
+  const checked = document.querySelectorAll(".chk-log:checked");
+  const area = document.getElementById("bulk-action-area");
+  if (checked.length > 0) {
+    area.style.display = "block";
+    document.getElementById("bulk-count").textContent = checked.length;
+  } else {
+    area.style.display = "none";
+  }
+};
+
+window.validasiBulk = async () => {
+  const checked = Array.from(document.querySelectorAll(".chk-log:checked")).map(
+    (c) => c.value,
+  );
+  if (
+    !confirm(
+      `Apakah Anda yakin ingin menyetujui ${checked.length} logbook sekaligus dengan nilai default (100)?`,
+    )
+  )
+    return;
+
+  showLoader(true);
+  const res = await postAPI("validasiLogBulk", {
+    ids: checked,
+    status: "Disetujui",
+    nilai: 100,
+  });
+  showLoader(false);
+
+  if (res.success) {
+    showToast("Berhasil", res.message, "success");
+    loadView("validasiView");
+  }
+};
 
 window.bukaModalValidasi = (id, nama, deskripsi) => {
   openModal(
@@ -1345,8 +2013,9 @@ window.bukaModalValidasi = (id, nama, deskripsi) => {
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Catatan Feedback/Review Preseptor</label>
-                    <textarea id="val-catatan" rows="3" class="form-control" required placeholder="Berikan arahan untuk pengembangan skill..."></textarea>
+                    <label><i class="fa-solid fa-comment-medical text-primary"></i> Catatan Coaching / Feedback Reflektif</label>
+                    <textarea id="val-catatan" rows="3" class="form-control" required placeholder="Berikan feedback sebagai Coaching Log Anda untuk pengembangan skill mahasiswa ini..."></textarea>
+                    <small class="text-muted">Feedback ini akan tersimpan sebagai riwayat bimbingan (Coaching Log).</small>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block mt-2"><i class="fa-solid fa-clipboard-check"></i> Eksekusi & Simpan Evaluasi</button>
             </form>
@@ -1411,16 +2080,28 @@ async function mahasiswaView(area) {
         </div>
      `;
 
-  const [resUsers, resJadwal, resTempat, resNilai] = await Promise.all([
-    fetchAPI("getUsers"),
-    fetchAPI("getJadwal"),
-    fetchAPI("getTempat"),
-    fetchAPI("getPenilaianAkhir"), // Ambil seluruh data nilai akhir utk cek status
-  ]);
   const tableBody = document.querySelector("#table-mhs-bimb tbody");
   if (!tableBody) return;
-  if (resUsers.success && resJadwal.success && resTempat.success) {
-    let mhs = resUsers.data.filter((u) => u.role === "mahasiswa");
+
+  const [resAssigned, resTempat, resGroups] = await Promise.all([
+    fetchAPI("getAssignedStudents", { tempat_id: currentUser.tempat_id }),
+    fetchCachedAPI("getTempat"),
+    fetchAPI("getKelompok"),
+  ]);
+
+  if (!resAssigned.success) {
+    tableBody.innerHTML = `<tr><td colspan="4" class="empty-table text-danger">Gagal memuat data bimbingan</td></tr>`;
+    return;
+  }
+
+  const studentIds = resAssigned.data.map((u) => u.id);
+  const [resJadwal, resNilai] = await Promise.all([
+    fetchAPI("getJadwal", { user_id: studentIds }),
+    fetchAPI("getPenilaianAkhir", { ids: studentIds }),
+  ]);
+
+  if (resJadwal.success && resTempat.success) {
+    let mhs = resAssigned.data;
     const roleKeyArray =
       currentUser.role === "preseptor_akademik"
         ? "akd_components_count"
@@ -1455,8 +2136,17 @@ async function mahasiswaView(area) {
         relevantJadwal.sort(
           (a, b) => new Date(a.tanggal) - new Date(b.tanggal),
         );
-        const dates = relevantJadwal.map((j) => formatDateIndo(j.tanggal));
-        u.tanggal_praktik = dates.join("<br>");
+        const dates = relevantJadwal.map((j) => j.tanggal);
+        const minDate = new Date(Math.min(...dates.map((d) => new Date(d))));
+        const maxDate = new Date(Math.max(...dates.map((d) => new Date(d))));
+
+        if (minDate.getTime() === maxDate.getTime()) {
+          u.tanggal_praktik = formatDateIndo(dates[0]);
+        } else {
+          u.tanggal_praktik = `${formatDateIndo(minDate.toISOString().split("T")[0])} <br>s/d<br> ${formatDateIndo(maxDate.toISOString().split("T")[0])}`;
+        }
+
+        u.firstDate = minDate.toISOString().split("T")[0];
         u.isAssignedToPreceptor = true;
       } else {
         u.nama_lahan = "-";
@@ -1496,53 +2186,103 @@ async function mahasiswaView(area) {
       renderTabelBimbingan(mhs, e.target.value);
     };
 
-    // Render fungsi local
-    const renderTabelBimbingan = (dataList, filterStr) => {
-      // Apply filtering location logic strictly for 'preseptor' klinik
+    // Initial render
+    const renderTabelBimbingan = async (dataList, filterStr) => {
       let displayData = dataList;
       if (currentUser.tempat_id && currentUser.tempat_id !== "-") {
         displayData = displayData.filter((u) => u.isAssignedToPreceptor);
       }
 
-      // Apply manual dropdown filter
       if (filterStr === "belum") {
         displayData = displayData.filter((u) => !u.sudahDinilai);
       } else if (filterStr === "sudah") {
         displayData = displayData.filter((u) => u.sudahDinilai);
       }
 
+      // Fetch Rekap for Progress Tracker
+      const sIds = displayData.map((x) => x.id);
+      const resRekap = await fetchAPI("getRekapLogbook", { ids: sIds });
+      const rekap = resRekap.success ? resRekap.data : {};
+
+      // Sort by earliest date
+      displayData.sort((a, b) => {
+        const dateA = a.firstDate
+          ? new Date(a.firstDate)
+          : new Date(8640000000000000);
+        const dateB = b.firstDate
+          ? new Date(b.firstDate)
+          : new Date(8640000000000000);
+        return dateA - dateB;
+      });
+
       if (displayData.length > 0) {
         tableBody.innerHTML = displayData
-          .map(
-            (u, idx) => `
+          .map((u, idx) => {
+            const myData = (resRekap.data || []).find(
+              (x) => x.user_id === u.id,
+            );
+            const myRekap = myData ? myData.rekap || [] : [];
+            const completed = myRekap.filter(
+              (r) => r.status === "Tercapai",
+            ).length;
+            const targets = myRekap.length;
+            const pct =
+              targets > 0 ? Math.round((completed / targets) * 100) : 0;
+            const progressColor =
+              pct >= 100 ? "var(--success)" : "var(--primary)";
+
+            const myKel = (resGroups.data || []).find(
+              (g) => g.id === u.kelompok_id,
+            );
+            const kelNama = myKel ? myKel.nama_kelompok : "Tanpa Kelompok";
+
+            return `
                     <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
                         <td>
-                            <strong>${u.nama}</strong>
-                            ${u.sudahDinilai ? '<i class="fa-solid fa-circle-check text-success ml-1" title="Sudah memiliki nilai"></i>' : ""}
+                            <div class="d-flex align-center gap-3">
+                                <div style="width:35px;height:35px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem">
+                                    ${u.nama.charAt(0)}
+                                </div>
+                                <div style="flex:1">
+                                    <div class="font-bold" style="color:var(--text-strong)">${u.nama}</div>
+                                    <div class="text-xs text-muted mb-1"><i class="fa-solid fa-users"></i> ${kelNama}</div>
+                                    <div class="text-xs font-medium" style="color:var(--primary)">${u.username || u.id}</div>
+                                </div>
+                                ${u.sudahDinilai ? '<i class="fa-solid fa-circle-check text-success" title="Sudah memiliki nilai final"></i>' : ""}
+                            </div>
                         </td>
-                        <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${u.username}</span></td>
                         <td>
-                            <span class="badge bg-primary">${u.prodi}</span><br>
-                            <small class="text-muted"><i class="fa-solid fa-hospital"></i> ${u.nama_lahan}</small>
+                            <div style="width:100px;">
+                                <div class="d-flex justify-between text-xs mb-1">
+                                    <span class="font-bold">${pct}%</span>
+                                    <span class="text-muted">${completed}/${targets} Skill</span>
+                                </div>
+                                <div style="height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden;">
+                                    <div style="width:${pct}%; height:100%; background:${progressColor}; transition:width 0.5s ease;"></div>
+                                </div>
+                            </div>
                         </td>
-                        <td><small>${u.tanggal_praktik}</small></td>
+                        <td>
+                            <span class="badge bg-primary-soft text-primary-dark" style="font-size:0.75rem">${u.prodi}</span><br>
+                            <small class="text-muted"><i class="fa-solid fa-hospital-user"></i> ${u.nama_lahan}</small>
+                        </td>
+                        <td>
+                            <div style="font-size:0.8rem; line-height:1.4;">
+                                ${u.tanggal_praktik}
+                            </div>
+                        </td>
                         <td style="text-align:right">
-                            ${
-                              u.sudahDinilai
-                                ? `<button class="btn btn-warning-soft btn-sm" onclick="bukaModalInputNilai('${u.id}', '${u.nama}')">
-                                        <i class="fa-solid fa-pen-to-square"></i> Update Nilai
-                                   </button>`
-                                : `<button class="btn btn-primary btn-sm" onclick="bukaModalInputNilai('${u.id}', '${u.nama}')">
-                                        <i class="fa-solid fa-pen-nib"></i> Input Nilai
-                                   </button>`
-                            }
+                            <div class="d-flex gap-1 justify-end">
+                                <button class="btn btn-icon-ghost" onclick="bukaModalPreceptorNotes('${u.id}', '${u.nama}')" title="Catatan Preseptor (Antar-Dosen)"><i class="fa-solid fa-comments"></i></button>
+                                ${u.sudahDinilai ? `<button class="btn btn-warning btn-sm" style="border-radius:20px; font-size:0.75rem" onclick="bukaModalInputNilai('${u.id}', '${u.nama}')"><i class="fa-solid fa-pen-to-square"></i></button>` : `<button class="btn btn-primary btn-sm" style="border-radius:20px; font-size:0.75rem" onclick="bukaModalInputNilai('${u.id}', '${u.nama}')"><i class="fa-solid fa-pen-nib"></i></button>`}
+                            </div>
                         </td>
                     </tr>
-                `,
-          )
+                `;
+          })
           .join("");
       } else {
-        tableBody.innerHTML = `<tr><td colspan="4" class="empty-table">Tidak ada mahasiswa yang sesuai kriteria filter.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="5" class="empty-table"><i class="fa-solid fa-user-slash fa-2x mb-2" style="display:block;color:#cbd5e1;"></i>Tidak ada mahasiswa bimbingan ditemukan.</td></tr>`;
       }
     };
 
@@ -3361,11 +4101,11 @@ window.bukaModalUser = async (roleFilter, id = null) => {
 
   document.getElementById("form-user").onsubmit = async (e) => {
     e.preventDefault();
+    const pwdRaw = document.getElementById("user-password").value;
     const payload = {
       id: document.getElementById("user-id").value,
       nama: document.getElementById("user-nama").value,
       username: document.getElementById("user-username").value,
-      password: document.getElementById("user-password").value,
       role: document.getElementById("user-role").value,
       prodi: document.getElementById("user-prodi")
         ? document.getElementById("user-prodi").value
@@ -3386,6 +4126,12 @@ window.bukaModalUser = async (roleFilter, id = null) => {
             )?.kelompok_id || "-"
           : "-",
     };
+
+    if (pwdRaw) {
+      payload.password = await hashPassword(pwdRaw);
+    } else if (!isEdit) {
+      payload.password = await hashPassword("123456"); // Default Password if not filled for new user
+    }
 
     // FIX: Set ID ke Username jika ini adalah user baru untuk mencegah duplikasi ID kosong
     if (!payload.id && payload.username) {
@@ -3555,9 +4301,16 @@ window.handleImportCSV = (e, roleFilter) => {
       // Final Check logic
       if (!u.id && u.username) u.id = u.username;
       if (!u.username && u.id) u.username = u.id;
-      if (!u.password) u.password = "123"; // Default password jika kosong
 
-      if (u.id) mappedUsers.push(u);
+      if (u.id) {
+        if (u.password) {
+          u.password = await hashPassword(u.password);
+        } else {
+          // Jika kosong, hapus property password agar tidak menimpa password lama (upsert)
+          delete u.password;
+        }
+        mappedUsers.push(u);
+      }
     }
 
     // DEDUPLICATION: Remove duplicates from same CSV batch (Postgres error fix)
@@ -4522,8 +5275,12 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const u = document.getElementById("username").value;
   const p = document.getElementById("password").value;
-
-  const res = await fetchAPI("login", { username: u, password: p });
+  const hp = await hashPassword(p);
+  const res = await fetchAPI("login", {
+    username: u,
+    password: hp,
+    raw_password: p,
+  });
 
   if (res.success) {
     // PWA Database/Version Check: Force refresh if needed
@@ -4744,7 +5501,6 @@ async function jadwalAdminView(area) {
       let currentTempatName = null;
 
       dates.forEach((d) => {
-        // assume group is in same place
         const schedToday = group.schedules.find((s) => s.tanggal === d);
         if (!schedToday) return;
 
@@ -4778,38 +5534,40 @@ async function jadwalAdminView(area) {
         });
 
       // Build single wide table for this Kelompok
-      let headHtml1 = `<tr style="background:#fff000; color:#000;">`;
-      let headHtml2 = `<tr style="background:#fff000; color:#000;">`;
+      const headerStyle =
+        "background:#f8fafc; color:var(--text-strong); font-weight:700; text-transform:uppercase; font-size:0.75rem; border:1px solid #cbd5e1;";
+      let headHtml1 = `<tr style="${headerStyle}">`;
+      let headHtml2 = `<tr style="${headerStyle}">`;
 
       headHtml1 += `
-                <th rowspan="2" style="width:30px; text-align:center; vertical-align:middle; border:1px solid #333;">No</th>
-                <th rowspan="2" style="min-width:200px; text-align:center; vertical-align:middle; border:1px solid #333; white-space:normal">Nama Mahasiswa</th>
-                <th rowspan="2" style="width:140px; text-align:center; vertical-align:middle; border:1px solid #333;">NIM</th>
+                <th rowspan="2" style="width:40px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NO</th>
+                <th rowspan="2" style="width:250px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1; white-space:normal">NAMA MAHASISWA</th>
+                <th rowspan="2" style="width:130px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NIM</th>
             `;
 
-      blocks.forEach((block, blockIdx) => {
+      blocks.forEach((block) => {
         headHtml1 += `
-                    <th rowspan="2" style="width:160px; text-align:center; vertical-align:middle; border:1px solid #333; white-space:normal">${blockIdx > 0 ? "Tempat Praktik" : "Tempat Praktik"}</th>
-                    <th colspan="${block.dates.length}" style="text-align:center; border:1px solid #333;">JADWAL</th>
+                    <th rowspan="2" style="width:180px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1; white-space:normal">TEMPAT PRAKTIK</th>
+                    <th colspan="${block.dates.length}" style="text-align:center; border:1px solid #cbd5e1; letter-spacing:1px;">JADWAL</th>
                 `;
 
-        block.dates.forEach((dStr, dayIdx) => {
+        block.dates.forEach((dStr) => {
           const dObj = new Date(dStr);
           const mStr = [
-            "Januari",
-            "Februari",
-            "Maret",
-            "April",
-            "Mei",
-            "Juni",
-            "Juli",
-            "Agustus",
-            "September",
-            "Oktober",
-            "November",
-            "Desember",
+            "JANUARI",
+            "FEBRUARI",
+            "MARET",
+            "APRIL",
+            "MEI",
+            "JUNI",
+            "JULI",
+            "AGUSTUS",
+            "SEPTEMBER",
+            "OKTOBER",
+            "NOVEMBER",
+            "DESEMBER",
           ][dObj.getMonth()];
-          headHtml2 += `<th style="text-align:center; border:1px solid #333; padding:4px;">${dObj.getDate()} ${mStr}</th>`;
+          headHtml2 += `<th style="text-align:center; width:65px; border:1px solid #cbd5e1; padding:6px 4px; font-size:0.7rem;">${dObj.getDate()} ${mStr}</th>`;
         });
       });
 
@@ -4819,13 +5577,13 @@ async function jadwalAdminView(area) {
       let bodyHtml = "";
       group.users.forEach((u, index) => {
         bodyHtml += `<tr style="background:#fff;">`;
-        bodyHtml += `<td style="text-align:center; border:1px solid #333">${index + 1}</td>`;
-        bodyHtml += `<td style="border:1px solid #333; padding:4px 8px; white-space:normal">${u.nama}</td>`;
-        bodyHtml += `<td style="border:1px solid #333; padding-left:4px;">${u.username}</td>`;
+        bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; padding:8px 4px;">${index + 1}</td>`;
+        bodyHtml += `<td style="border:1px solid #cbd5e1; padding:8px 12px; white-space:normal; font-weight:500;">${u.nama.toUpperCase()}</td>`;
+        bodyHtml += `<td style="border:1px solid #cbd5e1; padding:8px 8px; text-align:center; color:var(--text-body);">${u.username}</td>`;
 
         blocks.forEach((block, blockIdx) => {
           if (index === 0) {
-            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #333; background:#fff; padding: 4px; white-space:normal">${block.nama_tempat}</td>`;
+            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}</td>`;
           }
 
           block.dates.forEach((dStr) => {
@@ -4833,15 +5591,23 @@ async function jadwalAdminView(area) {
               (x) => x.user_id == u.id && x.tanggal === dStr,
             );
             let shiftText = "";
+            let shiftStyle = "";
             if (s && s.shift) {
-              if (s.shift == 1 || s.shift == "1") shiftText = "P";
-              else if (s.shift == 2 || s.shift == "2") shiftText = "S";
-              else if (s.shift == 3 || s.shift == "3") shiftText = "M";
-              else shiftText = `<span style="color:#2563eb">Libur</span>`;
+              if (s.shift == 1 || s.shift == "1") {
+                shiftText = "P";
+                shiftStyle = "color:var(--text-strong); font-weight:700;";
+              } else if (s.shift == 2 || s.shift == "2") {
+                shiftText = "S";
+                shiftStyle = "color:var(--text-strong); font-weight:700;";
+              } else if (s.shift == 3 || s.shift == "3") {
+                shiftText = "M";
+                shiftStyle = "color:var(--text-strong); font-weight:700;";
+              } else
+                shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
             } else {
-              shiftText = `<span style="color:#2563eb">Libur</span>`;
+              shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
             }
-            bodyHtml += `<td style="text-align:center; border:1px solid #333">${shiftText}</td>`;
+            bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; ${shiftStyle}">${shiftText}</td>`;
           });
         });
 
@@ -4849,8 +5615,8 @@ async function jadwalAdminView(area) {
       });
 
       htmlOut += `
-                <div class="table-responsive animate-fade-up delay-${(groupIdx % 5) * 100}" style="border-radius:4px; box-shadow:0 0 10px rgba(0,0,0,0.05)">
-                    <table class="table-compact text-sm table-bordered" style="width:max-content; font-size: 0.85rem; border-collapse: collapse;">
+                <div class="table-responsive animate-fade-up delay-${(groupIdx % 5) * 100}" style="margin-bottom:2.5rem; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; box-shadow: var(--shadow-sm);">
+                    <table class="table-compact text-sm" style="width:max-content; border-collapse: collapse; background:white;">
                         <thead style="position: sticky; top: 0; z-index: 10;">
                             ${headHtml1}
                             ${headHtml2}
@@ -5055,11 +5821,11 @@ window.exportJadwalPDF = async () => {
       body: bodyData,
       theme: "grid",
       headStyles: {
-        fillColor: [255, 240, 0],
-        textColor: [0, 0, 0],
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42],
         fontStyle: "bold",
         halign: "center",
-        fontSize: 8,
+        fontSize: 7,
       },
       bodyStyles: { fontSize: 8, halign: "center" },
       columnStyles: {
@@ -5124,11 +5890,11 @@ window.exportJadwalExcel = () => {
         <![endif]-->
         <meta charset="utf-8">
         <style>
-            table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
-            th, td { border: 1px solid #000000; padding: 5px; font-family: Arial, sans-serif; font-size: 12px; }
-            th { background-color: #ffff00; text-align: center; vertical-align: middle; font-weight: bold; }
+            table { border-collapse: collapse; margin-bottom: 30px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px; font-family: Arial, sans-serif; font-size: 11px; }
+            th { background-color: #f8fafc; text-align: center; vertical-align: middle; font-weight: bold; color: #0f172a; text-transform: uppercase; }
             td { vertical-align: middle; }
-            .info-text { font-size: 14px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; }
+            .info-text { font-size: 13px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; color: #1e293b; }
         </style>
     </head>
     <body>
@@ -5512,6 +6278,7 @@ async function updateNotifBadge() {
     const res = await supabaseFetchAPI("getNotif", {
       user_id: currentUser.id,
       role: currentUser.role,
+      tempat_id: currentUser.tempat_id,
     });
     const badge = document.getElementById("notif-count");
     const ping = document.getElementById("notif-ping");
@@ -5535,6 +6302,7 @@ window.bukaModalNotifikasi = async () => {
   const res = await fetchAPI("getNotif", {
     user_id: currentUser.id,
     role: currentUser.role,
+    tempat_id: currentUser.tempat_id,
   });
   showLoader(false);
 
@@ -5598,3 +6366,273 @@ function formatRelativeTime(dateStr) {
   if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`;
   return then.toLocaleDateString("id-ID");
 }
+
+// PRESEPTOR: SCAN MAHASISWA (QUICK IDENTITY)
+window.bukaModalScanMhs = () => {
+  openModal(
+    "Scan Identitas Mahasiswa",
+    `
+    <div class="animate-fade-in text-center">
+        <div id="reader-mhs" style="width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden;"></div>
+        <div id="mhs-scan-result" class="mt-4">
+             <div class="alert bg-light border p-4 text-muted">
+                <i class="fa-solid fa-qrcode fa-3x mb-3 d-block"></i>
+                <p>Arahkan kamera ke QR Code di aplikasi Mahasiswa untuk melihat profil & progres klinis mereka secara instan.</p>
+             </div>
+        </div>
+        <button class="btn btn-outline btn-block mt-3" onclick="closeModal()">Tutup</button>
+    </div>
+    `,
+  );
+
+  const scanner = new Html5Qrcode("reader-mhs");
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+  scanner
+    .start(
+      { facingMode: "environment" },
+      config,
+      async (decodedText) => {
+        scanner.stop();
+        document
+          .getElementById("beep-sound")
+          .play()
+          .catch((e) => {});
+        renderMiniProfile(decodedText);
+      },
+      (err) => {},
+    )
+    .catch((err) => {
+      showToast("Error Kamera", "Gagal mengakses kamera.", "error");
+    });
+
+  const renderMiniProfile = async (identifier) => {
+    const resultArea = document.getElementById("mhs-scan-result");
+    resultArea.innerHTML = `<div class="p-5 text-center"><i class="fa-solid fa-spinner fa-spin fa-2x text-primary"></i><br>Mencari data...</div>`;
+
+    const res = await fetchAPI("getStudentMiniProfile", { identifier });
+    if (res.success && res.data) {
+      const u = res.data;
+      resultArea.innerHTML = `
+            <div class="card shadow-sm border-primary animate-fade-in" style="background:var(--primary-light); border-left: 5px solid var(--primary);">
+                <div class="card-body">
+                    <div class="d-flex align-center gap-3 mb-3">
+                         <div style="width:60px; height:60px; border-radius:12px; background:white; color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.5rem; box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+                            ${u.nama.charAt(0)}
+                         </div>
+                         <div class="text-left">
+                            <h4 class="mb-0 font-bold" style="color:var(--text-strong)">${u.nama}</h4>
+                            <div class="badge bg-primary text-white">${u.username}</div>
+                         </div>
+                    </div>
+                    <div class="grid-cards" style="grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                         <div class="bg-white p-2 text-left" style="border-radius:8px;">
+                            <div class="text-xs text-muted">Program Studi</div>
+                            <div class="font-bold text-sm">${u.prodi}</div>
+                         </div>
+                         <div class="bg-white p-2 text-left" style="border-radius:8px;">
+                            <div class="text-xs text-muted">Angkatan</div>
+                            <div class="font-bold text-sm">2022</div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-block mt-3" onclick="closeModal(); loadView('mahasiswaView');">Buka Detail Penilaian</button>
+        `;
+    } else {
+      resultArea.innerHTML = `<div class="alert bg-danger-soft text-danger p-4">Mahasiswa tidak ditemukan atau QR tidak valid.</div>`;
+    }
+  };
+};
+
+// MAHASISWA: QR IDENTITY CARD
+window.bukaModalMyQR = () => {
+  openModal(
+    "Identity QR Mahasiswa",
+    `
+        <div class="p-4 text-center">
+             <div class="alert bg-primary-soft text-primary mb-4" style="border-radius:12px; font-size:0.85rem">
+                <i class="fa-solid fa-info-circle"></i> Tunjukkan QR ini kepada Preseptor untuk proses identifikasi cepat / verifikasi profil.
+             </div>
+             <div id="my-qr-render" style="margin: 0 auto 1.5rem; background:white; padding:1.5rem; border-radius:16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); display:inline-block;"></div>
+             <div class="font-bold text-lg">${currentUser.nama}</div>
+             <div class="text-muted text-sm mb-4">${currentUser.username}</div>
+             <button class="btn btn-primary btn-block" onclick="closeModal()">Tutup</button>
+        </div>
+        `,
+  );
+  setTimeout(() => {
+    new QRCode(document.getElementById("my-qr-render"), {
+      text: currentUser.username,
+      width: 250,
+      height: 250,
+      colorDark: "#0f172a",
+      colorLight: "#ffffff",
+    });
+  }, 150);
+};
+
+// MAHASISWA: EKSPOR PDF LOGBOOK
+window.exportLogbookPDF = async () => {
+  showLoader(true);
+  const res = await fetchAPI("getOfficialLogbook", { user_id: currentUser.id });
+  showLoader(false);
+
+  if (!res.success || !res.data || res.data.length === 0) {
+    return showToast(
+      "Gagal",
+      "Belum ada logbook yang disetujui untuk diekspor.",
+      "warning",
+    );
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("LAPORAN LOGBOOK KLINIS MAHASISWA", 105, 20, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Nama Mahasiswa : ${currentUser.nama}`, 20, 35);
+  doc.text(`NIM            : ${currentUser.username}`, 20, 41);
+  doc.text(`Program Studi  : ${currentUser.prodi || "-"}`, 20, 47);
+  doc.text(`Tanggal Cetak  : ${new Date().toLocaleString()}`, 20, 53);
+
+  const tableData = res.data.map((r) => [
+    r.tanggal,
+    r.lahan,
+    r.kompetensi,
+    r.level,
+    r.nilai || "-",
+    r.feedback || "-",
+  ]);
+
+  doc.autoTable({
+    startY: 60,
+    head: [
+      [
+        "Tanggal",
+        "Lahan",
+        "Kompetensi",
+        "Level",
+        "Nilai",
+        "Feedback Preseptor",
+      ],
+    ],
+    body: tableData,
+    theme: "striped",
+    headStyles: { fillStyle: "var(--primary)" },
+  });
+
+  doc.save(
+    `Logbook_Official_${currentUser.username}_${new Date().getTime()}.pdf`,
+  );
+};
+
+// PRESEPTOR: KOMUNIKASI ANTAR-PRESEPTOR (PRIVATE COORDINATION LOG)
+window.bukaModalPreceptorNotes = async (studentId, studentNama) => {
+  showLoader(true);
+  const res = await fetchAPI("getPreceptorNotes", { student_id: studentId });
+  showLoader(false);
+
+  openModal(
+    `Koordinasi Bimbingan: ${studentNama}`,
+    `
+    <div class="animate-fade-in">
+        <div class="alert bg-primary-soft text-primary p-3 mb-4" style="border-radius:12px; font-size:0.85rem">
+            <i class="fa-solid fa-shield-halved"></i> <strong>Catatan Internal Dosen</strong><br>
+            Gunakan area ini untuk berkoordinasi antara Preseptor Klinik & Akademik mengenai perkembangan sikap/keterampilan mahasiswa ini.
+        </div>
+
+        <div id="preceptor-notes-history" style="max-height:300px; overflow-y:auto; border-radius:12px; background:#f8fafc; padding:1rem; border:1px solid #e2e8f0;">
+             ${renderNotesList(res.data || [])}
+        </div>
+
+        <form id="form-preceptor-note" class="mt-4">
+            <div class="form-group">
+                <label>Tambah Catatan Baru</label>
+                <textarea id="pn-deskripsi" class="form-control" rows="3" placeholder="Tuliskan perkembangan bimbingan mahasiswa ini..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-paper-plane"></i> Simpan Catatan Koordinasi
+            </button>
+        </form>
+    </div>
+    `,
+  );
+
+  document.getElementById("form-preceptor-note").onsubmit = async (e) => {
+    e.preventDefault();
+    const deskripsi = document.getElementById("pn-deskripsi").value;
+    showLoader(true);
+    const postRes = await postAPI("saveReport", {
+      student_id: studentId,
+      user_id_pelapor: currentUser.id,
+      nama_pelapor: currentUser.nama,
+      role_pelapor: currentUser.role,
+      tipe_kejadian: "Preceptor Note",
+      deskripsi: deskripsi,
+    });
+    showLoader(false);
+
+    if (postRes.success) {
+      showToast("Berhasil", "Catatan koordinasi berhasil disimpan", "success");
+      bukaModalPreceptorNotes(studentId, studentNama); // reload
+    }
+  };
+};
+
+function renderNotesList(notes) {
+  if (notes.length === 0)
+    return `<div class="text-center py-4 text-muted">Belum ada catatan bimbingan untuk mahasiswa ini.</div>`;
+
+  return notes
+    .map((n) => {
+      const isMe = n.user_id_pelapor === currentUser.id;
+      const roleLabel = n.role_pelapor?.includes("akademik")
+        ? "AKADEMIK"
+        : "KLINIK";
+      const badgeColor = n.role_pelapor?.includes("akademik")
+        ? "#f59e0b"
+        : "#0ea5e9";
+
+      return `
+            <div class="mb-3 p-3 bg-white" style="border-radius:12px; ${isMe ? "border-right: 3px solid var(--primary);" : "border-left: 3px solid #64748b;"} box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div class="d-flex justify-between align-center mb-1">
+                    <strong style="font-size:0.8rem; color:var(--text-strong)">${n.nama_pelapor}</strong>
+                    <span class="badge" style="background:${badgeColor}; color:white; font-size:0.6rem;">${roleLabel}</span>
+                </div>
+                <p class="m-0" style="font-size:0.9rem; color:#475569">${n.deskripsi}</p>
+                <div class="text-right text-xs text-muted mt-2">${formatRelativeTime(n.created_at)}</div>
+            </div>
+        `;
+    })
+    .join("");
+}
+
+// ADMIN: BROADCAST SYSTEM
+window.eksekusiBroadcast = async () => {
+  const msg = document.getElementById("bc-message").value;
+  if (!msg)
+    return showToast(
+      "Kosong",
+      "Tuliskan pesan pengumuman terlebih dahulu.",
+      "warning",
+    );
+
+  showLoader(true);
+  const res = await fetchAPI("updateBroadcast", { message: msg });
+  showLoader(false);
+
+  if (res.success) {
+    showToast(
+      "Berhasil",
+      "Pengumuman telah disiarkan ke seluruh pengguna.",
+      "success",
+    );
+    document.getElementById("bc-message").value = "";
+    loadView("dashboardView");
+  }
+};

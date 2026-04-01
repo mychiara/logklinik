@@ -4733,7 +4733,6 @@ async function jadwalAdminView(area) {
       let currentTempatName = null;
 
       dates.forEach((d) => {
-        // assume group is in same place
         const schedToday = group.schedules.find((s) => s.tanggal === d);
         if (!schedToday) return;
 
@@ -4767,38 +4766,40 @@ async function jadwalAdminView(area) {
         });
 
       // Build single wide table for this Kelompok
-      let headHtml1 = `<tr style="background:#fff000; color:#000;">`;
-      let headHtml2 = `<tr style="background:#fff000; color:#000;">`;
+      const headerStyle =
+        "background:#f8fafc; color:var(--text-strong); font-weight:700; text-transform:uppercase; font-size:0.75rem; border:1px solid #cbd5e1;";
+      let headHtml1 = `<tr style="${headerStyle}">`;
+      let headHtml2 = `<tr style="${headerStyle}">`;
 
       headHtml1 += `
-                <th rowspan="2" style="width:30px; text-align:center; vertical-align:middle; border:1px solid #333;">No</th>
-                <th rowspan="2" style="min-width:200px; text-align:center; vertical-align:middle; border:1px solid #333; white-space:normal">Nama Mahasiswa</th>
-                <th rowspan="2" style="width:140px; text-align:center; vertical-align:middle; border:1px solid #333;">NIM</th>
+                <th rowspan="2" style="width:40px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NO</th>
+                <th rowspan="2" style="width:250px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1; white-space:normal">NAMA MAHASISWA</th>
+                <th rowspan="2" style="width:130px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NIM</th>
             `;
 
-      blocks.forEach((block, blockIdx) => {
+      blocks.forEach((block) => {
         headHtml1 += `
-                    <th rowspan="2" style="width:160px; text-align:center; vertical-align:middle; border:1px solid #333; white-space:normal">${blockIdx > 0 ? "Tempat Praktik" : "Tempat Praktik"}</th>
-                    <th colspan="${block.dates.length}" style="text-align:center; border:1px solid #333;">JADWAL</th>
+                    <th rowspan="2" style="width:180px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1; white-space:normal">TEMPAT PRAKTIK</th>
+                    <th colspan="${block.dates.length}" style="text-align:center; border:1px solid #cbd5e1; letter-spacing:1px;">JADWAL</th>
                 `;
 
-        block.dates.forEach((dStr, dayIdx) => {
+        block.dates.forEach((dStr) => {
           const dObj = new Date(dStr);
           const mStr = [
-            "Januari",
-            "Februari",
-            "Maret",
-            "April",
-            "Mei",
-            "Juni",
-            "Juli",
-            "Agustus",
-            "September",
-            "Oktober",
-            "November",
-            "Desember",
+            "JANUARI",
+            "FEBRUARI",
+            "MARET",
+            "APRIL",
+            "MEI",
+            "JUNI",
+            "JULI",
+            "AGUSTUS",
+            "SEPTEMBER",
+            "OKTOBER",
+            "NOVEMBER",
+            "DESEMBER",
           ][dObj.getMonth()];
-          headHtml2 += `<th style="text-align:center; border:1px solid #333; padding:4px;">${dObj.getDate()} ${mStr}</th>`;
+          headHtml2 += `<th style="text-align:center; width:65px; border:1px solid #cbd5e1; padding:6px 4px; font-size:0.7rem;">${dObj.getDate()} ${mStr}</th>`;
         });
       });
 
@@ -4808,13 +4809,13 @@ async function jadwalAdminView(area) {
       let bodyHtml = "";
       group.users.forEach((u, index) => {
         bodyHtml += `<tr style="background:#fff;">`;
-        bodyHtml += `<td style="text-align:center; border:1px solid #333">${index + 1}</td>`;
-        bodyHtml += `<td style="border:1px solid #333; padding:4px 8px; white-space:normal">${u.nama}</td>`;
-        bodyHtml += `<td style="border:1px solid #333; padding-left:4px;">${u.username}</td>`;
+        bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; padding:8px 4px;">${index + 1}</td>`;
+        bodyHtml += `<td style="border:1px solid #cbd5e1; padding:8px 12px; white-space:normal; font-weight:500;">${u.nama.toUpperCase()}</td>`;
+        bodyHtml += `<td style="border:1px solid #cbd5e1; padding:8px 8px; text-align:center; color:var(--text-body);">${u.username}</td>`;
 
         blocks.forEach((block, blockIdx) => {
           if (index === 0) {
-            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #333; background:#fff; padding: 4px; white-space:normal">${block.nama_tempat}</td>`;
+            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}</td>`;
           }
 
           block.dates.forEach((dStr) => {
@@ -4822,15 +4823,23 @@ async function jadwalAdminView(area) {
               (x) => x.user_id == u.id && x.tanggal === dStr,
             );
             let shiftText = "";
+            let shiftStyle = "";
             if (s && s.shift) {
-              if (s.shift == 1 || s.shift == "1") shiftText = "P";
-              else if (s.shift == 2 || s.shift == "2") shiftText = "S";
-              else if (s.shift == 3 || s.shift == "3") shiftText = "M";
-              else shiftText = `<span style="color:#2563eb">Libur</span>`;
+              if (s.shift == 1 || s.shift == "1") {
+                shiftText = "P";
+                shiftStyle = "color:var(--text-strong); font-weight:700;";
+              } else if (s.shift == 2 || s.shift == "2") {
+                shiftText = "S";
+                shiftStyle = "color:var(--text-strong); font-weight:700;";
+              } else if (s.shift == 3 || s.shift == "3") {
+                shiftText = "M";
+                shiftStyle = "color:var(--text-strong); font-weight:700;";
+              } else
+                shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
             } else {
-              shiftText = `<span style="color:#2563eb">Libur</span>`;
+              shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
             }
-            bodyHtml += `<td style="text-align:center; border:1px solid #333">${shiftText}</td>`;
+            bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; ${shiftStyle}">${shiftText}</td>`;
           });
         });
 
@@ -4838,8 +4847,8 @@ async function jadwalAdminView(area) {
       });
 
       htmlOut += `
-                <div class="table-responsive animate-fade-up delay-${(groupIdx % 5) * 100}" style="border-radius:4px; box-shadow:0 0 10px rgba(0,0,0,0.05)">
-                    <table class="table-compact text-sm table-bordered" style="width:max-content; font-size: 0.85rem; border-collapse: collapse;">
+                <div class="table-responsive animate-fade-up delay-${(groupIdx % 5) * 100}" style="margin-bottom:2.5rem; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; box-shadow: var(--shadow-sm);">
+                    <table class="table-compact text-sm" style="width:max-content; border-collapse: collapse; background:white;">
                         <thead style="position: sticky; top: 0; z-index: 10;">
                             ${headHtml1}
                             ${headHtml2}
@@ -5044,11 +5053,11 @@ window.exportJadwalPDF = async () => {
       body: bodyData,
       theme: "grid",
       headStyles: {
-        fillColor: [255, 240, 0],
-        textColor: [0, 0, 0],
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42],
         fontStyle: "bold",
         halign: "center",
-        fontSize: 8,
+        fontSize: 7,
       },
       bodyStyles: { fontSize: 8, halign: "center" },
       columnStyles: {
@@ -5113,11 +5122,11 @@ window.exportJadwalExcel = () => {
         <![endif]-->
         <meta charset="utf-8">
         <style>
-            table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
-            th, td { border: 1px solid #000000; padding: 5px; font-family: Arial, sans-serif; font-size: 12px; }
-            th { background-color: #ffff00; text-align: center; vertical-align: middle; font-weight: bold; }
+            table { border-collapse: collapse; margin-bottom: 30px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px; font-family: Arial, sans-serif; font-size: 11px; }
+            th { background-color: #f8fafc; text-align: center; vertical-align: middle; font-weight: bold; color: #0f172a; text-transform: uppercase; }
             td { vertical-align: middle; }
-            .info-text { font-size: 14px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; }
+            .info-text { font-size: 13px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; color: #1e293b; }
         </style>
     </head>
     <body>
