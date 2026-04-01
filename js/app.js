@@ -2870,19 +2870,22 @@ window.toggleRekapDetail = (userId) => {
 
 window.exportRekapCSV = () => {
   if (!window.dtRekapLog) return;
-  let csv = "Nama Mahasiswa;Prodi;Kompetensi;Capaian;Target;Status\n";
+  const headers = [
+    "Nama Mahasiswa",
+    "Prodi",
+    "Kompetensi",
+    "Capaian",
+    "Target",
+    "Status",
+  ];
+  const rows = [];
   window.dtRekapLog.forEach((m) => {
     m.rekap.forEach((r) => {
-      csv += `"${m.nama}";"${m.prodi}";"${r.nama_skill}";${r.capaian};${r.target};"${r.status}"\n`;
+      rows.push([m.nama, m.prodi, r.nama_skill, r.capaian, r.target, r.status]);
     });
   });
-  const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csv);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "Rekap_Logbook_Mahasiswa.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+
+  downloadCSV(headers, rows, "Rekap_Logbook_Mahasiswa.csv");
 };
 
 window.mahasiswaAdminView = (area) =>
@@ -3501,7 +3504,12 @@ window.handleImportCSV = (e, roleFilter) => {
   e.target.value = "";
   const reader = new FileReader();
   reader.onload = async (event) => {
-    const text = event.target.result;
+    let text = event.target.result;
+    // STRIP BOM if exists
+    if (text.startsWith("\uFEFF")) {
+      text = text.substring(1);
+    }
+
     const rows = text
       .split(/\r?\n/)
       .map((row) => row.trim())
@@ -3513,7 +3521,10 @@ window.handleImportCSV = (e, roleFilter) => {
         "error",
       );
 
-    const delimiter = rows[0].includes(";") ? ";" : ",";
+    let delimiter = ",";
+    if (rows[0].includes(";")) delimiter = ";";
+    else if (rows[0].includes("\t")) delimiter = "\t";
+
     const headersRaw = parseCSVLine(rows[0], delimiter);
     const headers = headersRaw.map((h) =>
       h
@@ -3549,12 +3560,17 @@ window.handleImportCSV = (e, roleFilter) => {
       if (u.id) mappedUsers.push(u);
     }
 
+    // DEDUPLICATION: Remove duplicates from same CSV batch (Postgres error fix)
+    const uniqueMap = new Map();
+    mappedUsers.forEach((user) => uniqueMap.set(user.id, user));
+    const finalUsers = Array.from(uniqueMap.values());
+
     if (
       confirm(
-        `🔎 Ditemukan ${mappedUsers.length} data untuk di-import (Role: ${roleFilter}).\nLanjut proses?`,
+        `🔎 Ditemukan ${finalUsers.length} data unik untuk di-import (Role: ${roleFilter}).\nLanjut proses?`,
       )
     ) {
-      const res = await postAPI("importUsers", { users: mappedUsers });
+      const res = await postAPI("importUsers", { users: finalUsers });
       if (res.success && res.summary) {
         const s = res.summary;
         const statusType =
@@ -4304,11 +4320,16 @@ window.handleImportMasterCSV = (e, type) => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = async (event) => {
-    const text = event.target.result;
+    let text = event.target.result;
+    if (text.startsWith("\uFEFF")) text = text.substring(1);
+
     const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
     if (lines.length < 2) return showToast("Gagal", "File kosong", "error");
 
-    const delimiter = lines[0].includes(";") ? ";" : ",";
+    let delimiter = ",";
+    if (lines[0].includes(";")) delimiter = ";";
+    else if (lines[0].includes("\t")) delimiter = "\t";
+
     const headers = parseCSVLine(lines[0], delimiter).map((h) =>
       h
         .trim()

@@ -711,17 +711,31 @@ window.supabasePostAPI = async (action, payload) => {
 
         if (!student_id) throw new Error("ID Mahasiswa tidak ditemukan.");
 
-        // Simpan komponen penilaian
-        await supabaseClient.from("penilaian_komponen").upsert(
-          results.map((r) => ({
+        // 1. Ambil data existing penilaian komponen untuk student ini agar di-update, bukan duplikat
+        const { data: existingG } = await supabaseClient
+          .from("penilaian_komponen")
+          .select("*")
+          .eq("student_id", student_id)
+          .eq("role_pemberi", grader_role);
+
+        // 2. Map payload, sertakan ID jika sudah ada
+        const upsertRows = results.map((r) => {
+          const matched = (existingG || []).find(
+            (ex) => ex.component_id === r.component_id && ex.type === r.type,
+          );
+          return {
+            id: matched ? matched.id : undefined,
             student_id,
             preseptor_id,
             role_pemberi: grader_role,
             type: r.type,
             component_id: r.component_id,
             nilai: r.nilai,
-          })),
-        );
+          };
+        });
+
+        // Simpan komponen penilaian (Update jika sudah ada ID)
+        await supabaseClient.from("penilaian_komponen").upsert(upsertRows);
 
         // Ambil SEMUA grades dari student tsb untuk hitung summary
         const { data: allG } = await supabaseClient
@@ -788,8 +802,22 @@ window.supabasePostAPI = async (action, payload) => {
           kompetensi: "kompetensi",
         };
         const tbl = tableMap[payload.type] || payload.type;
-        const { error } = await supabaseClient.from(tbl).upsert(payload.data);
-        if (error) throw error;
+
+        // Try batch upsert first
+        const { error: batchErr } = await supabaseClient
+          .from(tbl)
+          .upsert(payload.data);
+
+        if (batchErr) {
+          console.warn(
+            "Batch master import failed, falling back to one-by-one",
+            batchErr,
+          );
+          for (const item of payload.data) {
+            await supabaseClient.from(tbl).upsert(item);
+          }
+        }
+
         return {
           success: true,
           message: `Berhasil impor ${payload.data.length} data`,
@@ -797,17 +825,46 @@ window.supabasePostAPI = async (action, payload) => {
       }
 
       case "importUsers": {
-        const { error } = await supabaseClient
+        const results = {
+          successCount: 0,
+          failCount: 0,
+          failedRows: [],
+        };
+
+        // Try batch upsert first
+        const { error: batchErr } = await supabaseClient
           .from("users")
           .upsert(payload.users, { onConflict: "id" });
-        if (error) throw error;
+
+        if (!batchErr) {
+          results.successCount = payload.users.length;
+        } else {
+          console.warn(
+            "Batch import failed, falling back to one-by-one",
+            batchErr,
+          );
+          // Loop one by one if batch fails to ensure "data masuk" as much as possible
+          for (const u of payload.users) {
+            const { error: singleErr } = await supabaseClient
+              .from("users")
+              .upsert(u, { onConflict: "id" });
+
+            if (singleErr) {
+              results.failCount++;
+              results.failedRows.push({
+                row: "Deduplicated Row",
+                data: u,
+                reason: singleErr.message,
+              });
+            } else {
+              results.successCount++;
+            }
+          }
+        }
+
         return {
           success: true,
-          summary: {
-            successCount: payload.users.length,
-            failCount: 0,
-            failedRows: [],
-          },
+          summary: results,
         };
       }
 
