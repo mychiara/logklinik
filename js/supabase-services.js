@@ -169,14 +169,19 @@ window.supabaseFetchAPI = async (action, payload) => {
               .select("nama_skill, target_minimal, kategori"),
           ]);
 
+        // Pre-index logs by user_id+kompetensi for O(1) lookup
+        const logIndex = {};
+        (logs || []).forEach((l) => {
+          const key = `${l.user_id}|${l.kompetensi}`;
+          logIndex[key] = (logIndex[key] || 0) + 1;
+        });
+
         const rekap = (mhs || []).map((u) => ({
           user_id: u.id,
           nama: u.nama,
           prodi: u.prodi,
           rekap: (komp || []).map((k) => {
-            const achieved = (logs || []).filter(
-              (l) => l.user_id === u.id && l.kompetensi === k.nama_skill,
-            ).length;
+            const achieved = logIndex[`${u.id}|${k.nama_skill}`] || 0;
             return {
               nama_skill: k.nama_skill,
               kategori: k.kategori,
@@ -268,6 +273,54 @@ window.supabaseFetchAPI = async (action, payload) => {
           }),
         );
         return { success: true, data: backup };
+      }
+
+      case "getNotif": {
+        let query;
+        if (payload.role === "admin") {
+          query = supabaseClient
+            .from("laporan")
+            .select("id, tipe_kejadian, nama_pelapor, created_at")
+            .eq("status", "Baru")
+            .order("created_at", { ascending: false })
+            .limit(20);
+        } else if (payload.role && payload.role.includes("preseptor")) {
+          query = supabaseClient
+            .from("logbook")
+            .select("id, kompetensi, user_id, created_at")
+            .eq("status", "Menunggu Validasi")
+            .order("created_at", { ascending: false })
+            .limit(20);
+        } else {
+          query = supabaseClient
+            .from("logbook")
+            .select("id, kompetensi, status, feedback, created_at")
+            .eq("user_id", payload.user_id)
+            .neq("status", "Menunggu Validasi")
+            .order("created_at", { ascending: false })
+            .limit(10);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return { success: true, data: data || [] };
+      }
+
+      case "getStudentGrades": {
+        const { student_id, grader_role } = payload;
+        const { data, error } = await supabaseClient
+          .from("penilaian_komponen")
+          .select("*")
+          .eq("student_id", student_id)
+          .eq("role_pemberi", grader_role);
+        if (error) throw error;
+
+        // Group by type
+        const grouped = {
+          praktikum: (data || []).filter((g) => g.type === "praktikum"),
+          askep: (data || []).filter((g) => g.type === "askep"),
+          sikap: (data || []).filter((g) => g.type === "sikap"),
+        };
+        return { success: true, data: grouped };
       }
 
       default: {
@@ -438,6 +491,7 @@ window.supabasePostAPI = async (action, payload) => {
       case "addUser":
       case "editUser":
       case "updateUser": {
+        if (!payload.id && payload.username) payload.id = payload.username;
         const { error } = await supabaseClient
           .from("users")
           .upsert(payload, { onConflict: "id" });
@@ -477,6 +531,18 @@ window.supabasePostAPI = async (action, payload) => {
 
       case "addMaster":
       case "editMaster": {
+        const allowedTypes = [
+          "tempat",
+          "prodi",
+          "kompetensi",
+          "kelompok",
+          "bimb_praktikum",
+          "bimb_askep",
+          "sikap_perilaku",
+        ];
+        if (!allowedTypes.includes(payload.type)) {
+          throw new Error(`Tipe master '${payload.type}' tidak diizinkan`);
+        }
         const tableMap = {
           tempat: "tempat_praktik",
           prodi: "prodi",
@@ -486,7 +552,7 @@ window.supabasePostAPI = async (action, payload) => {
           bimb_askep: "bimb_askep",
           sikap_perilaku: "sikap_perilaku",
         };
-        let tbl = tableMap[payload.type] || payload.type;
+        let tbl = tableMap[payload.type];
         let data = { id: payload.id || undefined };
         if (payload.type === "tempat") data.nama_tempat = payload.nama;
         else if (payload.type === "prodi") data.nama_prodi = payload.nama;
@@ -639,8 +705,13 @@ window.supabasePostAPI = async (action, payload) => {
       }
 
       case "saveGrades": {
-        const { student_id, grader_role, results } = payload;
+        const { grader_role, results } = payload;
+        const student_id = payload.student_id || results[0]?.student_id;
         const preseptor_id = results[0]?.preseptor_id || "System";
+
+        if (!student_id) throw new Error("ID Mahasiswa tidak ditemukan.");
+
+        // Simpan komponen penilaian
         await supabaseClient.from("penilaian_komponen").upsert(
           results.map((r) => ({
             student_id,
@@ -652,16 +723,27 @@ window.supabasePostAPI = async (action, payload) => {
           })),
         );
 
+        // Ambil SEMUA grades dari student tsb untuk hitung summary
         const { data: allG } = await supabaseClient
           .from("penilaian_komponen")
           .select("*")
           .eq("student_id", student_id);
+
         const { data: s } = await supabaseClient.from("settings").select("*");
         const sets = {};
         (s || []).forEach((x) => (sets[x.key] = parseFloat(x.value)));
 
-        const summary = { id: student_id };
+        // Ambil data summary lama agar tidak overwrite kolom yang tidak diubah
+        const { data: qSummary } = await supabaseClient
+          .from("penilaian_akhir")
+          .select("*")
+          .eq("id", student_id);
+
+        const oldSummary = qSummary && qSummary.length > 0 ? qSummary[0] : null;
+
+        const summary = { ...(oldSummary || {}), id: student_id };
         let final = 0;
+
         ["preseptor", "preseptor_akademik"].forEach((role) => {
           let roleScore = 0;
           ["praktikum", "askep", "sikap"].forEach((type) => {
@@ -685,15 +767,16 @@ window.supabasePostAPI = async (action, payload) => {
           });
           summary[`${role === "preseptor" ? "klinik" : "akademik"}_total`] =
             roleScore;
-          final +=
-            (roleScore *
-              (role === "preseptor"
-                ? sets.w_klinik || 50
-                : sets.w_akademik || 50)) /
-            100;
+
+          const roleWeight =
+            role === "preseptor" ? sets.w_klinik || 50 : sets.w_akademik || 50;
+          final += (roleScore * roleWeight) / 100;
         });
+
         summary.total = final;
         summary.status = final >= (sets.batas_lulus || 75) ? "LULUS" : "REMIDI";
+        summary.updated_at = new Date().toISOString();
+
         await supabaseClient.from("penilaian_akhir").upsert(summary);
         return { success: true };
       }
@@ -747,11 +830,12 @@ window.supabasePostAPI = async (action, payload) => {
       case "repairUsers": {
         const { data } = await supabaseClient.from("users").select("*");
         for (const u of data || []) {
+          if (!u.id || !u.nama) continue; // Skip null entries
           const cleaned = {
-            id: u.id.trim(),
-            nama: u.nama.trim(),
-            prodi: u.prodi ? u.prodi.trim() : "-",
-            angkatan: u.angkatan ? u.angkatan.trim() : "-",
+            id: u.id.toString().trim(),
+            nama: u.nama.toString().trim(),
+            prodi: u.prodi ? u.prodi.toString().trim() : "-",
+            angkatan: u.angkatan ? u.angkatan.toString().trim() : "-",
           };
           await supabaseClient.from("users").update(cleaned).eq("id", u.id);
         }

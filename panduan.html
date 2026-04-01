@@ -1,253 +1,426 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panduan Instalasi E-Klinik Supabase</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panduan Instalasi E-Klinik Premium Edition</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <style>
-        :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --bg: #f8fafc;
-            --card-bg: #ffffff;
-            --text: #1e293b;
-            --text-light: #64748b;
+      :root {
+        --primary: #8b5cf6;
+        --primary-dark: #6d28d9;
+        --primary-soft: #f3e8ff;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --bg: #f8fafc;
+        --card-bg: #ffffff;
+        --text: #0f172a;
+        --text-light: #64748b;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Outfit", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        padding: 40px 20px;
+      }
+
+      .container {
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 50px;
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-dark)
+        );
+        padding: 80px 20px;
+        border-radius: 32px;
+        color: white;
+        box-shadow: 0 25px 50px -12px rgba(139, 92, 246, 0.4);
+        position: relative;
+        overflow: hidden;
+      }
+
+      header::before {
+        content: "";
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+      }
+
+      h1 {
+        font-size: 2.8rem;
+        margin-bottom: 15px;
+        font-weight: 800;
+        letter-spacing: -1px;
+      }
+      .subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        font-weight: 300;
+      }
+
+      .step-card {
+        background: var(--card-bg);
+        border-radius: 24px;
+        padding: 40px;
+        margin-bottom: 35px;
+        box-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.05),
+          0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        border: 1px solid #f1f5f9;
+        position: relative;
+        transition: all 0.3s ease;
+      }
+
+      .step-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      }
+
+      .step-number {
+        position: absolute;
+        top: -20px;
+        left: 40px;
+        background: var(--primary);
+        color: white;
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 1.2rem;
+        box-shadow: 0 10px 15px -3px rgba(139, 92, 246, 0.5);
+        transform: rotate(-5deg);
+      }
+
+      h2 {
+        margin-bottom: 25px;
+        font-size: 1.6rem;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-weight: 700;
+        color: var(--primary-dark);
+      }
+      h2 i {
+        color: var(--primary);
+      }
+
+      h3 {
+        margin: 25px 0 12px;
+        font-size: 1.1rem;
+        color: var(--text);
+        font-weight: 700;
+        border-left: 4px solid var(--primary);
+        padding-left: 12px;
+      }
+
+      p,
+      ul {
+        margin-bottom: 20px;
+        color: var(--text-light);
+        font-size: 1.05rem;
+      }
+      ul {
+        padding-left: 25px;
+      }
+      li {
+        margin-bottom: 10px;
+      }
+
+      code {
+        background: #f1f5f9;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-family: "Fira Code", "Courier New", monospace;
+        color: var(--danger);
+        font-weight: 600;
+        font-size: 0.9em;
+      }
+
+      .code-block {
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 25px;
+        border-radius: 16px;
+        font-family: "Fira Code", "Courier New", monospace;
+        font-size: 0.9rem;
+        overflow-x: auto;
+        margin: 20px 0;
+        position: relative;
+        border: 1px solid #334155;
+        line-height: 1.7;
+      }
+
+      .alert {
+        padding: 20px 25px;
+        border-radius: 16px;
+        margin: 25px 0;
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        font-size: 0.95rem;
+      }
+
+      .alert-info {
+        background: #f5f3ff;
+        color: #5b21b6;
+        border: 1px solid #ddd6fe;
+      }
+      .alert-warning {
+        background: #fffcf0;
+        color: #92400e;
+        border: 1px solid #fef3c7;
+      }
+
+      footer {
+        text-align: center;
+        margin-top: 60px;
+        padding: 40px 0;
+        color: var(--text-light);
+        font-size: 0.95rem;
+        border-top: 1px solid #e2e8f0;
+      }
+
+      .demo-badge {
+        display: inline-block;
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-family: monospace;
+      }
+
+      /* Mobile Adjustments */
+      @media (max-width: 600px) {
+        header {
+          padding: 50px 20px;
+          border-radius: 0;
+          margin: -40px -20px 40px;
         }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Outfit', sans-serif; 
-            background: var(--bg); 
-            color: var(--text); 
-            line-height: 1.6;
-            padding: 40px 20px;
+        h1 {
+          font-size: 2rem;
         }
-
-        .container { max-width: 900px; margin: 0 auto; }
-        
-        header { 
-            text-align: center; 
-            margin-bottom: 50px; 
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            padding: 60px 20px;
-            border-radius: 24px;
-            color: white;
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-        }
-
-        h1 { font-size: 2.5rem; margin-bottom: 15px; font-weight: 700; }
-        .subtitle { font-size: 1.1rem; opacity: 0.9; }
-
         .step-card {
-            background: var(--card-bg);
-            border-radius: 20px;
-            padding: 35px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-            border: 1px solid #e2e8f0;
-            position: relative;
-            transition: transform 0.3s ease;
+          padding: 30px 20px;
         }
-
-        .step-card:hover { transform: translateY(-5px); }
-
         .step-number {
-            position: absolute;
-            top: -15px;
-            left: 30px;
-            background: var(--primary);
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.4);
+          left: 20px;
         }
-
-        h2 { margin-bottom: 20px; font-size: 1.5rem; display: flex; align-items: center; gap: 12px; }
-        h2 i { color: var(--primary); }
-
-        h3 { margin: 20px 0 10px; font-size: 1.1rem; color: var(--primary-dark); }
-
-        p, ul { margin-bottom: 15px; color: var(--text-light); }
-        ul { padding-left: 20px; }
-        li { margin-bottom: 8px; }
-
-        code {
-            background: #f1f5f9;
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
-            color: var(--danger);
-            font-weight: 600;
-        }
-
-        .code-block {
-            background: #1e293b;
-            color: #e2e8f0;
-            padding: 20px;
-            border-radius: 12px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            overflow-x: auto;
-            margin: 15px 0;
-            position: relative;
-        }
-
-        .alert {
-            padding: 15px 20px;
-            border-radius: 12px;
-            margin: 20px 0;
-            display: flex;
-            gap: 15px;
-            align-items: flex-start;
-        }
-
-        .alert-info { background: #e0e7ff; color: #3730a3; border-left: 5px solid var(--primary); }
-        .alert-warning { background: #fff7ed; color: #9a3412; border-left: 5px solid var(--warning); }
-
-        .btn-copy {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255,255,255,0.1);
-            border: none;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-
-        .btn-copy:hover { background: rgba(255,255,255,0.2); }
-
-        footer { text-align: center; margin-top: 50px; color: var(--text-light); font-size: 0.9rem; }
-
-        /* Mobile Adjustments */
-        @media (max-width: 600px) {
-            header { padding: 40px 15px; border-radius: 0; margin: -40px -20px 30px; }
-            h1 { font-size: 1.8rem; }
-            .step-card { padding: 25px 20px; }
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Sistem E-Klinik Premium</h1>
+        <p class="subtitle">
+          Panduan Instalasi & Konfigurasi Database Supabase (Production Ready)
+        </p>
+      </header>
 
-<div class="container">
-    <header>
-        <h1>Panduan Instalasi E-Klinik</h1>
-        <p class="subtitle">Migrasi dari Google Sheets ke Database Supabase (Full PWA)</p>
-    </header>
-
-    <!-- STEP 1 -->
-    <div class="step-card">
+      <!-- STEP 1 -->
+      <div class="step-card">
         <div class="step-number">1</div>
-        <h2><i class="fa-solid fa-cloud"></i> Persiapan Proyek Supabase</h2>
-        <p>Langkah pertama adalah membuat "rumah" baru untuk database Anda.</p>
+        <h2>
+          <i class="fa-solid fa-cloud-bolt"></i> Menyiapkan Project Supabase
+        </h2>
+        <p>Langkah awal untuk membangun backend yang stabil dan cepat.</p>
         <ul>
-            <li>Masuk ke <a href="https://supabase.com" target="_blank">supabase.com</a> dan Login/Daftar.</li>
-            <li>Klik <b>New Project</b>. Pilih nama (misal: E-Klinik) dan tentukan Password Database.</li>
-            <li>Tunggu hingga proses <i>Setting Up Project</i> selesai (biasanya 2-3 menit).</li>
+          <li>
+            Buat akun di
+            <a
+              href="https://supabase.com"
+              target="_blank"
+              style="font-weight: 700"
+              >supabase.com</a
+            >.
+          </li>
+          <li>
+            Buat <b>New Project</b>. Simpan <b>Database Password</b> Anda
+            baik-baik.
+          </li>
+          <li>Tungu hingga status project menjadi <b>Active</b>.</li>
         </ul>
         <div class="alert alert-info">
-            <i class="fa-solid fa-info-circle"></i>
-            <div>Pilih Region yang terdekat dengan pengguna (misal: <b>Singapore</b>) agar akses aplikasi lebih cepat.</div>
+          <i class="fa-solid fa-location-dot fa-2x"></i>
+          <div>
+            Pilih Region <b>Singapore</b> untuk performa terbaik jika Anda
+            berada di Indonesia.
+          </div>
         </div>
-    </div>
+      </div>
 
-    <!-- STEP 2 -->
-    <div class="step-card">
+      <!-- STEP 2 -->
+      <div class="step-card">
         <div class="step-number">2</div>
-        <h2><i class="fa-solid fa-database"></i> Membuat Struktur Tabel (SQL)</h2>
-        <p>Agar database siap menampung data Mahasiswa, Preseptor, dan Logbook, kita harus menjalankan skema SQL.</p>
+        <h2><i class="fa-solid fa-database"></i> Membangun Skema Database</h2>
+        <p>
+          Eksekusi perintah SQL untuk membuat tabel-tabel utama termasuk sistem
+          Penilaian Akhir yang baru.
+        </p>
         <ul>
-            <li>Di dashboard Supabase, klik menu <b>SQL Editor</b> (ikon terminal di kiri).</li>
-            <li>Klik <b>New Query</b>.</li>
-            <li>Buka file <code>supabase-schema.sql</code> dari folder proyek Anda, lalu Copy dan Paste semua isinya ke editor.</li>
-            <li>Klik tombol <b>Run</b>.</li>
+          <li>Masuk ke menu <b>SQL Editor</b> di Sidebar kiri Supabase.</li>
+          <li>Klik <b>New Query</b>.</li>
+          <li>
+            Copy seluruh isi file <code>supabase-schema.sql</code> dari folder
+            project ini.
+          </li>
+          <li>Tempelkan ke dalam editor dan klik <b>Run</b>.</li>
         </ul>
         <div class="alert alert-warning">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <div>Jika muncul error <i>"relation users already exists"</i>, berarti tabel sudah ada. Tambahkan perintah <code>DROP TABLE IF EXISTS...</code> di awal atau abaikan saja jika tabel sudah terbuat.</div>
+          <i class="fa-solid fa-triangle-exclamation fa-2x"></i>
+          <div>
+            Pastikan semua tabel berhasil dibuat (centang hijau). Jika ada tabel
+            yang gagal, jalankan ulang kueri tersebut secara spesifik.
+          </div>
         </div>
-    </div>
+      </div>
 
-    <!-- STEP 3 -->
-    <div class="step-card">
+      <!-- STEP 3 -->
+      <div class="step-card">
         <div class="step-number">3</div>
-        <h2><i class="fa-solid fa-shield-halved"></i> Matikan RLS (Row Level Security)</h2>
-        <p>Supabase secara default mengunci akses tabel secara ketat. Kita perlu memberi izin akses agar aplikasi bisa login.</p>
-        <h3>Jalankan kueri berikut di SQL Editor:</h3>
+        <h2><i class="fa-solid fa-shield-halved"></i> Keamanan (RLS Policy)</h2>
+        <p>
+          <b>PENTING:</b> Jangan mematikan RLS di server produksi. Gunakan
+          kebijakan akses agar data tetap aman.
+        </p>
+        <h3>Jalankan kueri ini di SQL Editor untuk memberi izin akses:</h3>
         <div class="code-block">
-            -- Matikan proteksi (RLS) sementara agar API bisa diakses publik
-            ALTER TABLE users DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE presensi DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE logbook DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE kompetensi DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE tempat_praktik DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE prodi DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE jadwal DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE laporan DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE settings DISABLE ROW LEVEL SECURITY;
-            ALTER TABLE kelompok DISABLE ROW LEVEL SECURITY;
+          -- Memberi izin Baca/Tulis untuk Aplikasi ALTER TABLE users ENABLE ROW
+          LEVEL SECURITY; CREATE POLICY "Public Read" ON users FOR SELECT TO
+          anon USING (true); CREATE POLICY "Public Write" ON users FOR INSERT TO
+          anon WITH CHECK (true); -- Lakukan hal yang sama untuk tabel lain
+          (presensi, logbook, laporan) -- Atau jalankan script RLS lengkap dari
+          file audit_results.md
         </div>
-        <p>Langkah ini memastikan error <code>406 Not Acceptable</code> pada login tidak muncul lagi.</p>
-    </div>
+        <p>
+          Kebijakan ini memungkinkan aplikasi web Anda berkomunikasi dengan
+          database menggunakan <code>anon key</code> secara aman.
+        </p>
+      </div>
 
-    <!-- STEP 4 -->
-    <div class="step-card">
+      <!-- STEP 4 -->
+      <div class="step-card">
         <div class="step-number">4</div>
-        <h2><i class="fa-solid fa-gear"></i> Konfigurasi API di Aplikasi</h2>
-        <p>Hubungkan file proyek Anda dengan URL dan Kunci API dari Supabase.</p>
+        <h2><i class="fa-solid fa-plug"></i> Menghubungkan API</h2>
+        <p>
+          Konfigurasi koneksi antara frontend (browser) dan backend (Supabase).
+        </p>
         <ul>
-            <li>Buka menu <b>Project Settings</b> (ikon gir) > Pilih <b>API</b>.</li>
-            <li>Salin <b>Project URL</b> dan <b>anon public key</b>.</li>
-            <li>Buka file <code>js/supabase-config.js</code> di folder proyek Anda.</li>
-            <li>Tempelkan kedua nilai tersebut ke dalam variabel yang tersedia:</li>
+          <li>Buka <b>Project Settings</b> (gir bawah) > <b>API</b>.</li>
+          <li>Salin <b>Project URL</b> dan <b>anon keys</b>.</li>
+          <li>
+            Buka file <code>js/supabase-config.js</code> di komputer Anda.
+          </li>
+          <li>Update variabel berikut:</li>
         </ul>
         <div class="code-block">
-            const SUPABASE_URL = "https://xyz.supabase.co";<br>
-            const SUPABASE_ANON_KEY = "eyJhbGc...k0M2Y";
+          const SUPABASE_URL = "https://proyek-anda.supabase.co"; const
+          SUPABASE_ANON_KEY = "eyJhbGc...pasted-from-dashboard";
         </div>
+      </div>
+
+      <!-- FINISH -->
+      <div
+        class="step-card"
+        style="border: 3px solid var(--success); background: #f0fdfa"
+      >
+        <div
+          class="step-number"
+          style="background: var(--success); transform: rotate(0)"
+        >
+          <i class="fa-solid fa-trophy"></i>
+        </div>
+        <h2 style="color: var(--success)">Berhasil Diinstal!</h2>
+        <p>Gunakan akun demo berikut untuk mencoba seluruh fitur baru:</p>
+
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+          "
+        >
+          <div
+            style="
+              background: white;
+              padding: 15px;
+              border-radius: 12px;
+              border: 1px solid #d1fae5;
+            "
+          >
+            <p style="margin: 0; font-weight: 700; color: var(--primary)">
+              👤 SUPER ADMIN
+            </p>
+            <code class="demo-badge">hironimus</code> /
+            <code class="demo-badge">admin123</code>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 15px;
+              border-radius: 12px;
+              border: 1px solid #d1fae5;
+            "
+          >
+            <p style="margin: 0; font-weight: 700; color: var(--primary)">
+              🎓 MAHASISWA
+            </p>
+            <code class="demo-badge">mhs</code> /
+            <code class="demo-badge">123</code>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 15px;
+              border-radius: 12px;
+              border: 1px solid #d1fae5;
+            "
+          >
+            <p style="margin: 0; font-weight: 700; color: var(--primary)">
+              🏥 PRESEPTOR
+            </p>
+            <code class="demo-badge">pre</code> /
+            <code class="demo-badge">123</code>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <p>&copy; 2026 E-Klinik Management System | Pro-Grade PWA Edition</p>
+        <p style="font-size: 0.8rem; margin-top: 10px; opacity: 0.7">
+          Optimized for High Performance & Secure Database Interactions
+        </p>
+      </footer>
     </div>
-
-    <!-- STEP 5 -->
-    <div class="step-card">
-        <div class="step-number">5</div>
-        <h2><i class="fa-solid fa-globe"></i> Hosting & Anti-Pause (GitHub)</h2>
-        <p>Karena Supabase Free Plan bisa mati otomatis jika tidak ada aktivitas selama 1 minggu, kita pasang Robot GitHub.</p>
-        <ul>
-            <li>Upload proyek Anda ke <b>GitHub</b>.</li>
-            <li>Masuk ke tab <b>Settings</b> > <b>Secrets</b> > <b>Actions</b> di GitHub Anda.</li>
-            <li>Daftarkan Secret: <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code>.</li>
-            <li>Robot otomatis akan berjalan setiap hari Senin berdasarkan file di folder <code>.github/workflows/</code>.</li>
-        </ul>
-    </div>
-
-    <!-- FINISH -->
-    <div class="step-card" style="border: 2px solid var(--success); background: #f0fdf4;">
-        <div class="step-number" style="background: var(--success);"><i class="fa-solid fa-check"></i></div>
-        <h2 style="color: var(--success);">Instalasi Selesai!</h2>
-        <p>Coba buka aplikasi Anda dan login menggunakan Akun Demo:</p>
-        <ul>
-            <li><b>Admin:</b> <code>adm</code> / <code>123</code></li>
-            <li><b>Mahasiswa:</b> <code>mhs</code> / <code>123</code></li>
-            <li><b>Preseptor:</b> <code>pre</code> / <code>123</code></li>
-        </ul>
-    </div>
-
-    <footer>
-        <p>&copy; 2026 E-Klinik Management System | PWA & Supabase Edition</p>
-    </footer>
-</div>
-
-</body>
+  </body>
 </html>

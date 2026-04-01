@@ -10,7 +10,6 @@ function escapeHTML(str) {
 function downloadCSV(headers, rows, filename, extraText = "") {
   const quote = (val) => {
     let s = String(val === null || val === undefined ? "" : val).trim();
-    // Escape quotes and wrap in quotes
     return `"${s.replace(/"/g, '""')}"`;
   };
   const headerLine = headers.map(quote).join(",");
@@ -29,16 +28,8 @@ function downloadCSV(headers, rows, filename, extraText = "") {
   URL.revokeObjectURL(url);
 }
 
-// SHA-256 Hash Utility for Password Security
-async function hashPassword(pwd) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(pwd);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
+const GAS_URL =
+  "https://script.google.com/macros/s/AKfycbxkVfL_dirGxL0_MK3J3vBButwz2oRIVVGHHWqJfA9zmvFDBuJOGHdPAkVc4Mr7Lot5/exec"; // GANTI DENGAN URL WEB APP GAS ANDA
 let currentUser = null;
 let html5QrcodeScanner = null;
 window.EKLINIK_CACHE = {};
@@ -425,7 +416,7 @@ function loadView(viewName) {
     area.innerHTML = `
             <div class="animate-fade-up text-center mt-3 text-muted">
                 <i class="fa-solid fa-triangle-exclamation fa-3x mb-2"></i>
-                <h3>View ${escapeHTML(viewName)} belum tersedia</h3>
+                <h3>View ${viewName} belum tersedia</h3>
             </div>
         `;
   }
@@ -3614,7 +3605,7 @@ window.downloadFailedCSV = (roleFilter, failedRows) => {
     "password",
     "prodi",
   ];
-  const csvData = failedRows.map((f) => {
+  const rows = failedRows.map((f) => {
     const d = f.data;
     return [
       f.row,
@@ -3623,21 +3614,10 @@ window.downloadFailedCSV = (roleFilter, failedRows) => {
       d.username || "",
       d.password || "",
       d.prodi || "-",
-    ].join(";");
+    ];
   });
 
-  let csvContent =
-    "data:text/csv;charset=utf-8," +
-    headers.join(";") +
-    "\n" +
-    csvData.join("\n");
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `GAGAL_IMPORT_${roleFilter.toUpperCase()}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  downloadCSV(headers, rows, `GAGAL_IMPORT_${roleFilter.toUpperCase()}.csv`);
 };
 
 // ADMIN: PENGATURAN SISTEM
@@ -4362,16 +4342,28 @@ window.exportToCSV = () => {
     "Durasi (Jam)",
   ];
   const rows = window.dtAdminPresensi.map((p) => [
-    p.nama,
-    p.prodi || "-",
-    p.nama_lahan,
+    `"${p.nama}"`,
+    `"${p.prodi || "-"}"`,
+    `"${p.nama_lahan}"`,
     p.tanggal,
     p.jam_masuk,
     p.jam_keluar || "",
     p.durasi || 0,
   ]);
 
-  downloadCSV(headers, rows, "Laporan_Master_Presensi.csv");
+  const csvContent =
+    "data:text/csv;charset=utf-8," +
+    headers.join(",") +
+    "\n" +
+    rows.map((e) => e.join(",")).join("\n");
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "Laporan_Master_Presensi.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
   showToast("Export Berhasil", "File CSV telah diunduh", "success");
 };
 
@@ -5486,26 +5478,21 @@ window.cetakSemuaQRCode = async () => {
 
 // NOTIFICATION LOGIC
 async function updateNotifBadge() {
-  // Direct call without loader to prevent flickering
-  try {
-    const res = await supabaseFetchAPI("getNotif", {
-      user_id: currentUser.id,
-      role: currentUser.role,
-    });
-    const badge = document.getElementById("notif-count");
-    const ping = document.getElementById("notif-ping");
-    if (!badge || !ping) return;
+  const res = await fetchAPI("getNotif", {
+    user_id: currentUser.id,
+    role: currentUser.role,
+  });
+  const badge = document.getElementById("notif-count");
+  const ping = document.getElementById("notif-ping");
+  if (!badge || !ping) return;
 
-    if (res.success && res.data && res.data.length > 0) {
-      badge.textContent = res.data.length;
-      badge.classList.remove("hidden");
-      ping.style.display = "block";
-    } else {
-      badge.classList.add("hidden");
-      ping.style.display = "none";
-    }
-  } catch (e) {
-    console.warn("Notif badge update skipped:", e.message);
+  if (res.success && res.data && res.data.length > 0) {
+    badge.textContent = res.data.length;
+    badge.classList.remove("hidden");
+    ping.style.display = "block";
+  } else {
+    badge.classList.add("hidden");
+    ping.style.display = "none";
   }
 }
 
