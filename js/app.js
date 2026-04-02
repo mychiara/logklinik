@@ -235,6 +235,18 @@ function initDashboard() {
         text: "Informasi Praktik",
         view: "informasiPraktikView",
       },
+      {
+        id: "nav-sdki",
+        icon: "fa-book-medical",
+        text: "Aplikasi SDKI,SLKI,SIKI",
+        view: "aplikasiSDKIView",
+      },
+      {
+        id: "nav-ukom",
+        icon: "fa-user-nurse",
+        text: "Aplikasi Ukom Perawat",
+        view: "aplikasiUkomView",
+      },
     ],
     preseptor: [
       {
@@ -255,6 +267,18 @@ function initDashboard() {
         text: "Mahasiswa Bimbingan",
         view: "mahasiswaView",
       },
+      {
+        id: "nav-sdki",
+        icon: "fa-book-medical",
+        text: "Aplikasi SDKI,SLKI,SIKI",
+        view: "aplikasiSDKIView",
+      },
+      {
+        id: "nav-ukom",
+        icon: "fa-user-nurse",
+        text: "Aplikasi Ukom Perawat",
+        view: "aplikasiUkomView",
+      },
     ],
     preseptor_akademik: [
       {
@@ -274,6 +298,18 @@ function initDashboard() {
         icon: "fa-users",
         text: "Mahasiswa Bimbingan",
         view: "mahasiswaView",
+      },
+      {
+        id: "nav-sdki",
+        icon: "fa-book-medical",
+        text: "Aplikasi SDKI,SLKI,SIKI",
+        view: "aplikasiSDKIView",
+      },
+      {
+        id: "nav-ukom",
+        icon: "fa-user-nurse",
+        text: "Aplikasi Ukom Perawat",
+        view: "aplikasiUkomView",
       },
     ],
     admin: [
@@ -620,6 +656,161 @@ async function informasiPraktikView(area) {
   } else {
     tableBody.innerHTML = `<tr><td colspan="4" class="empty-table text-danger">Gagal menyinkronkan data praktik.</td></tr>`;
   }
+}
+
+// --- APLIKASI EKSTERNAL ---
+function aplikasiSDKIView(area) {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+        <div class="card shadow-lg" style="border-radius: 20px; overflow: hidden; border: none; background: #fff;">
+            <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 40px 20px; text-align: center; color: white;">
+                <i class="fa-solid fa-book-medical fa-4x mb-3 animate-bounce-subtle" style="color: white;"></i>
+                <h2 style="font-weight: 800; font-size: 2rem; margin-bottom: 10px; color: white;">Aplikasi SDKI, SLKI, SIKI</h2>
+                <p style="opacity: 0.9; max-width: 600px; margin: 0 auto; font-size: 1.1rem; color: white;">Solusi Digital Terintegrasi untuk Diagnosis, Luaran, dan Intervensi Keperawatan Indonesia.</p>
+            </div>
+            <div class="card-body" style="padding: 30px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 40px;">
+                    <!-- Section 1: Overview & Primary Features -->
+                    <div>
+                        <h3 style="color: var(--primary-dark); margin-bottom: 15px; font-weight: 800; border-left: 5px solid var(--primary); padding-left: 15px;">Manfaat & Keunggulan</h3>
+                        <p style="line-height: 1.6; color: #475569; margin-bottom: 25px; font-weight: 500;">Bagaimana aplikasi ini mendukung pembelajaran dan aktivitas keperawatan?</p>
+                        
+                        <div style="display: grid; gap: 20px;">
+                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                                <div style="background: var(--primary-light); color: var(--primary); width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="fa-solid fa-list-check fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Standar 3S Lengkap</h4>
+                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Referensi komprehensif SDKI (149), SLKI (137), dan SIKI (187) sesuai standar PPNI dalam satu genggaman.</p>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                                <div style="background: #ecfdf5; color: #10b981; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="fa-solid fa-brain fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Diagnosa Pintar</h4>
+                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Algoritma cerdas yang memberikan rekomendasi diagnosa keperawatan instan berdasarkan data pengkajian Anda.</p>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                                <div style="background: #fff7ed; color: #f59e0b; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="fa-solid fa-stethoscope fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">75+ SOP Klinis</h4>
+                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Panduan prosedur tindakan klinis detail (KMB, Anak, Maternitas, Jiwa, Gadar) lengkap dengan fitur Voice Over.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Advanced Tools & Checkout -->
+                    <div>
+                        <div style="display: grid; gap: 20px; margin-top: 55px;">
+                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                                <div style="background: #eff6ff; color: #3b82f6; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="fa-solid fa-calculator fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Kalkulator Medis</h4>
+                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Hitung cepat dosis obat, tetesan infus, GFR, hingga skor risiko Braden & Morse secara akurat.</p>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                                <div style="background: #fdf2f8; color: #db2777; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="fa-solid fa-person-chalkboard fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Modul Edukasi</h4>
+                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Template edukasi pasien & discharge planning siap pakai untuk meningkatkan kualitas asuhan medik.</p>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                                <div style="background: #f5f3ff; color: #7c3aed; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="fa-solid fa-file-signature fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Dokumentasi SOAP</h4>
+                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Catat perkembangan harian pasien (CPPT) secara terstruktur & simpan riwayat catatan dengan aman.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 35px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); padding: 25px; border-radius: 20px; border: 1px solid #e2e8f0; text-align: center;">
+                            <h4 style="font-weight: 800; margin-bottom: 10px; color: var(--primary-dark);">Dapatkan Akses Penuh</h4>
+                            <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 20px;">Lisensi profesional di sdkipro.com</p>
+                            <a href="https://sdkipro.com" target="_blank" class="btn btn-primary btn-block btn-lg shadow-primary" style="border-radius: 12px; padding: 15px; color: white;">
+                                <i class="fa-solid fa-cart-shopping mr-2"></i> Langganan SDKI Pro Sekarang
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  `;
+}
+
+function aplikasiUkomView(area) {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+        <div class="card shadow-lg" style="border-radius: 20px; overflow: hidden; border: none; background: #fff;">
+            <div style="background: linear-gradient(135deg, #059669, #10b981); padding: 40px 20px; text-align: center; color: white;">
+                <i class="fa-solid fa-user-nurse fa-4x mb-3 animate-bounce-subtle" style="color: white;"></i>
+                <h2 style="font-weight: 800; font-size: 2rem; margin-bottom: 10px; color: white;">Bimbel Ukom Perawat</h2>
+                <p style="opacity: 0.9; max-width: 600px; margin: 0 auto; font-size: 1.1rem; color: white;">Persiapan Matang Menuju Lulus Uji Kompetensi (UKOM) 100% One Shot!</p>
+            </div>
+            <div class="card-body" style="padding: 30px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
+                    <div>
+                        <h3 style="color: #065f46; margin-bottom: 15px; font-weight: 700;">Mengapa Harus Aplikasi Ini?</h3>
+                        <p style="line-height: 1.6; color: #475569;">UKOM adalah gerbang terakhir menjadi perawat profesional. Kami menghadirkan platform persiapan Uji Kompetensi Perawat (Ners & D3) terlengkap dengan metode belajar yang simpel, fokus pada kata kunci (keywords), efektif, dan terukur.</p>
+                        <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr; gap: 15px;">
+                            <div style="background: #f0fdfa; padding: 20px; border-radius: 12px; text-align: center; border: 1px dashed #10b981;">
+                                <i class="fa-solid fa-file-circle-check text-success fa-3x mb-3"></i>
+                                <div style="font-size: 1rem; font-weight: 700; color: #065f46;">Ribuan Bank Soal & Tryout</div>
+                                <div style="font-size: 0.85rem; color: #065f46; opacity: 0.8; margin-top: 5px;">Update berkala sesuai Blueprint terbaru</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="background: #f8fafc; padding: 25px; border-radius: 15px; border: 1px solid #e2e8f0;">
+                        <h4 style="font-weight: 700; margin-bottom: 15px; color: var(--text-strong);">Keunggulan Utama:</h4>
+                        <ul style="list-style: none; padding: 0; font-size: 0.95rem; color: #64748b; display: flex; flex-direction: column; gap: 15px;">
+                            <li style="display: flex; align-items: start; gap: 12px;">
+                                <i class="fa-solid fa-calendar-check text-success" style="margin-top: 4px;"></i>
+                                <div style="color: var(--text-body);"><strong>Metode Lengkap & Up-to-Date:</strong> Kurikulum disusun berdasarkan kisi-kisi resmi PPNI terbaru.</div>
+                            </li>
+                            <li style="display: flex; align-items: start; gap: 12px;">
+                                <i class="fa-solid fa-display text-primary" style="margin-top: 4px;"></i>
+                                <div style="color: var(--text-body);"><strong>Teknologi Belajar Kekinian:</strong> Akses platform modern interaktif yang memudahkan belajar di mana saja.</div>
+                            </li>
+                            <li style="display: flex; align-items: start; gap: 12px;">
+                                <i class="fa-solid fa-laptop-code text-info" style="margin-top: 4px;"></i>
+                                <div style="color: var(--text-body);"><strong>Simulasi Try Out Mirip Asli:</strong> Latihan berbasis teknologi modern 100% sesuai format ujian Kompetensi.</div>
+                            </li>
+                            <li style="display: flex; align-items: start; gap: 12px;">
+                                <i class="fa-solid fa-brain text-warning" style="margin-top: 4px;"></i>
+                                <div style="color: var(--text-body);"><strong>Metode Belajar Smart:</strong> Pendekatan interaktif untuk memahami materi dengan lebih cepat dan mudah.</div>
+                            </li>
+                        </ul>
+                        <div style="margin-top: 25px;">
+                            <a href="https://bimbel.masandigital.com" target="_blank" class="btn btn-success btn-block btn-lg shadow-success" style="border-radius: 12px; padding: 15px; background: #10b981; border: none; color: white;">
+                                <i class="fa-solid fa-rocket mr-2"></i> Daftar Bimbel Sekarang
+                            </a>
+                            <p style="text-center; font-size: 0.8rem; color: #94a3b8; margin-top: 10px; text-align: center;">Investasikan masa depan Anda untuk kelulusan UKOM.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  `;
 }
 
 // Router Simple
