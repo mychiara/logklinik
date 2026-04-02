@@ -3820,16 +3820,134 @@ window.repairUserDatabase = async () => {
   }
 };
 
-window.tempatAdminView = (area) =>
-  renderMasterData(
-    area,
-    "tempat",
-    "Tempat Praktik",
-    "fa-hospital",
-    ["Nama Tempat Praktik"],
-    ["nama_tempat"],
-    "getTempat",
-  );
+window.tempatAdminView = async (area) => {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center wrap gap-2">
+          <h3><i class="fa-solid fa-hospital text-primary"></i> Master Tempat Praktik</h3>
+          <div class="d-flex gap-2 wrap">
+            <button class="btn btn-outline btn-sm" onclick="downloadMasterTemplate('tempat')"><i class="fa-solid fa-file-csv"></i> Template CSV</button>
+            <label class="btn btn-outline btn-sm m-0" style="cursor:pointer">
+              <i class="fa-solid fa-file-import"></i> Import CSV
+              <input type="file" accept=".csv" class="hidden" onchange="handleImportMasterCSV(event, 'tempat')">
+            </label>
+            <button class="btn btn-danger-soft btn-sm" onclick="clearMasterData('tempat', 'Tempat Praktik')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
+            <button class="btn btn-primary btn-sm" onclick="bukaModalMaster('tempat', 'Tempat Praktik')"><i class="fa-solid fa-plus"></i> Tambah Baru</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="table-master-tempat">
+              <thead>
+                <tr>
+                  <th>Nama Tempat Praktik</th>
+                  <th><i class="fa-solid fa-user-doctor" style="color:var(--primary)"></i> Preseptor Klinik</th>
+                  <th><i class="fa-solid fa-chalkboard-teacher" style="color:#f59e0b"></i> Preseptor Akademik</th>
+                  <th style="text-align:right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody><tr><td colspan="4" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const [resTempat, resUsers] = await Promise.all([
+    fetchAPI("getTempat"),
+    fetchAPI("getUsers"),
+  ]);
+
+  const tableBody = document.querySelector("#table-master-tempat tbody");
+  if (resTempat.success && resTempat.data && resTempat.data.length > 0) {
+    window.adminMasterData_tempat = resTempat.data;
+
+    // Build maps of preseptors per tempat_id
+    const pkMap = {};
+    const paMap = {};
+    if (resUsers.success && resUsers.data) {
+      resUsers.data.forEach((u) => {
+        if (
+          (u.role === "preseptor" || u.role === "preseptor_akademik") &&
+          u.tempat_id &&
+          u.tempat_id !== "-"
+        ) {
+          const tids = u.tempat_id.split(",");
+          tids.forEach((tid) => {
+            const trimmed = tid.trim();
+            if (u.role === "preseptor") {
+              if (!pkMap[trimmed]) pkMap[trimmed] = [];
+              pkMap[trimmed].push(u.nama);
+            } else {
+              if (!paMap[trimmed]) paMap[trimmed] = [];
+              paMap[trimmed].push(u.nama);
+            }
+          });
+        }
+      });
+    }
+
+    const htmlRows = resTempat.data.map((row, idx) => {
+      const pkNames = pkMap[row.id] || [];
+      const paNames = paMap[row.id] || [];
+
+      const pkHtml =
+        pkNames.length > 0
+          ? pkNames
+              .map(
+                (n) =>
+                  `<span class="badge bg-primary" style="font-size:0.8em; margin:2px 4px 2px 0; padding:0.3rem 0.6rem;">${escapeHTML(n)}</span>`,
+              )
+              .join("")
+          : '<span style="color:#94a3b8; font-size:0.85em;">— Belum ditetapkan</span>';
+
+      const paHtml =
+        paNames.length > 0
+          ? paNames
+              .map(
+                (n) =>
+                  `<span class="badge" style="font-size:0.8em; margin:2px 4px 2px 0; padding:0.3rem 0.6rem; background:#fef3c7; color:#92400e; border:1px solid #fde68a;">${escapeHTML(n)}</span>`,
+              )
+              .join("")
+          : '<span style="color:#94a3b8; font-size:0.85em;">— Belum ditetapkan</span>';
+
+      let text = escapeHTML(row.nama_tempat) || "";
+      let firstNumIdx = text.search(/[0-9]+\./);
+      let titlePart = text;
+      let listPart = "";
+      if (firstNumIdx !== -1) {
+        titlePart = text.substring(0, firstNumIdx).trim();
+        listPart = text.substring(firstNumIdx);
+      }
+      let formattedList = listPart.replace(
+        /([0-9]+\.)/g,
+        '<br><span style="color:var(--primary); font-weight:700; margin-right:8px; display:inline-block; width:20px;">$1</span>',
+      );
+
+      return `
+        <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+          <td>
+            <div style="margin-bottom:4px;"><strong style="color:var(--primary-dark); font-size:1.05em; border-bottom:1px dashed #cbd5e1">${titlePart}</strong></div>
+            <div style="line-height:1.7; color:var(--text-strong); padding-left:5px;">${formattedList}</div>
+          </td>
+          <td>${pkHtml}</td>
+          <td>${paHtml}</td>
+          <td style="text-align:right">
+            <button class="btn btn-icon-ghost" onclick="bukaModalMaster('tempat', 'Tempat Praktik', '${row.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('tempat', '${row.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `;
+    });
+
+    tableBody.innerHTML = htmlRows.join("");
+  } else {
+    tableBody.innerHTML =
+      '<tr><td colspan="4" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data</td></tr>';
+  }
+};
 window.prodiAdminView = (area) =>
   renderMasterData(
     area,
@@ -4666,13 +4784,40 @@ async function jadwalAdminView(area) {
         </div>
     `;
 
-  const [resJadwal, resUsers] = await Promise.all([
+  const [resJadwal, resUsers, resTempat] = await Promise.all([
     fetchAPI("getJadwal"),
     fetchAPI("getUsers"),
+    fetchCachedAPI("getTempat"),
   ]);
 
   const wrapper = document.querySelector("#jadwal-table-wrapper");
   window.dtJadwalAdmin = [];
+
+  // Build preseptor maps per tempat_id
+  const preseptorKlinikMap = {};
+  const preseptorAkademikMap = {};
+  if (resUsers.success && resUsers.data) {
+    resUsers.data.forEach((u) => {
+      if (
+        (u.role === "preseptor" || u.role === "preseptor_akademik") &&
+        u.tempat_id &&
+        u.tempat_id !== "-"
+      ) {
+        const tids = u.tempat_id.split(",");
+        tids.forEach((tid) => {
+          const trimmed = tid.trim();
+          if (u.role === "preseptor") {
+            if (!preseptorKlinikMap[trimmed]) preseptorKlinikMap[trimmed] = [];
+            preseptorKlinikMap[trimmed].push(u.nama);
+          } else {
+            if (!preseptorAkademikMap[trimmed])
+              preseptorAkademikMap[trimmed] = [];
+            preseptorAkademikMap[trimmed].push(u.nama);
+          }
+        });
+      }
+    });
+  }
 
   if (
     resJadwal.success &&
@@ -4815,7 +4960,16 @@ async function jadwalAdminView(area) {
 
         blocks.forEach((block, blockIdx) => {
           if (index === 0) {
-            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}</td>`;
+            const pkList = preseptorKlinikMap[block.tempat_id] || [];
+            const paList = preseptorAkademikMap[block.tempat_id] || [];
+            let preseptorHtml = "";
+            if (pkList.length > 0) {
+              preseptorHtml += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #e2e8f0; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-user-doctor" style="color:var(--primary); margin-right:4px;"></i>PK: ${pkList.join(", ")}</div>`;
+            }
+            if (paList.length > 0) {
+              preseptorHtml += `<div style="margin-top:4px; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-chalkboard-teacher" style="color:#f59e0b; margin-right:4px;"></i>PA: ${paList.join(", ")}</div>`;
+            }
+            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}${preseptorHtml}</td>`;
           }
 
           block.dates.forEach((dStr) => {
@@ -4884,6 +5038,29 @@ window.exportJadwalPDF = async () => {
 
   const users = resUsers.data;
   const schedules = window.dtJadwalAdmin;
+
+  // Build preseptor maps per tempat_id for PDF
+  const pdfPKMap = {};
+  const pdfPAMap = {};
+  users.forEach((u) => {
+    if (
+      (u.role === "preseptor" || u.role === "preseptor_akademik") &&
+      u.tempat_id &&
+      u.tempat_id !== "-"
+    ) {
+      const tids = u.tempat_id.split(",");
+      tids.forEach((tid) => {
+        const trimmed = tid.trim();
+        if (u.role === "preseptor") {
+          if (!pdfPKMap[trimmed]) pdfPKMap[trimmed] = [];
+          pdfPKMap[trimmed].push(u.nama);
+        } else {
+          if (!pdfPAMap[trimmed]) pdfPAMap[trimmed] = [];
+          pdfPAMap[trimmed].push(u.nama);
+        }
+      });
+    }
+  });
 
   // Grouping identical to HTML table logic
   const groupsTemp = {};
@@ -5016,7 +5193,12 @@ window.exportJadwalPDF = async () => {
       const rowData = [index + 1, u.nama, u.username];
 
       blocks.forEach((block, bIdx) => {
-        rowData.push(block.nama_tempat); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
+        let tempatLabel = block.nama_tempat;
+        const pdfPK = pdfPKMap[block.tempat_id] || [];
+        const pdfPA = pdfPAMap[block.tempat_id] || [];
+        if (pdfPK.length > 0) tempatLabel += `\nPK: ${pdfPK.join(", ")}`;
+        if (pdfPA.length > 0) tempatLabel += `\nPA: ${pdfPA.join(", ")}`;
+        rowData.push(tempatLabel); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
 
         block.dates.forEach((dStr) => {
           const s = group.schedules.find(

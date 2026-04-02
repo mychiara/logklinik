@@ -177,11 +177,41 @@ window.supabaseFetchAPI = async (action, payload) => {
         };
       }
 
+      case "getUsers": {
+        const { data, error } = await supabaseClient
+          .from("users")
+          .select(
+            "id, username, nama, role, prodi, kelompok_id, tempat_id, angkatan, no_telp",
+          )
+          .order("nama", { ascending: true });
+        if (error) throw error;
+        return {
+          success: true,
+          data: (data || []).map((u) => ({
+            ...u,
+            kelompok: u.kelompok_id,
+            tempat_id: u.tempat_id || "-",
+          })),
+        };
+      }
+
+      case "getPendingLogs": {
+        const { data, error } = await supabaseClient
+          .from("logbook")
+          .select("*, users!inner(nama)")
+          .eq("status", "Menunggu Validasi")
+          .order("tanggal", { ascending: true });
+        if (error) throw error;
+        return {
+          success: true,
+          data: data.map((l) => ({ ...l, nama_mahasiswa: l.users.nama })),
+        };
+      }
+
       case "getAllPresensi": {
         const { data, error } = await supabaseClient
           .from("presensi")
-          .select("*, users!inner(nama, prodi)")
-          .range(0, 4999);
+          .select("*, users!inner(nama, prodi)");
         if (error) throw error;
         return {
           success: true,
@@ -213,28 +243,22 @@ window.supabaseFetchAPI = async (action, payload) => {
 
       case "getMendesakLogs": {
         const yesterday = new Date(Date.now() - 86400000).toISOString();
-        let query = supabaseClient
+        const { data, error } = await supabaseClient
           .from("logbook")
-          .select("*, users!inner(nama)")
+          .select("*, users!inner(nama, tempat_id)")
           .eq("status", "Menunggu Validasi")
           .lt("created_at", yesterday);
+        if (error) throw error;
 
+        let filtered = data || [];
         if (payload.tempat_id && payload.tempat_id !== "-") {
           const tIds = payload.tempat_id.split(",");
-          query = query.in("lahan", tIds); // Use record-specific 'lahan' column
+          filtered = filtered.filter((l) =>
+            tIds.includes(String(l.users.tempat_id)),
+          );
         }
 
-        const { data, error } = await query
-          .order("tanggal", { ascending: true })
-          .range(0, 4999);
-        if (error) throw error;
-        return {
-          success: true,
-          data: (data || []).map((l) => ({
-            ...l,
-            nama_mahasiswa: l.users.nama,
-          })),
-        };
+        return { success: true, data: filtered };
       }
 
       case "getCompetencyGap": {
@@ -272,8 +296,7 @@ window.supabaseFetchAPI = async (action, payload) => {
           .from("logbook")
           .select("user_id, users!inner(nama)")
           .eq("status", "Disetujui")
-          .gt("created_at", lastWeek)
-          .range(0, 4999);
+          .gt("created_at", lastWeek);
         if (error) throw error;
 
         const board = {};
@@ -319,107 +342,23 @@ window.supabaseFetchAPI = async (action, payload) => {
         return { success: true, data };
       }
 
-      case "getAdminAnalytics": {
-        const today = new Date().toISOString().split("T")[0];
-        const [mhs, logs, pres, scores, prodis] = await Promise.all([
-          supabaseClient
-            .from("users")
-            .select("id", { count: "exact", head: true })
-            .eq("role", "mahasiswa"),
-          supabaseClient
-            .from("logbook")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "Disetujui"),
-          supabaseClient
-            .from("presensi")
-            .select("*", { count: "exact", head: true })
-            .eq("tanggal", today),
-          supabaseClient
-            .from("penilaian_akhir")
-            .select("total, users!inner(prodi)"),
-          supabaseClient.from("prodi").select("nama_prodi"),
-        ]);
-
-        // Calculate Average Performance per Prodi (Still fetch records for this, but only scoring ones)
-        // Note: Supabase limit is 1000 by default. If we have >1000 student final scores,
-        // we might need to handle this differently, but for 500 students it's safe.
-        const prodiStats = (prodis.data || []).map((p) => {
-          const prodiScores = (scores.data || []).filter(
-            (s) => s.users.prodi === p.nama_prodi,
-          );
-          const avg =
-            prodiScores.length > 0
-              ? (
-                  prodiScores.reduce((acc, s) => acc + (s.total || 0), 0) /
-                  prodiScores.length
-                ).toFixed(1)
-              : 0;
-          return { nama: p.nama_prodi, avg };
-        });
-
-        return {
-          success: true,
-          data: {
-            totalMhs: mhs.count || 0,
-            activeToday: pres.count || 0,
-            totalLogs: logs.count || 0,
-            avgLogs: mhs.count > 0 ? (logs.count / mhs.count).toFixed(1) : 0,
-            prodiStats: prodiStats,
-          },
-        };
-      }
-
-      case "getUsers": {
-        const { data, error } = await supabaseClient
-          .from("users")
-          .select(
-            "id, username, nama, role, prodi, kelompok_id, tempat_id, angkatan, no_telp",
-          )
-          .order("nama", { ascending: true })
-          .range(0, 4999); // Handle up to 5000 users for scalability
-        if (error) throw error;
-        return {
-          success: true,
-          data: (data || []).map((u) => ({
-            ...u,
-            kelompok: u.kelompok_id,
-            tempat_id: u.tempat_id || "-",
-          })),
-        };
-      }
-
       case "getRekapLogbook": {
-        let mCol = supabaseClient
-          .from("users")
-          .select("id, nama, prodi")
-          .eq("role", "mahasiswa");
-
-        if (payload.ids && Array.isArray(payload.ids)) {
-          mCol = mCol.in("id", payload.ids);
-        } else {
-          mCol = mCol.range(0, 499); // Safe default for 500 students
-        }
-
-        let lCol = supabaseClient
-          .from("logbook")
-          .select("user_id, kompetensi")
-          .eq("status", "Disetujui");
-
-        if (payload.ids && Array.isArray(payload.ids)) {
-          lCol = lCol.in("user_id", payload.ids);
-        } else {
-          lCol = lCol.range(0, 4999);
-        }
-
         const [{ data: mhs }, { data: logs }, { data: komp }] =
           await Promise.all([
-            mCol,
-            lCol,
+            supabaseClient
+              .from("users")
+              .select("id, nama, prodi")
+              .eq("role", "mahasiswa"),
+            supabaseClient
+              .from("logbook")
+              .select("user_id, kompetensi")
+              .eq("status", "Disetujui"),
             supabaseClient
               .from("kompetensi")
               .select("nama_skill, target_minimal, kategori"),
           ]);
 
+        // Pre-index logs by user_id+kompetensi for O(1) lookup
         const logIndex = {};
         (logs || []).forEach((l) => {
           const key = `${l.user_id}|${l.kompetensi}`;
@@ -505,7 +444,9 @@ window.supabaseFetchAPI = async (action, payload) => {
         // Step 2: Fetch user details for these students
         const { data: users, error: uErr } = await supabaseClient
           .from("users")
-          .select("id, username, nama, role, prodi, kelompok_id")
+          .select(
+            "id, username, nama, role, prodi, groups:kelompok(nama_kelompok)",
+          )
           .in("id", studentIds)
           .eq("role", "mahasiswa");
 
@@ -530,7 +471,7 @@ window.supabaseFetchAPI = async (action, payload) => {
           query = query.eq("users.kelompok_id", payload.kelompok_id);
         }
 
-        const { data, error } = await query.range(0, 4999);
+        const { data, error } = await query;
         if (error) throw error;
         return {
           success: true,
@@ -547,9 +488,9 @@ window.supabaseFetchAPI = async (action, payload) => {
         let query = supabaseClient.from("presensi").select("*");
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
         if (payload.tanggal) query = query.eq("tanggal", payload.tanggal);
-        const { data, error } = await query
-          .order("tanggal", { ascending: false })
-          .range(0, 4999);
+        const { data, error } = await query.order("tanggal", {
+          ascending: false,
+        });
         if (error) throw error;
         return { success: true, data: data || [] };
       }
@@ -557,9 +498,9 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getLogbook": {
         let query = supabaseClient.from("logbook").select("*");
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
-        const { data, error } = await query
-          .order("tanggal", { ascending: false })
-          .range(0, 4999);
+        const { data, error } = await query.order("tanggal", {
+          ascending: false,
+        });
         if (error) throw error;
         return { success: true, data: data || [] };
       }
@@ -678,7 +619,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
           if (payload.tempat_id && payload.tempat_id !== "-") {
             const tIds = payload.tempat_id.split(",");
-            logQuery = logQuery.in("lahan", tIds);
+            logQuery = logQuery.in("users.tempat_id", tIds);
           }
 
           query = logQuery.order("created_at", { ascending: false }).limit(20);

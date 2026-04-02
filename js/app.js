@@ -258,7 +258,7 @@ function initDashboard() {
       {
         id: "nav-semua",
         icon: "fa-database",
-        text: "Semua Data QR",
+        text: "Semua Data",
         view: "adminView",
       },
       {
@@ -634,55 +634,30 @@ async function dashboardView(area) {
         </div>
     `;
 
-  const [resStats, resMendesak, resLive, resGap, resBoard, resAdminAn, resS] =
-    await Promise.all([
-      fetchAPI("getDashboardStats", {
-        user_id: currentUser.id,
-        role: currentUser.role,
-      }),
-      currentUser.role.includes("preseptor")
-        ? fetchAPI("getMendesakLogs", { tempat_id: currentUser.tempat_id })
-        : Promise.resolve({ success: false }),
-      currentUser.role.includes("preseptor")
-        ? fetchAPI("getLiveAttendance", { tempat_id: currentUser.tempat_id })
-        : Promise.resolve({ success: false }),
-      currentUser.role.includes("preseptor")
-        ? fetchAPI("getCompetencyGap", { tempat_id: currentUser.tempat_id })
-        : Promise.resolve({ success: false }),
-      currentUser.role.includes("preseptor")
-        ? fetchAPI("getSkillLeaderboard")
-        : Promise.resolve({ success: false }),
-      currentUser.role === "admin"
-        ? fetchAPI("getAdminAnalytics")
-        : Promise.resolve({ success: false }),
-      fetchAPI("getSettings"),
-    ]);
+  const [resStats, resMendesak, resLive, resGap, resBoard] = await Promise.all([
+    fetchAPI("getDashboardStats", {
+      user_id: currentUser.id,
+      role: currentUser.role,
+    }),
+    currentUser.role.includes("preseptor")
+      ? fetchAPI("getMendesakLogs", { tempat_id: currentUser.tempat_id })
+      : Promise.resolve({ success: false }),
+    currentUser.role.includes("preseptor")
+      ? fetchAPI("getLiveAttendance", { tempat_id: currentUser.tempat_id })
+      : Promise.resolve({ success: false }),
+    currentUser.role.includes("preseptor")
+      ? fetchAPI("getCompetencyGap", { tempat_id: currentUser.tempat_id })
+      : Promise.resolve({ success: false }),
+    currentUser.role.includes("preseptor")
+      ? fetchAPI("getSkillLeaderboard")
+      : Promise.resolve({ success: false }),
+  ]);
 
   updateNotifBadge();
   const container = document.getElementById("dashboard-widgets");
   const urgentContainer = document.getElementById("urgent-notif-container");
   const liveArea = document.getElementById("preseptor-live-area");
   const extraArea = document.getElementById("preseptor-extra-area");
-
-  // Broadcast Message
-  const bMsg =
-    resS.success && resS.data
-      ? resS.data.find((s) => s.key === "broadcast_message")?.value || ""
-      : "";
-  if (bMsg) {
-    urgentContainer.innerHTML =
-      `
-        <div class="alert bg-primary text-white animate-fade-in mb-4 d-flex align-center gap-3" style="border-radius:12px; border:none; box-shadow:0 10px 15px -3px rgba(37,99,235,0.2);">
-            <div style="background:rgba(255,255,255,0.2); width:35px; height:35px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                <i class="fa-solid fa-bullhorn fa-sm"></i>
-            </div>
-            <div style="flex:1; font-size:0.9rem; font-weight:500;">
-                <span style="opacity:0.8; font-size:0.75rem; display:block; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Pengumuman Sistem</span>
-                ${escapeHTML(bMsg)}
-            </div>
-        </div>
-      ` + urgentContainer.innerHTML;
-  }
 
   if (!resStats.success || !resStats.data) {
     container.innerHTML = `<div class="alert alert-danger">Gagal memuat statistik.</div>`;
@@ -914,142 +889,6 @@ async function dashboardView(area) {
       "#ef4444",
       "penilaianAkhirView",
     );
-
-    // ADMIN EXTRA: ANALYTICS & TOOLS (PREMIUM DESIGN)
-    if (resAdminAn.success && resAdminAn.data) {
-      const an = resAdminAn.data;
-      const attRate = Math.round((an.activeToday / an.totalMhs) * 100) || 0;
-
-      html += `
-            <div class="card border-0 mt-5 animate-fade-up" style="grid-column: 1 / -1; border-radius:24px; background:white; box-shadow:0 20px 40px -10px rgba(79, 70, 229, 0.1); overflow:hidden;">
-                 <div class="card-header border-0 py-4 px-5 d-flex justify-between align-center" style="background: linear-gradient(90deg, #4f46e5, #7c3aed); color:white;">
-                    <div class="d-flex align-center gap-3">
-                        <div style="background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;">
-                            <i class="fa-solid fa-chart-line fa-lg"></i>
-                        </div>
-                        <div>
-                            <h4 class="mb-0 font-bold" style="letter-spacing:-0.5px; font-size:1.2rem;">Executive Dashboard Analitik</h4>
-                            <p class="text-xs mb-0" style="opacity:0.8">Institutional Monitoring & Clinical Quality Analytics</p>
-                        </div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.15); font-size:0.75rem; padding:4px 12px; border-radius:20px; font-weight:600; border:1px solid rgba(255,255,255,0.2);">
-                        <i class="fa-solid fa-clock-rotate-left mr-1"></i> Real-time Update
-                    </div>
-                 </div>
-                 <div class="card-body p-4" style="background:#fafafa;">
-                    <div class="grid-cards" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1.25rem;">
-                        
-                        <!-- Attendance Stats (EMERALD VIBRANT) -->
-                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius:24px; border:1px solid #10b98133; box-shadow:0 10px 15px -3px rgba(16, 185, 129, 0.1); min-height:180px; text-align:center;">
-                            <div class="d-flex justify-between align-center mb-3 w-100">
-                                <div style="flex:1"></div>
-                                <div class="text-xs font-black" style="color:#065f46; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Presensi Real-Time</div>
-                                <div style="flex:1; display:flex; justify-content:flex-end">
-                                    <div class="badge bg-success text-white px-2" style="font-size:0.6rem; border-radius:30px; box-shadow:0 4px 6px -1px rgba(16, 185, 129, 0.4); font-weight:800;">LIVE</div>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <div class="d-flex align-end justify-center gap-2 mb-1">
-                                    <span class="h1 font-black m-0" style="color:#064e3b; letter-spacing:-2px; line-height:1;">${an.activeToday}</span>
-                                    <span class="font-black mb-1" style="font-size:1.2rem; color:#059669">/ ${an.totalMhs}</span>
-                                </div>
-                                <div class="text-xs font-extrabold" style="color:#059669; text-transform:uppercase;">Mahasiswa Terdaftar</div>
-                            </div>
-                            <div class="mt-auto w-100">
-                                <div style="height:12px; background:rgba(6, 78, 59, 0.08); border-radius:10px; overflow:hidden; position:relative; border:1px solid rgba(16, 185, 129, 0.15); margin-bottom:12px;">
-                                    <div style="width:${attRate}%; height:100%; background:linear-gradient(90deg, #10b981, #34d399); border-radius:10px; box-shadow:0 0 15px rgba(16,185,129,0.4)"></div>
-                                </div>
-                                <div class="d-flex justify-center align-center gap-3">
-                                    <span class="text-xs font-black" style="color:#065f46; opacity:0.8; text-transform:uppercase;">Institutional Presence:</span>
-                                    <span class="text-sm font-black" style="color:#059669">${attRate}% <i class="fa-solid fa-arrow-trend-up ml-1"></i></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Activity Stats (AZURE BLUE) -->
-                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius:24px; border:1px solid #3b82f633; box-shadow:0 10px 15px -3px rgba(59, 130, 246, 0.1); min-height:180px; text-align:center;">
-                            <div class="d-flex justify-between align-center mb-3 w-100">
-                                <div style="flex:1"></div>
-                                <div class="text-xs font-black" style="color:#1e40af; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Kedisiplinan Logbook</div>
-                                <div style="flex:1; display:flex; justify-content:flex-end">
-                                    <div class="badge bg-primary text-white px-2" style="font-size:0.6rem; border-radius:30px; font-weight:800;">AKTIVITAS</div>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <div class="d-flex align-end justify-center gap-2 mb-1">
-                                    <span class="h1 font-black m-0" style="color:#1e3a8a; letter-spacing:-2px; line-height:1;">${an.avgLogs}</span>
-                                    <span class="font-black mb-1" style="font-size:1.2rem; color:#2563eb">Log</span>
-                                </div>
-                                <div class="text-xs font-extrabold" style="color:#2563eb; text-transform:uppercase;">Avg Logbook Akhir</div>
-                            </div>
-                            <div class="d-flex gap-2 mt-auto w-100">
-                                <div style="flex:1; background:rgba(255,255,255,0.65); padding:10px; border-radius:16px; border:1px solid rgba(59, 130, 246, 0.15); backdrop-filter:blur(4px); display:flex; flex-direction: column; align-items:center; justify-content:center;">
-                                    <div class="text-xs font-black mb-1" style="color:#1e40af; font-size:0.65rem;">TOTAL DISIPLIN</div>
-                                    <div class="h4 m-0 font-black" style="color:var(--primary); line-height:1;">${an.totalLogs}</div>
-                                </div>
-                                <div style="flex:1; background:rgba(255,255,255,0.65); padding:10px; border-radius:16px; border:1px solid rgba(59, 130, 246, 0.15); backdrop-filter:blur(4px); display:flex; flex-direction: column; align-items:center; justify-content:center;">
-                                    <div class="text-xs font-black mb-1" style="color:#5b21b6; font-size:0.65rem;">PRODUKTIVITAS</div>
-                                    <div class="h5 m-0 font-black" style="color:#7c3aed; line-height:1; letter-spacing:0.5px;">TINGGI</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Prodi Performance List (LAVENDER PINK) -->
-                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%); border-radius:24px; border:1px solid #d946ef33; box-shadow:0 10px 15px -3px rgba(217, 70, 239, 0.1); grid-column: span 2; text-align:center;">
-                            <div class="text-xs font-black mb-4" style="color:#701a75; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Clinical Average Scoring per Prodi</div>
-                            <div class="d-flex gap-3 wrap justify-center">
-                                ${an.prodiStats
-                                  .map(
-                                    (p) => `
-                                    <div style="background:rgba(255,255,255,0.75); border:1px solid rgba(217, 70, 239, 0.2); border-radius:20px; padding:18px 24px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.03); min-width:220px; backdrop-filter:blur(10px); transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;" onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 20px 25px -5px rgba(217, 70, 239, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.03)';">
-                                        <div class="text-xs font-extrabold mb-3" style="color:#a21caf; letter-spacing:0.3px; text-transform:uppercase;">${p.nama}</div>
-                                        <div class="d-flex align-center justify-center gap-3">
-                                            <span class="h2 font-black m-0" style="color:#4a044e; letter-spacing:-1.5px; line-height:1;">${p.avg}</span>
-                                            <div style="width:42px; height:42px; border-radius:14px; background:linear-gradient(135deg, #d946ef, #a21caf); color:white; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 15px rgba(162, 28, 175, 0.3); transform: rotate(-5deg);">
-                                                <i class="fa-solid fa-trophy fa-sm"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `,
-                                  )
-                                  .join("")}
-                            </div>
-                        </div>
-                    </div>
-                 </div>
-            </div>
-
-            <!-- Broadcast Hub (Premium Glassy Design) -->
-            <div class="card border-0 mt-4 animate-fade-up" style="grid-column: 1 / -1; border-radius:24px; background:linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color:white; overflow:hidden; position:relative;">
-                 <div style="position:absolute; top:-50px; right:-50px; width:200px; height:200px; background:rgba(124, 58, 237, 0.2); border-radius:50%; filter:blur(60px);"></div>
-                 <div style="position:absolute; bottom:-40px; left:-40px; width:150px; height:150px; background:rgba(79, 70, 229, 0.3); border-radius:50%; filter:blur(50px);"></div>
-                 
-                 <div class="card-body d-flex align-center gap-1 py-5 px-5" style="position:relative; z-index:1;">
-                    <div style="flex:1">
-                        <div class="d-flex align-center gap-3 mb-2">
-                             <div style="width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.3)">
-                                <i class="fa-solid fa-bullhorn fa-sm text-white"></i>
-                             </div>
-                             <h4 class="m-0 font-bold" style="letter-spacing:-0.5px;">Broadcast Hub Central</h4>
-                        </div>
-                        <p class="text-sm mb-0" style="opacity:0.8; max-width:480px;">Kirim pengumuman vital ke layar Utama seluruh entitas (Mahasiswa & Preseptor) dalam satu klik.</p>
-                    </div>
-                    
-                    <div class="d-flex gap-3 align-center" style="background:rgba(255,255,255,0.1); padding:10px; border-radius:20px; border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(10px);">
-                        <input type="text" id="bc-message" class="form-control" style="width:340px; height:46px; border:none; border-radius:14px; background:rgba(255,255,255,0.1); color:white; padding-left:20px; font-size:0.95rem;" placeholder="Ketik pengumuman penting di sini...">
-                        <button class="btn" style="height:46px; width:100px; background:white; color:#1e1b4b; border-radius:14px; font-weight:800; border:none; box-shadow:0 10px 20px -5px rgba(255,255,255,0.3); transition:all 0.3s;" onclick="eksekusiBroadcast()">
-                            <i class="fa-solid fa-paper-plane mr-2"></i> KIRIM
-                        </button>
-                    </div>
-                 </div>
-            </div>
-            <style>
-                #bc-message::placeholder { color: rgba(255,255,255,0.5); }
-                #bc-message:focus { outline:none; background:rgba(255,255,255,0.15); }
-                .btn:active { transform: scale(0.95); }
-            </style>
-        `;
-    }
   } else if (currentUser.role.includes("preseptor")) {
     html += createWidget(
       "fa-solid fa-user-check",
@@ -2083,10 +1922,9 @@ async function mahasiswaView(area) {
   const tableBody = document.querySelector("#table-mhs-bimb tbody");
   if (!tableBody) return;
 
-  const [resAssigned, resTempat, resGroups] = await Promise.all([
+  const [resAssigned, resTempat] = await Promise.all([
     fetchAPI("getAssignedStudents", { tempat_id: currentUser.tempat_id }),
     fetchCachedAPI("getTempat"),
-    fetchAPI("getKelompok"),
   ]);
 
   if (!resAssigned.success) {
@@ -2218,12 +2056,9 @@ async function mahasiswaView(area) {
       if (displayData.length > 0) {
         tableBody.innerHTML = displayData
           .map((u, idx) => {
-            const myData = (resRekap.data || []).find(
-              (x) => x.user_id === u.id,
-            );
-            const myRekap = myData ? myData.rekap || [] : [];
+            const myRekap = rekap[u.id] || [];
             const completed = myRekap.filter(
-              (r) => r.status === "Tercapai",
+              (r) => r.status === "Selesai",
             ).length;
             const targets = myRekap.length;
             const pct =
@@ -2231,22 +2066,16 @@ async function mahasiswaView(area) {
             const progressColor =
               pct >= 100 ? "var(--success)" : "var(--primary)";
 
-            const myKel = (resGroups.data || []).find(
-              (g) => g.id === u.kelompok_id,
-            );
-            const kelNama = myKel ? myKel.nama_kelompok : "Tanpa Kelompok";
-
             return `
                     <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
                         <td>
-                            <div class="d-flex align-center gap-3">
+                            <div class="d-flex align-center gap-2">
                                 <div style="width:35px;height:35px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem">
                                     ${u.nama.charAt(0)}
                                 </div>
-                                <div style="flex:1">
-                                    <div class="font-bold" style="color:var(--text-strong)">${u.nama}</div>
-                                    <div class="text-xs text-muted mb-1"><i class="fa-solid fa-users"></i> ${kelNama}</div>
-                                    <div class="text-xs font-medium" style="color:var(--primary)">${u.username || u.id}</div>
+                                <div>
+                                    <div class="font-bold">${u.nama}</div>
+                                    <div class="text-xs text-muted"><i class="fa-solid fa-users"></i> ${u.groups?.nama_kelompok || "Tanpa Kelompok"}</div>
                                 </div>
                                 ${u.sudahDinilai ? '<i class="fa-solid fa-circle-check text-success" title="Sudah memiliki nilai final"></i>' : ""}
                             </div>
@@ -4596,16 +4425,133 @@ window.repairUserDatabase = async () => {
   }
 };
 
-window.tempatAdminView = (area) =>
-  renderMasterData(
-    area,
-    "tempat",
-    "Tempat Praktik",
-    "fa-hospital",
-    ["Nama Tempat Praktik"],
-    ["nama_tempat"],
-    "getTempat",
-  );
+window.tempatAdminView = async (area) => {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center wrap gap-2">
+          <h3><i class="fa-solid fa-hospital text-primary"></i> Master Tempat Praktik</h3>
+          <div class="d-flex gap-2 wrap">
+            <button class="btn btn-outline btn-sm" onclick="downloadMasterTemplate('tempat')"><i class="fa-solid fa-file-csv"></i> Template CSV</button>
+            <label class="btn btn-outline btn-sm m-0" style="cursor:pointer">
+              <i class="fa-solid fa-file-import"></i> Import CSV
+              <input type="file" accept=".csv" class="hidden" onchange="handleImportMasterCSV(event, 'tempat')">
+            </label>
+            <button class="btn btn-danger-soft btn-sm" onclick="clearMasterData('tempat', 'Tempat Praktik')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
+            <button class="btn btn-primary btn-sm" onclick="bukaModalMaster('tempat', 'Tempat Praktik')"><i class="fa-solid fa-plus"></i> Tambah Baru</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="table-master-tempat">
+              <thead>
+                <tr>
+                  <th>Nama Tempat Praktik</th>
+                  <th><i class="fa-solid fa-user-doctor" style="color:var(--primary)"></i> Preseptor Klinik</th>
+                  <th><i class="fa-solid fa-chalkboard-teacher" style="color:#f59e0b"></i> Preseptor Akademik</th>
+                  <th style="text-align:right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody><tr><td colspan="4" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const [resTempat, resUsers] = await Promise.all([
+    fetchAPI("getTempat"),
+    fetchAPI("getUsers"),
+  ]);
+
+  const tableBody = document.querySelector("#table-master-tempat tbody");
+  if (resTempat.success && resTempat.data && resTempat.data.length > 0) {
+    window.adminMasterData_tempat = resTempat.data;
+
+    const pkMap = {};
+    const paMap = {};
+    if (resUsers.success && resUsers.data) {
+      resUsers.data.forEach((u) => {
+        if (
+          (u.role === "preseptor" || u.role === "preseptor_akademik") &&
+          u.tempat_id &&
+          u.tempat_id !== "-"
+        ) {
+          const tids = u.tempat_id.split(",");
+          tids.forEach((tid) => {
+            const trimmed = tid.trim();
+            if (u.role === "preseptor") {
+              if (!pkMap[trimmed]) pkMap[trimmed] = [];
+              pkMap[trimmed].push(u.nama);
+            } else {
+              if (!paMap[trimmed]) paMap[trimmed] = [];
+              paMap[trimmed].push(u.nama);
+            }
+          });
+        }
+      });
+    }
+
+    const htmlRows = resTempat.data.map((row, idx) => {
+      const pkNames = pkMap[row.id] || [];
+      const paNames = paMap[row.id] || [];
+
+      const pkHtml =
+        pkNames.length > 0
+          ? pkNames
+              .map(
+                (n) =>
+                  `<span class="badge bg-primary" style="font-size:0.8em; margin:2px 4px 2px 0; padding:0.3rem 0.6rem;">${escapeHTML(n)}</span>`,
+              )
+              .join("")
+          : '<span style="color:#94a3b8; font-size:0.85em;">\u2014 Belum ditetapkan</span>';
+
+      const paHtml =
+        paNames.length > 0
+          ? paNames
+              .map(
+                (n) =>
+                  `<span class="badge" style="font-size:0.8em; margin:2px 4px 2px 0; padding:0.3rem 0.6rem; background:#fef3c7; color:#92400e; border:1px solid #fde68a;">${escapeHTML(n)}</span>`,
+              )
+              .join("")
+          : '<span style="color:#94a3b8; font-size:0.85em;">\u2014 Belum ditetapkan</span>';
+
+      let text = escapeHTML(row.nama_tempat) || "";
+      let firstNumIdx = text.search(/[0-9]+\./);
+      let titlePart = text;
+      let listPart = "";
+      if (firstNumIdx !== -1) {
+        titlePart = text.substring(0, firstNumIdx).trim();
+        listPart = text.substring(firstNumIdx);
+      }
+      let formattedList = listPart.replace(
+        /([0-9]+\.)/g,
+        '<br><span style="color:var(--primary); font-weight:700; margin-right:8px; display:inline-block; width:20px;">$1</span>',
+      );
+
+      return `
+        <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+          <td>
+            <div style="margin-bottom:4px;"><strong style="color:var(--primary-dark); font-size:1.05em; border-bottom:1px dashed #cbd5e1">${titlePart}</strong></div>
+            <div style="line-height:1.7; color:var(--text-strong); padding-left:5px;">${formattedList}</div>
+          </td>
+          <td>${pkHtml}</td>
+          <td>${paHtml}</td>
+          <td style="text-align:right">
+            <button class="btn btn-icon-ghost" onclick="bukaModalMaster('tempat', 'Tempat Praktik', '${row.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('tempat', '${row.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `;
+    });
+
+    tableBody.innerHTML = htmlRows.join("");
+  } else {
+    tableBody.innerHTML =
+      '<tr><td colspan="4" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data</td></tr>';
+  }
+};
 window.prodiAdminView = (area) =>
   renderMasterData(
     area,
@@ -5442,6 +5388,32 @@ async function jadwalAdminView(area) {
   const wrapper = document.querySelector("#jadwal-table-wrapper");
   window.dtJadwalAdmin = [];
 
+  // Build preseptor maps per tempat_id
+  const preseptorKlinikMap = {};
+  const preseptorAkademikMap = {};
+  if (resUsers.success && resUsers.data) {
+    resUsers.data.forEach((u) => {
+      if (
+        (u.role === "preseptor" || u.role === "preseptor_akademik") &&
+        u.tempat_id &&
+        u.tempat_id !== "-"
+      ) {
+        const tids = u.tempat_id.split(",");
+        tids.forEach((tid) => {
+          const trimmed = tid.trim();
+          if (u.role === "preseptor") {
+            if (!preseptorKlinikMap[trimmed]) preseptorKlinikMap[trimmed] = [];
+            preseptorKlinikMap[trimmed].push(u.nama);
+          } else {
+            if (!preseptorAkademikMap[trimmed])
+              preseptorAkademikMap[trimmed] = [];
+            preseptorAkademikMap[trimmed].push(u.nama);
+          }
+        });
+      }
+    });
+  }
+
   if (
     resJadwal.success &&
     resJadwal.data &&
@@ -5583,7 +5555,16 @@ async function jadwalAdminView(area) {
 
         blocks.forEach((block, blockIdx) => {
           if (index === 0) {
-            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}</td>`;
+            const pkList = preseptorKlinikMap[block.tempat_id] || [];
+            const paList = preseptorAkademikMap[block.tempat_id] || [];
+            let preseptorHtml = "";
+            if (pkList.length > 0) {
+              preseptorHtml += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #e2e8f0; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-user-doctor" style="color:var(--primary); margin-right:4px;"></i>PK: ${pkList.join(", ")}</div>`;
+            }
+            if (paList.length > 0) {
+              preseptorHtml += `<div style="margin-top:4px; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-chalkboard-teacher" style="color:#f59e0b; margin-right:4px;"></i>PA: ${paList.join(", ")}</div>`;
+            }
+            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}${preseptorHtml}</td>`;
           }
 
           block.dates.forEach((dStr) => {
@@ -5652,6 +5633,29 @@ window.exportJadwalPDF = async () => {
 
   const users = resUsers.data;
   const schedules = window.dtJadwalAdmin;
+
+  // Build preseptor maps per tempat_id for PDF
+  const pdfPKMap = {};
+  const pdfPAMap = {};
+  users.forEach((u) => {
+    if (
+      (u.role === "preseptor" || u.role === "preseptor_akademik") &&
+      u.tempat_id &&
+      u.tempat_id !== "-"
+    ) {
+      const tids = u.tempat_id.split(",");
+      tids.forEach((tid) => {
+        const trimmed = tid.trim();
+        if (u.role === "preseptor") {
+          if (!pdfPKMap[trimmed]) pdfPKMap[trimmed] = [];
+          pdfPKMap[trimmed].push(u.nama);
+        } else {
+          if (!pdfPAMap[trimmed]) pdfPAMap[trimmed] = [];
+          pdfPAMap[trimmed].push(u.nama);
+        }
+      });
+    }
+  });
 
   // Grouping identical to HTML table logic
   const groupsTemp = {};
@@ -5784,7 +5788,12 @@ window.exportJadwalPDF = async () => {
       const rowData = [index + 1, u.nama, u.username];
 
       blocks.forEach((block, bIdx) => {
-        rowData.push(block.nama_tempat); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
+        let tempatLabel = block.nama_tempat;
+        const pdfPK = pdfPKMap[block.tempat_id] || [];
+        const pdfPA = pdfPAMap[block.tempat_id] || [];
+        if (pdfPK.length > 0) tempatLabel += `\nPK: ${pdfPK.join(", ")}`;
+        if (pdfPA.length > 0) tempatLabel += `\nPA: ${pdfPA.join(", ")}`;
+        rowData.push(tempatLabel); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
 
         block.dates.forEach((dStr) => {
           const s = group.schedules.find(
@@ -6611,28 +6620,3 @@ function renderNotesList(notes) {
     })
     .join("");
 }
-
-// ADMIN: BROADCAST SYSTEM
-window.eksekusiBroadcast = async () => {
-  const msg = document.getElementById("bc-message").value;
-  if (!msg)
-    return showToast(
-      "Kosong",
-      "Tuliskan pesan pengumuman terlebih dahulu.",
-      "warning",
-    );
-
-  showLoader(true);
-  const res = await fetchAPI("updateBroadcast", { message: msg });
-  showLoader(false);
-
-  if (res.success) {
-    showToast(
-      "Berhasil",
-      "Pengumuman telah disiarkan ke seluruh pengguna.",
-      "success",
-    );
-    document.getElementById("bc-message").value = "";
-    loadView("dashboardView");
-  }
-};
