@@ -263,26 +263,45 @@ window.supabaseFetchAPI = async (action, payload) => {
 
       case "getCompetencyGap": {
         const tIds = payload.tempat_id ? payload.tempat_id.split(",") : [];
-        const { data: logs, error: e1 } = await supabaseClient
+        const angkFilter = payload.angkatan;
+
+        // Fetch logs (approved) for these hospitals, joined with user angkatan
+        let logsQuery = supabaseClient
           .from("logbook")
-          .select("kompetensi")
+          .select("kompetensi, users!inner(angkatan)")
           .in("lahan", tIds)
           .eq("status", "Disetujui");
-        const { data: allKomp, error: e2 } = await supabaseClient
+
+        if (angkFilter && angkFilter !== "Semua") {
+          logsQuery = logsQuery.eq("users.angkatan", angkFilter);
+        }
+
+        const { data: logs, error: e1 } = await logsQuery;
+
+        // Fetch competencies filtered by same angkatan (plus universal)
+        let kompQuery = supabaseClient
           .from("kompetensi")
-          .select("nama_skill");
+          .select("nama_skill, angkatan");
+        if (angkFilter && angkFilter !== "Semua") {
+          kompQuery = kompQuery.or(
+            `angkatan.eq.${angkFilter},angkatan.eq.Semua,angkatan.is.null`,
+          );
+        }
+
+        const { data: allKomp, error: e2 } = await kompQuery;
 
         if (e1 || e2) throw e1 || e2;
 
         const counts = {};
-        logs.forEach(
+        (logs || []).forEach(
           (l) => (counts[l.kompetensi] = (counts[l.kompetensi] || 0) + 1),
         );
 
         // Return competencies with 0 or low counts
-        const gaps = allKomp
+        const gaps = (allKomp || [])
           .map((k) => ({
             nama: k.nama_skill,
+            angkatan: k.angkatan || "Semua",
             count: counts[k.nama_skill] || 0,
           }))
           .sort((a, b) => a.count - b.count);
@@ -342,12 +361,79 @@ window.supabaseFetchAPI = async (action, payload) => {
         return { success: true, data };
       }
 
+      case "getKompetensi": {
+        // === TERKUNCI PER ROMBONGAN (ANGKATAN) ===
+        // Mahasiswa HANYA bisa melihat kompetensi sesuai rombongannya.
+        // Admin yang butuh semua data harus gunakan action "getKompetensiAll".
+
+        const { data: userRow } = payload.user_id
+          ? await supabaseClient
+              .from("users")
+              .select("angkatan, role")
+              .eq("id", payload.user_id)
+              .single()
+          : { data: null };
+
+        const userAngkatan = userRow?.angkatan;
+        const userRole = userRow?.role || "";
+
+        // Admin & preseptor tetap bisa lihat semua (akses via getKompetensiAll)
+        // Untuk mahasiswa: SELALU filter — jika belum punya angkatan, hanya tampil "Semua"
+        let kompQuery = supabaseClient
+          .from("kompetensi")
+          .select("id, nama_skill, target_minimal, kategori, angkatan")
+          .order("kategori", { ascending: true })
+          .order("nama_skill", { ascending: true });
+
+        if (payload.user_id) {
+          // Jika punya angkatan → filter sesuai angkatan + universal
+          // Jika belum ada angkatan → hanya tampilkan universal (Semua / null)
+          if (userAngkatan && userAngkatan !== "-") {
+            kompQuery = kompQuery.or(
+              `angkatan.eq.${userAngkatan},angkatan.eq.Semua,angkatan.is.null`,
+            );
+          } else {
+            // Fallback: hanya kompetensi universal
+            kompQuery = kompQuery.or(`angkatan.eq.Semua,angkatan.is.null`);
+          }
+        }
+        // Tanpa user_id (misal admin) → tidak di-filter, data lengkap
+
+        const { data: kompData, error: kompErr } = await kompQuery;
+        if (kompErr) throw kompErr;
+
+        if (!payload.user_id) {
+          return { success: true, data: kompData || [] };
+        }
+
+        // Hitung pencapaian (logbook disetujui) per skill untuk student ini
+        const { data: logData } = await supabaseClient
+          .from("logbook")
+          .select("kompetensi")
+          .eq("user_id", payload.user_id)
+          .eq("status", "Disetujui");
+
+        const logCount = {};
+        (logData || []).forEach((l) => {
+          logCount[l.kompetensi] = (logCount[l.kompetensi] || 0) + 1;
+        });
+
+        return {
+          success: true,
+          angkatan: userAngkatan || null, // Kirim ke frontend untuk tampil di UI
+          data: (kompData || []).map((k) => ({
+            ...k,
+            pencapaian: logCount[k.nama_skill] || 0,
+          })),
+        };
+      }
+
       case "getRekapLogbook": {
         const [{ data: mhs }, { data: logs }, { data: komp }] =
           await Promise.all([
             supabaseClient
               .from("users")
-              .select("id, nama, prodi")
+              .select("id, nama, prodi, angkatan")
               .eq("role", "mahasiswa"),
             supabaseClient
               .from("logbook")
@@ -355,7 +441,7 @@ window.supabaseFetchAPI = async (action, payload) => {
               .eq("status", "Disetujui"),
             supabaseClient
               .from("kompetensi")
-              .select("nama_skill, target_minimal, kategori"),
+              .select("nama_skill, target_minimal, kategori, angkatan"),
           ]);
 
         // Pre-index logs by user_id+kompetensi for O(1) lookup
@@ -365,28 +451,39 @@ window.supabaseFetchAPI = async (action, payload) => {
           logIndex[key] = (logIndex[key] || 0) + 1;
         });
 
-        const rekap = (mhs || []).map((u) => ({
-          user_id: u.id,
-          nama: u.nama,
-          prodi: u.prodi,
-          rekap: (komp || []).map((k) => {
-            const achieved = logIndex[`${u.id}|${k.nama_skill}`] || 0;
-            return {
-              nama_skill: k.nama_skill,
-              kategori: k.kategori,
-              target: k.target_minimal,
-              capaian: achieved,
-              status: achieved >= k.target_minimal ? "Tercapai" : "Belum",
-            };
-          }),
-        }));
+        const rekap = (mhs || []).map((u) => {
+          // Filter kompetensi sesuai angkatan mahasiswa ini
+          const relevantKomp = (komp || []).filter((k) => {
+            if (!k.angkatan || k.angkatan === "-" || k.angkatan === "Semua")
+              return true;
+            return k.angkatan == u.angkatan;
+          });
+          return {
+            user_id: u.id,
+            nama: u.nama,
+            prodi: u.prodi,
+            angkatan: u.angkatan,
+            rekap: relevantKomp.map((k) => {
+              const achieved = logIndex[`${u.id}|${k.nama_skill}`] || 0;
+              return {
+                nama_skill: k.nama_skill,
+                kategori: k.kategori,
+                target: k.target_minimal,
+                capaian: achieved,
+                status: achieved >= k.target_minimal ? "Tercapai" : "Belum",
+              };
+            }),
+          };
+        });
         return { success: true, data: rekap };
       }
 
       case "getPenilaianAkhir": {
         let query = supabaseClient
           .from("penilaian_akhir")
-          .select("*, users!inner(nama, prodi, angkatan)");
+          .select(
+            "*, users!inner(nama, prodi, angkatan, kelompok_id, kelompok(nama_kelompok))",
+          );
 
         if (payload.ids && Array.isArray(payload.ids)) {
           query = query.in("id", payload.ids);
@@ -419,6 +516,7 @@ window.supabaseFetchAPI = async (action, payload) => {
             nama: p.users.nama,
             prodi: p.users.prodi,
             angkatan: p.users.angkatan,
+            kelompok: p.users.kelompok ? p.users.kelompok.nama_kelompok : "-",
           })),
         };
       }

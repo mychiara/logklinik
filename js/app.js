@@ -47,9 +47,11 @@ window.EKLINIK_CACHE = {};
 async function fetchCachedAPI(action, payload = {}) {
   const cacheKey = `EKLINIK_CACHE_${action}`;
 
+  // NOTE: getKompetensi is intentionally excluded from no-payload cache
+  // because student requests always include user_id for angkatan filtering
   if (
     Object.keys(payload).length === 0 &&
-    ["getProdi", "getTempat", "getKelompok", "getKompetensi"].includes(action)
+    ["getProdi", "getTempat", "getKelompok"].includes(action)
   ) {
     // Check in-memory first
     if (window.EKLINIK_CACHE[action]) {
@@ -70,7 +72,7 @@ async function fetchCachedAPI(action, payload = {}) {
   if (
     res.success &&
     Object.keys(payload).length === 0 &&
-    ["getProdi", "getTempat", "getKelompok", "getKompetensi"].includes(action)
+    ["getProdi", "getTempat", "getKelompok"].includes(action)
   ) {
     window.EKLINIK_CACHE[action] = res.data;
     sessionStorage.setItem(cacheKey, JSON.stringify(res.data));
@@ -104,6 +106,31 @@ async function postAPI(action, payload = {}) {
     return { success: false, message: "Supabase belum diatur" };
   }
 
+  // Clear relevant cache if it's a mutation action
+  const mutationActions = [
+    "addMaster",
+    "editMaster",
+    "deleteMaster",
+    "clearMaster",
+    "importMaster",
+    "addUser",
+    "editUser",
+    "deleteUser",
+    "clearUsersByRole",
+    "importUsers",
+    "setKelompokBulk",
+    "importKelompokAssignment",
+    "generateJadwal",
+    "generateJadwalKelompok",
+    "saveSettings",
+    "saveGrades",
+    "clearAllGrades",
+  ];
+
+  if (mutationActions.includes(action)) {
+    clearAppCache();
+  }
+
   showLoader(true);
   try {
     const data = await supabasePostAPI(action, payload);
@@ -117,6 +144,19 @@ async function postAPI(action, payload = {}) {
       "error",
     );
     return { success: false, message: error.message };
+  }
+}
+
+// Global function to invalidate cache
+function clearAppCache() {
+  window.EKLINIK_CACHE = {};
+  // Clear only E-Klinik related session storage keys
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key && key.startsWith("EKLINIK_CACHE_")) {
+      sessionStorage.removeItem(key);
+      i--; // Adjust index after removal
+    }
   }
 }
 
@@ -686,25 +726,64 @@ async function dashboardView(area) {
     if (resGap.success && resGap.data) {
       gapHtml = `
                 <div class="card shadow-sm border-0" style="border-radius:16px;">
-                    <div class="card-header bg-white">
-                        <h4 class="mb-0 font-bold"><i class="fa-solid fa-chart-line text-primary"></i> Gap Analysis Kompetensi</h4>
-                        <p class="text-xs text-muted mb-0">Kompetensi yang paling jarang dilakukan di lahan ini</p>
+                    <div class="card-header bg-white d-flex justify-between align-center wrap gap-2">
+                        <div>
+                          <h4 class="mb-0 font-bold"><i class="fa-solid fa-chart-line text-primary"></i> Gap Analysis Kompetensi</h4>
+                          <p class="text-xs text-muted mb-0">Kompetensi yang paling jarang dilakukan</p>
+                        </div>
+                        <select id="select-gap-angkatan" class="form-control" style="width:140px; font-size:0.75rem; padding:4px 8px; height:auto" onchange="window.refreshGapDashboard(this.value)">
+                            <option value="Semua">Semua Angkatan</option>
+                            ${(() => {
+                              const yrs = [];
+                              const curr = new Date().getFullYear();
+                              for (let i = curr + 1; i >= curr - 3; i--)
+                                yrs.push(i);
+                              return yrs
+                                .map(
+                                  (y) => `<option value="${y}">${y}</option>`,
+                                )
+                                .join("");
+                            })()}
+                        </select>
                     </div>
                     <div class="card-body" style="padding:1rem;">
                         ${resGap.data
-                          .map(
-                            (g) => `
-                            <div class="mb-2">
-                                <div class="d-flex justify-between text-xs mb-1">
-                                    <span class="text-truncate" style="max-width:180px">${g.nama}</span>
-                                    <span class="font-bold">${g.count}x</span>
+                          .map((g) => {
+                            let text = escapeHTML(g.nama) || "";
+                            let firstNumIdx = text.search(/[0-9]+\./);
+                            let titlePart = text;
+                            let listPart = "";
+
+                            if (firstNumIdx !== -1) {
+                              titlePart = text.substring(0, firstNumIdx).trim();
+                              listPart = text.substring(firstNumIdx);
+                            }
+
+                            let formattedList = listPart.replace(
+                              /([0-9]+\.)/g,
+                              '<br><span style="color:var(--primary); font-weight:700; margin-right:4px;">$1</span>',
+                            );
+
+                            return `
+                            <div class="mb-3" style="padding-bottom:8px; border-bottom:1px solid #f8fafc;">
+                                <div class="d-flex justify-between align-start mb-1 gap-2">
+                                    <div style="flex:1; line-height:1.4;">
+                                        <div class="d-flex align-center gap-2 wrap mb-1">
+                                          <div style="font-weight:700; color:var(--primary-dark); font-size:0.85rem; border-bottom: 1px dashed #e2e8f0; display:inline-block;">${titlePart}</div>
+                                          <span class="badge" style="font-size:0.65rem; padding:2px 6px; ${g.angkatan === "Semua" ? "background:#f0fdf4; color:#166534; border:1px solid #bbf7d0" : "background:#f5f3ff; color:#5b21b6; border:1px solid #ddd6fe"}">
+                                            ${g.angkatan === "Semua" ? "Universal" : g.angkatan}
+                                          </span>
+                                        </div>
+                                        <div style="font-size:0.8rem; color:var(--text-strong); padding-left:2px;">${formattedList}</div>
+                                    </div>
+                                    <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem; align-self:start;">${g.count}x</span>
                                 </div>
-                                <div style="height:4px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
-                                    <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.6"></div>
+                                <div style="height:3px; background:#f1f5f9; border-radius:10px; overflow:hidden; margin-top:6px;">
+                                    <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.5"></div>
                                 </div>
                             </div>
-                        `,
-                          )
+                        `;
+                          })
                           .join("")}
                     </div>
                 </div>
@@ -1525,6 +1604,22 @@ async function kompetensiView(area) {
   const chartsBody = document.getElementById("kompetensi-charts-body");
   if (!chartsBody) return;
 
+  // Tampilkan badge rombongan mahasiswa
+  const rombonganBadge = res.angkatan
+    ? `<div style="margin-bottom:1.2rem; padding:10px 16px; background:linear-gradient(135deg,#ede9fe,#ddd6fe); border-radius:10px; border-left:4px solid #7c3aed; display:flex; align-items:center; gap:10px;">
+        <i class="fa-solid fa-layer-group" style="color:#7c3aed; font-size:1.2rem;"></i>
+        <div>
+          <div style="font-weight:700; color:#5b21b6; font-size:0.9rem;">Kompetensi Rombongan Praktik Anda</div>
+          <div style="font-size:0.8rem; color:#6d28d9;">Angkatan <strong>${res.angkatan}</strong> — Data hanya menampilkan kompetensi sesuai rombongan Anda</div>
+        </div>
+      </div>`
+    : `<div style="margin-bottom:1.2rem; padding:10px 16px; background:#fef3c7; border-radius:10px; border-left:4px solid #f59e0b; display:flex; align-items:center; gap:10px;">
+        <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i>
+        <div style="font-size:0.85rem; color:#92400e;">Rombongan praktik belum ditetapkan. Kompetensi yang ditampilkan adalah kompetensi universal. Hubungi admin untuk penetapan angkatan.</div>
+      </div>`;
+
+  chartsBody.insertAdjacentHTML("afterbegin", rombonganBadge);
+
   if (res.success && res.data.length > 0) {
     // Kelompokkan berdasarkan kategori
     const grouped = {};
@@ -2275,10 +2370,23 @@ async function penilaianAkhirView(area) {
                         </div>
                     </div>
                     <div class="d-flex align-center gap-2 wrap">
-                        <div class="filter-group d-flex align-center gap-2">
-                             <select id="filter-prodi-assessment" class="form-control" style="width:180px; padding:0.4rem;">
-                                <option value="all">Semua Prodi</option>
-                            </select>
+                        <div class="filter-group d-flex align-center gap-2" style="position:relative">
+                             <div class="custom-multi-select" id="kelompok-check-container">
+                                 <button class="btn btn-outline btn-sm d-flex align-center gap-2" onclick="document.getElementById('kelompok-check-list').classList.toggle('hidden')" style="background:white; border:1px solid #cbd5e1; padding: 0.5rem 1rem;">
+                                    <i class="fa-solid fa-filter-list text-primary"></i> 
+                                    <span>Filter Kelompok</span>
+                                    <span id="kelompok-select-count" class="badge bg-primary text-white" style="font-size:0.7rem; padding:2px 6px;">0</span>
+                                 </button>
+                                 <div id="kelompok-check-list" class="hidden animate-fade-in" style="position:absolute; top:45px; right:0; z-index:1000; background:white; border:1px solid #e2e8f0; border-radius:12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); width:280px; max-height:350px; overflow-y:auto; padding:15px;">
+                                     <div class="d-flex justify-between align-center mb-3">
+                                         <strong style="font-size:0.85rem">Pilih Kelompok</strong>
+                                         <button class="btn-icon-ghost" onclick="resetKelompokFilter()" title="Reset Filter"><i class="fa-solid fa-rotate-left text-muted"></i></button>
+                                     </div>
+                                     <div id="kelompok-options-area" class="d-flex flex-column gap-1">
+                                         <!-- Checkboxes dynamically generated -->
+                                     </div>
+                                 </div>
+                             </div>
                         </div>
                         <div class="btn-group d-flex gap-2">
                              <button class="btn btn-outline btn-sm" onclick="exportAssessmentCSV()"><i class="fa-solid fa-file-csv"></i> CSV</button>
@@ -2293,15 +2401,16 @@ async function penilaianAkhirView(area) {
                             <thead>
                                 <tr>
                                     <th>Nama Mahasiswa</th>
-                                    <th>Prodi</th>
-                                    <th>Praktikum (40%)</th>
-                                    <th>ASKEP (40%)</th>
-                                    <th>Sikap (20%)</th>
+                                    <th>Kelompok</th>
+                                    <th>Skor</th>
+                                    <th>Kontrib.</th>
+                                    <th>Skor</th>
+                                    <th>Kontrib.</th>
                                     <th>NILAI AKHIR</th>
                                     <th>STATUS</th>
                                 </tr>
                             </thead>
-                            <tbody><tr><td colspan="7" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menghitung skor...</td></tr></tbody>
+                            <tbody><tr><td colspan="8" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menghitung skor...</td></tr></tbody>
                         </table>
                     </div>
                  </div>
@@ -2310,9 +2419,9 @@ async function penilaianAkhirView(area) {
     `;
 
   showLoader(true);
-  const [allRes, prodiRes] = await Promise.all([
+  const [allRes, resKelompok] = await Promise.all([
     fetchAPI("getPenilaianAkhir"),
-    fetchAPI("getProdi"),
+    fetchCachedAPI("getKelompok"),
   ]);
   showLoader(false);
 
@@ -2320,7 +2429,6 @@ async function penilaianAkhirView(area) {
     return showToast("Gagal", "Gagal memuat data penilaian", "error");
 
   const tableBody = document.querySelector("#table-final-scores tbody");
-  const prodiSelect = document.getElementById("filter-prodi-assessment");
   const thresholdInfo = document.getElementById("status-threshold-info");
 
   const activeThreshold = allRes.threshold || 75;
@@ -2332,17 +2440,15 @@ async function penilaianAkhirView(area) {
 
   thresholdInfo.innerHTML = `Rumus: (Prak ${w.prak}%) + (ASKEP ${w.askep}%) + (Sikap ${w.sikap}%). <strong>Nilai = ${wKlinik}% Klinik + ${wAkademik}% Akademik</strong>. Batas Lulus: <strong>${activeThreshold}</strong>`;
 
-  // Update Table Headers
   const tableHeader = document.querySelector("#table-final-scores thead tr");
   tableHeader.innerHTML = `
         <th rowspan="2">Nama Mahasiswa</th>
-        <th rowspan="2">Prodi</th>
+        <th rowspan="2">Kelompok</th>
         <th colspan="2" class="text-center" style="background:#e0f2fe; border-bottom:1px solid #bae6fd;">Preseptor Klinik (${wKlinik}%)</th>
         <th colspan="2" class="text-center" style="background:#fef3c7; border-bottom:1px solid #fde68a;">Preseptor Akademik (${wAkademik}%)</th>
         <th rowspan="2">NILAI AKHIR</th>
         <th rowspan="2">STATUS</th>
     `;
-  // Add sub-header row
   const subHeaderRow = document.createElement("tr");
   subHeaderRow.innerHTML = `
         <th style="background:#e0f2fe; font-size:0.75rem">Skor</th>
@@ -2352,15 +2458,6 @@ async function penilaianAkhirView(area) {
     `;
   tableHeader.parentElement.appendChild(subHeaderRow);
 
-  if (prodiRes.success && prodiRes.data) {
-    prodiRes.data.forEach((p) => {
-      const opt = document.createElement("option");
-      opt.value = p.nama_prodi;
-      opt.textContent = p.nama_prodi;
-      prodiSelect.appendChild(opt);
-    });
-  }
-
   const renderAssessmentTable = (data) => {
     window.dtAssessmentView = data;
     if (!data || data.length === 0) {
@@ -2368,12 +2465,7 @@ async function penilaianAkhirView(area) {
       return;
     }
 
-    // Sort data by nama alphabetically
-    data.sort((a, b) => {
-      const nameA = a.nama || "";
-      const nameB = b.nama || "";
-      return nameA.localeCompare(nameB);
-    });
+    data.sort((a, b) => (a.nama || "").localeCompare(b.nama || ""));
 
     tableBody.innerHTML = data
       .map((row, idx) => {
@@ -2384,7 +2476,7 @@ async function penilaianAkhirView(area) {
         return `
                 <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
                     <td><strong>${row.nama}</strong><br><small class="text-muted">${row.username}</small></td>
-                    <td><span class="badge bg-primary-soft text-primary" style="font-weight:600">${row.prodi || "-"}</span></td>
+                    <td><span class="badge bg-primary-soft text-primary" style="font-weight:600">${row.kelompok || "-"}</span></td>
                     <td style="background:#f0f9ff">${row.klinik_total.toFixed(2)}</td>
                     <td style="background:#f0f9ff"><strong>${((row.klinik_total * wKlinik) / 100).toFixed(2)}</strong></td>
                     <td style="background:#fffbeb">${row.akademik_total.toFixed(2)}</td>
@@ -2397,20 +2489,59 @@ async function penilaianAkhirView(area) {
       .join("");
   };
 
+  if (resKelompok.success && resKelompok.data) {
+    const optionsArea = document.getElementById("kelompok-options-area");
+    optionsArea.innerHTML = resKelompok.data
+      .map(
+        (k) => `
+            <label class="d-flex align-center gap-2" style="cursor:pointer; font-size:0.82rem; padding:6px 10px; border-radius:8px; transition:all 0.2s" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+                <input type="checkbox" class="kelompok-filter-check" value="${k.nama_kelompok}" onchange="window.filterAssessmentMulti()">
+                <span>${k.nama_kelompok}</span>
+            </label>
+        `,
+      )
+      .join("");
+  }
+
+  window.filterAssessmentMulti = () => {
+    const checked = Array.from(
+      document.querySelectorAll(".kelompok-filter-check:checked"),
+    ).map((cb) => cb.value);
+    const countBadge = document.getElementById("kelompok-select-count");
+    countBadge.textContent = checked.length;
+
+    if (checked.length === 0) {
+      renderAssessmentTable(window.rawAssessmentData);
+    } else {
+      const filtered = window.rawAssessmentData.filter((d) =>
+        checked.includes(d.kelompok),
+      );
+      renderAssessmentTable(filtered);
+    }
+  };
+
+  window.resetKelompokFilter = () => {
+    document
+      .querySelectorAll(".kelompok-filter-check")
+      .forEach((cb) => (cb.checked = false));
+    window.filterAssessmentMulti();
+    document.getElementById("kelompok-check-list").classList.add("hidden");
+  };
+
   if (allRes.success) {
     window.rawAssessmentData = allRes.data;
     renderAssessmentTable(window.rawAssessmentData);
   }
 
-  prodiSelect.onchange = (e) => {
-    const val = e.target.value;
-    if (val === "all") {
-      renderAssessmentTable(window.rawAssessmentData);
-    } else {
-      const filtered = window.rawAssessmentData.filter((d) => d.prodi === val);
-      renderAssessmentTable(filtered);
+  // Close dropdown when clicking outside
+  const closeDropdown = (e) => {
+    const container = document.getElementById("kelompok-check-container");
+    const list = document.getElementById("kelompok-check-list");
+    if (container && !container.contains(e.target)) {
+      list.classList.add("hidden");
     }
   };
+  document.addEventListener("click", closeDropdown);
 }
 
 window.exportAssessmentCSV = () => {
@@ -2420,7 +2551,7 @@ window.exportAssessmentCSV = () => {
   const headers = [
     "Nama",
     "NIM",
-    "Prodi",
+    "Kelompok",
     "Skor Klinik",
     `Kontrib. Klinik (${wK}%)`,
     "Skor Akademik",
@@ -2431,13 +2562,13 @@ window.exportAssessmentCSV = () => {
   const rows = window.dtAssessmentView.map((r) => [
     r.nama,
     r.username,
-    r.prodi || "-",
+    r.kelompok || "-",
     r.klinik_total.toFixed(2),
     ((r.klinik_total * wK) / 100).toFixed(2),
     r.akademik_total.toFixed(2),
     ((r.akademik_total * wA) / 100).toFixed(2),
     r.total.toFixed(2),
-    r.total >= window.lastAssessmentThreshold ? "LULUS" : "TIDAK LULUS",
+    r.total >= activeThreshold ? "LULUS" : "TIDAK LULUS",
   ]);
 
   downloadCSV(
@@ -3298,10 +3429,13 @@ async function rekapLogbookAdminView(area) {
             <div class="card">
                 <div class="card-header d-flex justify-between align-center wrap gap-3">
                     <h3 class="m-0"><i class="fa-solid fa-chart-pie text-primary"></i> Rekapan Logbook Mahasiswa</h3>
-                    <div class="d-flex gap-2">
-                        <div class="input-with-icon" style="width:250px;">
+                    <div class="d-flex gap-2 wrap">
+                        <select id="filter-angkatan-rekap" class="form-control" style="width:180px; font-size:0.85rem;" onchange="renderRekapTable()">
+                          <option value="">Semua Angkatan</option>
+                        </select>
+                        <div class="input-with-icon" style="width:220px;">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="search-rekap" class="form-control" placeholder="Cari nama mahasiswa...">
+                            <input type="text" id="search-rekap" class="form-control" placeholder="Cari nama mahasiswa..." oninput="renderRekapTable()">
                         </div>
                         <button class="btn btn-outline btn-sm" onclick="exportRekapCSV()"><i class="fa-solid fa-file-csv"></i> Unduh Rekap</button>
                     </div>
@@ -3330,90 +3464,112 @@ async function rekapLogbookAdminView(area) {
   window.dtRekapLog = [];
   if (res.success && res.data) {
     window.dtRekapLog = res.data;
-    const render = (data) => {
-      if (data.length === 0) {
+
+    // Populate angkatan filter
+    const angkatanSet = new Set();
+    res.data.forEach((m) => {
+      if (m.angkatan && m.angkatan !== "-") angkatanSet.add(m.angkatan);
+    });
+    const selRekap = document.getElementById("filter-angkatan-rekap");
+    if (selRekap) {
+      [...angkatanSet].sort().forEach((a) => {
+        const opt = document.createElement("option");
+        opt.value = a;
+        opt.textContent = `Angkatan ${a}`;
+        selRekap.appendChild(opt);
+      });
+    }
+
+    window.renderRekapTable = () => {
+      const q = (
+        document.getElementById("search-rekap")?.value || ""
+      ).toLowerCase();
+      const angkFilter =
+        document.getElementById("filter-angkatan-rekap")?.value || "";
+      const filtered = res.data.filter((m) => {
+        const matchNama = m.nama.toLowerCase().includes(q);
+        const matchAngk = !angkFilter || m.angkatan == angkFilter;
+        return matchNama && matchAngk;
+      });
+
+      if (filtered.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Tidak ada data ditemukan</td></tr>`;
         return;
       }
-      tableBody.innerHTML = data
-        .map((m, idx) => {
+      tableBody.innerHTML = filtered
+        .map((m) => {
           const totalTercapai = m.rekap.filter(
             (r) => r.status === "Tercapai",
           ).length;
           const totalTarget = m.rekap.length;
+          const angkatanBadge =
+            m.angkatan && m.angkatan !== "-"
+              ? `<span class="badge" style="font-size:0.72rem; background:#ede9fe; color:#6d28d9; margin-top:4px; display:inline-block;"><i class="fa-solid fa-users"></i> Angkatan ${m.angkatan}</span>`
+              : "";
 
           return `
-                <tr class="animate-fade-up">
-                    <td style="width:250px; vertical-align:top">
-                        <strong>${m.nama}</strong><br>
-                        <small class="text-muted">${m.prodi}</small>
-                        <div class="mt-2">
-                             <span class="badge ${totalTercapai === totalTarget ? "bg-success" : "bg-warning"}" style="font-size:0.75rem">
-                                ${totalTercapai} / ${totalTarget} Kompetensi
-                             </span>
-                        </div>
-                        <button class="btn btn-primary-soft btn-sm mt-3" onclick="toggleRekapDetail('${m.user_id}')" id="btn-toggle-${m.user_id}">
-                            <i class="fa-solid fa-eye"></i> Lihat Detail
-                        </button>
-                    </td>
-                    <td>
-                        <div id="rekap-detail-${m.user_id}" class="hidden">
-                            ${(() => {
-                              // Group rekap by kategori
-                              const gRekap = {};
-                              m.rekap.forEach((r) => {
-                                const kat =
-                                  r.kategori && r.kategori !== "-"
-                                    ? r.kategori
-                                    : "Umum";
-                                if (!gRekap[kat]) gRekap[kat] = [];
-                                gRekap[kat].push(r);
-                              });
-                              return Object.keys(gRekap)
-                                .map(
-                                  (kat) => `
-                                    <div style="margin-bottom:1rem;">
-                                        <div style="font-weight:700; font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
-                                            <i class="fa-solid fa-folder-open text-primary" style="margin-right:6px;"></i>${kat}
-                                        </div>
-                                        <div class="grid-skills-rekap" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
-                                            ${gRekap[kat]
-                                              .map(
-                                                (r) => `
-                                                <div class="skill-rekap-card" style="padding:10px; border-radius:8px; background:var(--bg-main); border-left: 4px solid ${r.status === "Tercapai" ? "#22c55e" : "#ef4444"};">
-                                                    <div style="font-weight:600; font-size:0.8rem; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${r.nama_skill}</div>
-                                                    <div class="d-flex justify-between align-center mt-2">
-                                                        <span class="badge ${r.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.75rem">${r.capaian} / ${r.target}</span>
-                                                        <small style="color:${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}; font-weight:700; font-size:0.75rem">${r.status.toUpperCase()}</small>
-                                                    </div>
-                                                </div>
-                                            `,
-                                              )
-                                              .join("")}
-                                        </div>
-                                    </div>
-                                `,
-                                )
-                                .join("");
-                            })()}
-                        </div>
-                        <div id="rekap-summary-text-${m.user_id}" class="text-muted" style="font-size:0.85rem">
-                            <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
-                        </div>
-                    </td>
-                </tr>
-            `;
+              <tr class="animate-fade-up">
+                  <td style="width:250px; vertical-align:top">
+                      <strong>${m.nama}</strong><br>
+                      <small class="text-muted">${m.prodi}</small>
+                      ${angkatanBadge}
+                      <div class="mt-2">
+                           <span class="badge ${totalTercapai === totalTarget ? "bg-success" : "bg-warning"}" style="font-size:0.75rem">
+                              ${totalTercapai} / ${totalTarget} Kompetensi
+                           </span>
+                      </div>
+                      <button class="btn btn-primary-soft btn-sm mt-3" onclick="toggleRekapDetail('${m.user_id}')" id="btn-toggle-${m.user_id}">
+                          <i class="fa-solid fa-eye"></i> Lihat Detail
+                      </button>
+                  </td>
+                  <td>
+                      <div id="rekap-detail-${m.user_id}" class="hidden">
+                          ${(() => {
+                            const gRekap = {};
+                            m.rekap.forEach((r) => {
+                              const kat =
+                                r.kategori && r.kategori !== "-"
+                                  ? r.kategori
+                                  : "Umum";
+                              if (!gRekap[kat]) gRekap[kat] = [];
+                              gRekap[kat].push(r);
+                            });
+                            return Object.keys(gRekap)
+                              .map(
+                                (kat) => `
+                              <div style="margin-bottom:1rem;">
+                                  <div style="font-weight:700; font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
+                                      <i class="fa-solid fa-folder-open text-primary" style="margin-right:6px;"></i>${kat}
+                                  </div>
+                                  <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
+                                      ${gRekap[kat]
+                                        .map(
+                                          (r) => `
+                                      <div style="padding:10px; border-radius:8px; background:var(--bg-main); border-left:4px solid ${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}">
+                                          <div style="font-weight:600; font-size:0.8rem; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${r.nama_skill}</div>
+                                          <div class="d-flex justify-between align-center mt-2">
+                                              <span class="badge ${r.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.75rem">${r.capaian} / ${r.target}</span>
+                                              <small style="color:${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}; font-weight:700; font-size:0.75rem">${r.status.toUpperCase()}</small>
+                                          </div>
+                                      </div>`,
+                                        )
+                                        .join("")}
+                                  </div>
+                              </div>`,
+                              )
+                              .join("");
+                          })()}
+                      </div>
+                      <div id="rekap-summary-text-${m.user_id}" class="text-muted" style="font-size:0.85rem">
+                          <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
+                      </div>
+                  </td>
+              </tr>`;
         })
         .join("");
     };
 
-    render(res.data);
-
-    document.getElementById("search-rekap").oninput = (e) => {
-      const q = e.target.value.toLowerCase();
-      const filtered = res.data.filter((m) => m.nama.toLowerCase().includes(q));
-      render(filtered);
-    };
+    window.renderRekapTable();
   } else {
     tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Gagal memuat rekap data</td></tr>`;
   }
@@ -3709,11 +3865,26 @@ async function renderUserManagement(area, roleFilter, title, icon) {
         <div class="animate-fade-up">
             <div class="card">
                 <div class="card-header d-flex align-center justify-between wrap gap-3">
-                    <div class="d-flex align-center gap-3 wrap">
+                    <div class="d-flex align-center gap-3 wrap flex-1">
                         <h3 class="m-0"><i class="fa-solid ${icon} text-primary"></i> Manajemen ${title}</h3>
-                        <div class="input-with-icon" style="width:250px;">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="search-users" class="form-control" placeholder="Cari nama atau ID..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+                        <div class="d-flex gap-2 wrap align-center flex-1">
+                          ${
+                            roleFilter === "mahasiswa"
+                              ? `
+                            <select id="filter-user-prodi" class="form-control" style="width:180px; font-size:0.85rem;" onchange="window.filterUsersByCriteria()">
+                              <option value="">Semua Prodi</option>
+                            </select>
+                            <select id="filter-user-angkatan" class="form-control" style="width:160px; font-size:0.85rem;" onchange="window.filterUsersByCriteria()">
+                              <option value="">Semua Angkatan</option>
+                            </select>
+                          `
+                              : ""
+                          }
+                          <div class="input-with-icon" style="min-width:200px; flex:1;">
+                              <i class="fa-solid fa-magnifying-glass"></i>
+                              <input type="text" id="search-users" class="form-control" placeholder="Cari nama atau ID..." style="padding-top:0.4rem; padding-bottom:0.4rem;" oninput="window.filterUsersByCriteria()">
+                          </div>
+                          <span id="user-count-badge" class="badge bg-primary" style="font-size:0.8rem; white-space:nowrap;"></span>
                         </div>
                     </div>
                     <div class="d-flex gap-2">
@@ -3798,20 +3969,58 @@ async function renderUserManagement(area, roleFilter, title, icon) {
   if (resUsers.success && resUsers.data && resUsers.data.length > 0) {
     const filteredByRole = resUsers.data.filter((u) => u.role === roleFilter);
     window["adminUsersData_" + roleFilter] = filteredByRole;
-    renderUsers(filteredByRole);
+
+    // Populate Filters
+    if (roleFilter === "mahasiswa") {
+      const prodSet = new Set(),
+        angkSet = new Set();
+      filteredByRole.forEach((u) => {
+        if (u.prodi && u.prodi !== "-") prodSet.add(u.prodi);
+        if (u.angkatan && u.angkatan !== "-") angkSet.add(u.angkatan);
+      });
+      const selProd = document.getElementById("filter-user-prodi");
+      const selAngk = document.getElementById("filter-user-angkatan");
+      if (selProd)
+        [...prodSet].sort().forEach((p) => {
+          const o = document.createElement("option");
+          o.value = p;
+          o.textContent = p;
+          selProd.appendChild(o);
+        });
+      if (selAngk)
+        [...angkSet].sort().forEach((a) => {
+          const o = document.createElement("option");
+          o.value = a;
+          o.textContent = `Angkatan ${a}`;
+          selAngk.appendChild(o);
+        });
+    }
+
+    window.filterUsersByCriteria = () => {
+      const q = (
+        document.getElementById("search-users")?.value || ""
+      ).toLowerCase();
+      const pFil = document.getElementById("filter-user-prodi")?.value || "";
+      const aFil = document.getElementById("filter-user-angkatan")?.value || "";
+
+      const results = filteredByRole.filter((u) => {
+        const matchQ =
+          (u.nama || "").toLowerCase().includes(q) ||
+          (u.username || "").toLowerCase().includes(q);
+        const matchP = !pFil || u.prodi === pFil;
+        const matchA = !aFil || u.angkatan == aFil;
+        return matchQ && matchP && matchA;
+      });
+
+      const badge = document.getElementById("user-count-badge");
+      if (badge) badge.textContent = `${results.length} data`;
+      renderUsers(results);
+    };
+
+    window.filterUsersByCriteria();
   } else {
     tableBody.innerHTML = `<tr><td colspan="${roleFilter === "mahasiswa" ? 5 : 4}" class="empty-table"><i class="fa-solid fa-users-slash fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data ${title}</td></tr>`;
   }
-
-  document.getElementById("search-users").oninput = (e) => {
-    const q = e.target.value.toLowerCase();
-    const results = window["adminUsersData_" + roleFilter].filter(
-      (u) =>
-        u.nama.toLowerCase().includes(q) ||
-        u.username.toLowerCase().includes(q),
-    );
-    renderUsers(results);
-  };
 }
 
 window.bukaModalUser = async (roleFilter, id = null) => {
@@ -4562,16 +4771,177 @@ window.prodiAdminView = (area) =>
     ["nama_prodi"],
     "getProdi",
   );
-window.kompetensiAdminView = (area) =>
-  renderMasterData(
-    area,
-    "kompetensi",
-    "Kompetensi / Skill",
-    "fa-list-check",
-    ["Nama Kompetensi", "Target Minimal", "Kategori", "Angkatan"],
-    ["nama_skill", "target_minimal", "kategori", "angkatan"],
-    "getKompetensiAll",
-  );
+window.kompetensiAdminView = async (area) => {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center wrap gap-2">
+          <h3><i class="fa-solid fa-list-check text-primary"></i> Master Kompetensi / Skill</h3>
+          <div class="d-flex gap-2 wrap">
+            <button class="btn btn-outline btn-sm" onclick="downloadMasterTemplate('kompetensi')"><i class="fa-solid fa-file-csv"></i> Template CSV</button>
+            <label class="btn btn-outline btn-sm m-0" style="cursor:pointer">
+              <i class="fa-solid fa-file-import"></i> Import CSV
+              <input type="file" accept=".csv" class="hidden" onchange="handleImportMasterCSV(event, 'kompetensi')">
+            </label>
+            <button class="btn btn-danger-soft btn-sm" onclick="clearMasterData('kompetensi', 'Kompetensi')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
+            <button class="btn btn-primary btn-sm" onclick="bukaModalMaster('kompetensi', 'Kompetensi / Skill')"><i class="fa-solid fa-plus"></i> Tambah Baru</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="d-flex gap-2 wrap mb-3 align-center" style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
+            <i class="fa-solid fa-filter" style="color:var(--primary);"></i>
+            <select id="filter-komp-angkatan" class="form-control" style="width:200px; font-size:0.85rem;" onchange="filterKompetensiTable()">
+              <option value="">Semua Rombongan</option>
+            </select>
+            <select id="filter-komp-kategori" class="form-control" style="width:180px; font-size:0.85rem;" onchange="filterKompetensiTable()">
+              <option value="">Semua Kategori</option>
+            </select>
+            <div class="input-with-icon" style="flex:1; min-width:180px;">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="search-komp" class="form-control" placeholder="Cari nama skill..." oninput="filterKompetensiTable()">
+            </div>
+            <span id="komp-count-badge" class="badge bg-primary" style="font-size:0.8rem; white-space:nowrap;"></span>
+          </div>
+          <div class="table-responsive">
+            <table id="table-master-kompetensi">
+              <thead>
+                <tr>
+                  <th>Nama Kompetensi</th>
+                  <th style="width:110px; text-align:center;">Target</th>
+                  <th style="width:140px;">Kategori</th>
+                  <th style="width:140px;">Rombongan</th>
+                  <th style="text-align:right; width:80px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody><tr><td colspan="5" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const res = await fetchAPI("getKompetensiAll");
+  const tableBody = document.querySelector("#table-master-kompetensi tbody");
+  if (!res.success || !res.data || res.data.length === 0) {
+    tableBody.innerHTML =
+      '<tr><td colspan="5" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data kompetensi</td></tr>';
+    return;
+  }
+
+  window.adminMasterData_kompetensi = res.data;
+
+  // Populate filter dropdowns
+  const angkatanSet = new Set();
+  const kategoriSet = new Set();
+  res.data.forEach((r) => {
+    if (r.angkatan && r.angkatan !== "-") angkatanSet.add(r.angkatan);
+    if (r.kategori && r.kategori !== "-") kategoriSet.add(r.kategori);
+  });
+
+  const selAngk = document.getElementById("filter-komp-angkatan");
+  const selKat = document.getElementById("filter-komp-kategori");
+
+  [...angkatanSet].sort().forEach((a) => {
+    const opt = document.createElement("option");
+    opt.value = a;
+    opt.textContent =
+      a === "Semua" ? "Universal (Semua Rombongan)" : `Angkatan ${a}`;
+    selAngk.appendChild(opt);
+  });
+  // Add "Universal" option
+  const uOpt = document.createElement("option");
+  uOpt.value = "__universal__";
+  uOpt.textContent = "Universal (kosong / Semua)";
+  selAngk.appendChild(uOpt);
+
+  [...kategoriSet].sort().forEach((k) => {
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = k;
+    selKat.appendChild(opt);
+  });
+
+  // Render function
+  window.filterKompetensiTable = () => {
+    const angkFilter = selAngk.value;
+    const katFilter = selKat.value;
+    const q = (
+      document.getElementById("search-komp")?.value || ""
+    ).toLowerCase();
+
+    const filtered = res.data.filter((r) => {
+      const matchAngk = !angkFilter
+        ? true
+        : angkFilter === "__universal__"
+          ? !r.angkatan || r.angkatan === "-" || r.angkatan === "Semua"
+          : r.angkatan == angkFilter || r.angkatan === "Semua";
+      const matchKat = !katFilter || r.kategori === katFilter;
+      const matchQ = !q || (r.nama_skill || "").toLowerCase().includes(q);
+      return matchAngk && matchKat && matchQ;
+    });
+
+    const badge = document.getElementById("komp-count-badge");
+    if (badge) badge.textContent = `${filtered.length} skill`;
+
+    if (filtered.length === 0) {
+      tableBody.innerHTML =
+        '<tr><td colspan="5" class="empty-table">Tidak ada data sesuai filter</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = filtered
+      .map((row, idx) => {
+        let text = escapeHTML(row.nama_skill) || "";
+        let firstNumIdx = text.search(/[0-9]+\./);
+        let titlePart = text;
+        let listPart = "";
+
+        if (firstNumIdx !== -1) {
+          titlePart = text.substring(0, firstNumIdx).trim();
+          listPart = text.substring(firstNumIdx);
+        }
+
+        let formattedList = listPart.replace(
+          /([0-9]+\.)/g,
+          '<br><span style="color:var(--primary); font-weight:700; margin-right:8px; display:inline-block; width:20px;">$1</span>',
+        );
+
+        const angkatanVal =
+          row.angkatan && row.angkatan !== "-" ? row.angkatan : null;
+        const angkatanBadge =
+          angkatanVal === "Semua" || !angkatanVal
+            ? `<span class="badge" style="font-size:0.78em; background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:0.3rem 0.6rem;"><i class="fa-solid fa-globe" style="margin-right:4px;"></i>Universal</span>`
+            : `<span class="badge" style="font-size:0.78em; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; padding:0.3rem 0.6rem;"><i class="fa-solid fa-layer-group" style="margin-right:4px;"></i>${escapeHTML(angkatanVal)}</span>`;
+
+        const katBadge =
+          row.kategori && row.kategori !== "-"
+            ? `<span class="badge" style="font-size:0.78em; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; padding:0.3rem 0.6rem;">${escapeHTML(row.kategori)}</span>`
+            : `<span style="color:#94a3b8; font-size:0.85em;">\u2014</span>`;
+
+        return `
+        <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+          <td>
+            <div style="margin-bottom:4px;"><strong style="color:var(--primary-dark); font-size:1em; border-bottom:1px dashed #cbd5e1">${titlePart}</strong></div>
+            <div style="line-height:1.6; color:var(--text-strong); padding-left:2px; font-size:0.9rem;">${formattedList}</div>
+          </td>
+          <td style="text-align:center;">
+            <span class="badge bg-primary" style="font-size:0.9em; padding:0.4rem 0.8rem;">${row.target_minimal ?? "-"}</span>
+          </td>
+          <td>${katBadge}</td>
+          <td>${angkatanBadge}</td>
+          <td style="text-align:right;">
+            <button class="btn btn-icon-ghost" onclick="bukaModalMaster('kompetensi', 'Kompetensi / Skill', '${row.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('kompetensi', '${row.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `;
+      })
+      .join("");
+  };
+
+  window.filterKompetensiTable();
+};
 window.bimbPraktikumAdminView = (area) =>
   renderMasterData(
     area,
@@ -5358,12 +5728,18 @@ async function jadwalAdminView(area) {
                         <span class="text-sm" style="color:#475569">
                             <i class="fa-solid fa-circle-info text-primary"></i> Info: <strong>P</strong> = Pagi, <strong>S</strong> = Siang, <strong>M</strong> = Malam
                         </span>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 align-center wrap">
+                            <div class="input-with-icon" style="width:210px;">
+                              <i class="fa-solid fa-layer-group" style="color:var(--primary)"></i>
+                              <select id="filter-angkatan-jadwal" class="form-control" style="font-size:0.85rem;" onchange="filterJadwalByAngkatan()">
+                                <option value="">Semua Rombongan</option>
+                              </select>
+                            </div>
                             <button class="btn btn-sm" style="background:#e2e8f0; color:#475569;" onclick="document.querySelectorAll('.table-responsive').forEach(el=>el.scrollBy({left: -300, behavior: 'smooth'}))">
-                                <i class="fa-solid fa-chevron-left"></i> Geser Tabel Ke Kiri
+                                <i class="fa-solid fa-chevron-left"></i> Kiri
                             </button>
                             <button class="btn btn-sm" style="background:#e2e8f0; color:#475569;" onclick="document.querySelectorAll('.table-responsive').forEach(el=>el.scrollBy({left: 300, behavior: 'smooth'}))">
-                                Geser Tabel Ke Kanan <i class="fa-solid fa-chevron-right"></i>
+                                Kanan <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
                     </div>
@@ -5611,6 +5987,28 @@ async function jadwalAdminView(area) {
     });
 
     wrapper.innerHTML = htmlOut;
+
+    // Populate angkatan filter dropdown from actual groups
+    const angkatanSet = new Set();
+    groups.forEach((g) => {
+      g.users.forEach((u) => {
+        if (u.angkatan && u.angkatan !== "-") angkatanSet.add(u.angkatan);
+      });
+    });
+    const sel = document.getElementById("filter-angkatan-jadwal");
+    if (sel) {
+      [...angkatanSet].sort().forEach((a) => {
+        const opt = document.createElement("option");
+        opt.value = a;
+        opt.textContent = `Angkatan ${a}`;
+        sel.appendChild(opt);
+      });
+    }
+
+    // Store groups for filtering
+    window._jadwalGroups = groups;
+    window._jadwalPreseptorKlinikMap = preseptorKlinikMap;
+    window._jadwalPreseptorAkademikMap = preseptorAkademikMap;
   } else {
     wrapper.innerHTML = `
             <div class="table-responsive">
@@ -5620,6 +6018,151 @@ async function jadwalAdminView(area) {
             </div>`;
   }
 }
+
+// Filter jadwal berdasarkan angkatan yang dipilih
+window.filterJadwalByAngkatan = () => {
+  const filterVal = document.getElementById("filter-angkatan-jadwal").value;
+  const groups = window._jadwalGroups || [];
+  const preseptorKlinikMap = window._jadwalPreseptorKlinikMap || {};
+  const preseptorAkademikMap = window._jadwalPreseptorAkademikMap || {};
+  const wrapper = document.querySelector("#jadwal-table-wrapper");
+  if (!wrapper) return;
+
+  // Filter groups by angkatan of their members
+  const filtered = filterVal
+    ? groups.filter((g) => g.users.some((u) => u.angkatan == filterVal))
+    : groups;
+
+  if (filtered.length === 0) {
+    wrapper.innerHTML = `<div class="empty-table p-4 text-center"><i class="fa-solid fa-filter-circle-xmark fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Tidak ada jadwal untuk angkatan ini</div>`;
+    return;
+  }
+
+  let htmlOut = "";
+  filtered.forEach((group, groupIdx) => {
+    // For filtered view, also filter users by angkatan
+    const groupUsers = filterVal
+      ? group.users.filter((u) => u.angkatan == filterVal)
+      : group.users;
+    if (groupUsers.length === 0) return;
+
+    const dates = [...new Set(group.schedules.map((s) => s.tanggal))].sort();
+    const blocks = [];
+    let currentBlockDates = [],
+      currentTempat = null,
+      currentTempatName = null;
+    dates.forEach((d) => {
+      const schedToday = group.schedules.find((s) => s.tanggal === d);
+      if (!schedToday) return;
+      const tId = schedToday.tempat_id;
+      const tName = schedToday.nama_tempat;
+      if (currentBlockDates.length === 0) {
+        currentBlockDates.push(d);
+        currentTempat = tId;
+        currentTempatName = tName;
+      } else {
+        if (tId === currentTempat) {
+          currentBlockDates.push(d);
+        } else {
+          blocks.push({
+            tempat_id: currentTempat,
+            nama_tempat: currentTempatName,
+            dates: currentBlockDates,
+          });
+          currentBlockDates = [d];
+          currentTempat = tId;
+          currentTempatName = tName;
+        }
+      }
+    });
+    if (currentBlockDates.length > 0)
+      blocks.push({
+        tempat_id: currentTempat,
+        nama_tempat: currentTempatName,
+        dates: currentBlockDates,
+      });
+
+    const headerStyle =
+      "background:#f8fafc; color:var(--text-strong); font-weight:700; text-transform:uppercase; font-size:0.75rem; border:1px solid #cbd5e1;";
+    let headHtml1 = `<tr style="${headerStyle}">`;
+    let headHtml2 = `<tr style="${headerStyle}">`;
+    headHtml1 += `<th rowspan="2" style="width:40px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NO</th><th rowspan="2" style="width:250px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NAMA MAHASISWA</th><th rowspan="2" style="width:130px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NIM</th>`;
+    blocks.forEach((block) => {
+      headHtml1 += `<th rowspan="2" style="width:180px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1; white-space:normal">TEMPAT PRAKTIK</th><th colspan="${block.dates.length}" style="text-align:center; border:1px solid #cbd5e1;">JADWAL</th>`;
+      block.dates.forEach((dStr) => {
+        const dObj = new Date(dStr);
+        const mStr = [
+          "JAN",
+          "FEB",
+          "MAR",
+          "APR",
+          "MEI",
+          "JUN",
+          "JUL",
+          "AGS",
+          "SEP",
+          "OKT",
+          "NOV",
+          "DES",
+        ][dObj.getMonth()];
+        headHtml2 += `<th style="text-align:center; width:65px; border:1px solid #cbd5e1; padding:6px 4px; font-size:0.7rem;">${dObj.getDate()} ${mStr}</th>`;
+      });
+    });
+    headHtml1 += `</tr>`;
+    headHtml2 += `</tr>`;
+
+    let bodyHtml = "";
+    groupUsers.forEach((u, index) => {
+      bodyHtml += `<tr style="background:#fff;">`;
+      bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; padding:8px 4px;">${index + 1}</td>`;
+      bodyHtml += `<td style="border:1px solid #cbd5e1; padding:8px 12px; white-space:normal; font-weight:500;">${u.nama.toUpperCase()}</td>`;
+      bodyHtml += `<td style="border:1px solid #cbd5e1; padding:8px 8px; text-align:center;">${u.username}</td>`;
+      blocks.forEach((block) => {
+        if (index === 0) {
+          const pkList = preseptorKlinikMap[block.tempat_id] || [];
+          const paList = preseptorAkademikMap[block.tempat_id] || [];
+          let preseptorHtml = "";
+          if (pkList.length > 0)
+            preseptorHtml += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #e2e8f0; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-user-doctor" style="color:var(--primary); margin-right:4px;"></i>PK: ${pkList.join(", ")}</div>`;
+          if (paList.length > 0)
+            preseptorHtml += `<div style="margin-top:4px; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-chalkboard-teacher" style="color:#f59e0b; margin-right:4px;"></i>PA: ${paList.join(", ")}</div>`;
+          bodyHtml += `<td rowspan="${groupUsers.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding:10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}${preseptorHtml}</td>`;
+        }
+        block.dates.forEach((dStr) => {
+          const s = group.schedules.find(
+            (x) => x.user_id == u.id && x.tanggal === dStr,
+          );
+          let shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
+          let shiftStyle = "";
+          if (s && s.shift) {
+            if (s.shift == 1) {
+              shiftText = "P";
+              shiftStyle = "color:var(--text-strong); font-weight:700;";
+            } else if (s.shift == 2) {
+              shiftText = "S";
+              shiftStyle = "color:var(--text-strong); font-weight:700;";
+            } else if (s.shift == 3) {
+              shiftText = "M";
+              shiftStyle = "color:var(--text-strong); font-weight:700;";
+            }
+          }
+          bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; ${shiftStyle}">${shiftText}</td>`;
+        });
+      });
+      bodyHtml += `</tr>`;
+    });
+
+    htmlOut += `<div class="table-responsive animate-fade-up" style="margin-bottom:2.5rem; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; box-shadow:var(--shadow-sm);">
+      <table class="table-compact text-sm" style="width:max-content; border-collapse:collapse; background:white;">
+        <thead style="position:sticky; top:0; z-index:10;">${headHtml1}${headHtml2}</thead>
+        <tbody>${bodyHtml}</tbody>
+      </table></div>`;
+  });
+
+  wrapper.innerHTML =
+    htmlOut ||
+    `<div class="empty-table p-4 text-center">Tidak ada data untuk rombongan ini</div>`;
+};
 
 window.exportJadwalPDF = async () => {
   if (!window.dtJadwalAdmin || window.dtJadwalAdmin.length === 0)
@@ -6576,9 +7119,9 @@ window.bukaModalPreceptorNotes = async (studentId, studentNama) => {
     e.preventDefault();
     const deskripsi = document.getElementById("pn-deskripsi").value;
     showLoader(true);
-    const postRes = await postAPI("saveReport", {
+    const postRes = await postAPI("addLaporan", {
       student_id: studentId,
-      user_id_pelapor: currentUser.id,
+      user_id: currentUser.id,
       nama_pelapor: currentUser.nama,
       role_pelapor: currentUser.role,
       tipe_kejadian: "Preceptor Note",
@@ -6620,3 +7163,64 @@ function renderNotesList(notes) {
     })
     .join("");
 }
+
+// Global Refresh Helper for Preseptor Dashboard Gap
+window.refreshGapDashboard = async (angkatan) => {
+  const container = document.querySelector("#preseptor-extra-area .card-body");
+  if (!container) return;
+
+  container.innerHTML = `<p class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memperbarui filter...</p>`;
+
+  const res = await fetchAPI("getCompetencyGap", {
+    tempat_id: currentUser.tempat_id,
+    angkatan: angkatan,
+  });
+
+  if (res.success && res.data) {
+    if (res.data.length === 0) {
+      container.innerHTML = `<p class="empty-table"><i class="fa-solid fa-folder-open"></i> Tidak ada gap data di filter ini.</p>`;
+      return;
+    }
+
+    container.innerHTML = res.data
+      .map((g) => {
+        let text = escapeHTML(g.nama) || "";
+        let firstNumIdx = text.search(/[0-9]+\./);
+        let titlePart = text;
+        let listPart = "";
+
+        if (firstNumIdx !== -1) {
+          titlePart = text.substring(0, firstNumIdx).trim();
+          listPart = text.substring(firstNumIdx);
+        }
+
+        let formattedList = listPart.replace(
+          /([0-9]+\.)/g,
+          '<br><span style="color:var(--primary); font-weight:700; margin-right:4px;">$1</span>',
+        );
+
+        const isUniversal = g.angkatan === "Semua" || !g.angkatan;
+
+        return `
+            <div class="mb-3" style="padding-bottom:8px; border-bottom:1px solid #f8fafc;">
+                <div class="d-flex justify-between align-start mb-1 gap-2">
+                    <div style="flex:1; line-height:1.4;">
+                        <div class="d-flex align-center gap-2 wrap mb-1">
+                          <div style="font-weight:700; color:var(--primary-dark); font-size:0.85rem; border-bottom: 1px dashed #e2e8f0; display:inline-block;">${titlePart}</div>
+                          <span class="badge" style="font-size:0.65rem; padding:2px 6px; ${isUniversal ? "background:#f0fdf4; color:#166534; border:1px solid #bbf7d0" : "background:#f5f3ff; color:#5b21b6; border:1px solid #ddd6fe"}">
+                            ${isUniversal ? "Universal" : g.angkatan}
+                          </span>
+                        </div>
+                        <div style="font-size:0.8rem; color:var(--text-strong); padding-left:2px;">${formattedList}</div>
+                    </div>
+                    <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem; align-self:start;">${g.count}x</span>
+                </div>
+                <div style="height:3px; background:#f1f5f9; border-radius:10px; overflow:hidden; margin-top:6px;">
+                    <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.5"></div>
+                </div>
+            </div>
+        `;
+      })
+      .join("");
+  }
+};
