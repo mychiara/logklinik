@@ -1337,11 +1337,13 @@ window.supabasePostAPI = async (action, payload) => {
             (existingUsers || []).map((u) => String(u.id)),
           );
 
-          // 2. Berikan default password untuk user yang benar-benar baru jika kosong
+          // 2. Berikan default password untuk user yang benar-benar baru jika kosong (Default: 123456)
+          const DEFAULT_PWD_HASH =
+            "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
           const processedUsers = payload.users.map((u) => {
             const isNew = !existingIds.has(String(u.id));
             if (isNew && !u.password) {
-              return { ...u, password: hashPassword("123456") };
+              return { ...u, password: DEFAULT_PWD_HASH };
             }
             return u;
           });

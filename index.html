@@ -146,10 +146,11 @@
               <h3 style="margin: 0">E-LogKlinik</h3>
               <div
                 style="
-                  font-size: 0.65rem;
-                  color: #94a3b8;
-                  font-weight: 400;
-                  opacity: 0.8;
+                  font-size: 0.8rem;
+                  color: #ffffff;
+                  font-weight: 700;
+                  opacity: 0.9;
+                  margin-top: 2px;
                 "
               >
                 E-Klinik Mgmt V.1
@@ -196,6 +197,28 @@
               <strong id="topbar-title-text" class="ml-1">Dashboard</strong>
             </div>
           </div>
+          
+          <style>
+              @keyframes rainbow_text_animated {
+                  0% { background-position: 0% 50%; }
+                  50% { background-position: 100% 50%; }
+                  100% { background-position: 0% 50%; }
+              }
+              .navbar-credits {
+                  background: linear-gradient(to right, #ffffff, #8be9fd, #50fa7b, #ffb86c, #ff79c6, #bd93f9, #ffffff);
+                  background-size: 200% auto;
+                  -webkit-background-clip: text;
+                  background-clip: text;
+                  -webkit-text-fill-color: transparent;
+                  animation: rainbow_text_animated 3s linear infinite;
+                  font-weight: 700;
+                  font-size: 1.15rem;
+              }
+          </style>
+          <div class="navbar-credits desktop-only" style="flex: 1; text-align: center;">
+             develop by Mas Andy - <a href="https://masandigital.com" target="_blank" style="color: inherit; text-decoration: none;">masandigital.com</a> @2026
+          </div>
+          
           <div class="topbar-right">
             <div class="pulse-icon">
               <button

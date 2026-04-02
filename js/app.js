@@ -1728,8 +1728,8 @@ async function nilaiMahasiswaView(area) {
         </div>
     `;
 
-  // Kita gunakan endpoint getPenilaianAkhir yang sudah ada, lalu filter by user id
-  const res = await fetchAPI("getPenilaianAkhir");
+  // Kita gunakan endpoint getPenilaianAkhir yang sudah ada, lalu filter by user id di server
+  const res = await fetchAPI("getPenilaianAkhir", { user_id: currentUser.id });
   const container = document.getElementById("nilai-mhs-content");
 
   if (res.success && res.data) {
