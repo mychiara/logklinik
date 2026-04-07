@@ -1472,21 +1472,31 @@ async function presensiView(area) {
 
           showLoader(true);
           const actionTarget = type === "in" ? "checkIn" : "checkOut";
-          const logRes = await postAPI(actionTarget, {
-            user_id: currentUser.id,
-            lahan: decodedText,
-          });
-          showLoader(false);
 
-          if (logRes.success) {
+          try {
+            const logRes = await postAPI(actionTarget, {
+              user_id: currentUser.id,
+              lahan: decodedText,
+            });
+            showLoader(false);
+
+            if (logRes.success) {
+              showToast(
+                "Berhasil",
+                `Berhasil Check-${type.toUpperCase()}`,
+                "success",
+              );
+              presensiView(area); // Reload view
+            } else {
+              showToast("Gagal Disimpan", logRes.message, "error");
+            }
+          } catch (err) {
+            showLoader(false);
             showToast(
-              "Berhasil",
-              `Berhasil Check-${type.toUpperCase()}`,
-              "success",
+              "Gagal",
+              "Terjadi kesalahan koneksi. Silakan coba lagi.",
+              "error",
             );
-            presensiView(area); // Reload view
-          } else {
-            showToast("Gagal Disimpan", logRes.message, "error");
           }
         },
         (err) => {},
@@ -1658,24 +1668,34 @@ async function logbookView(area) {
 
     document.getElementById("form-logbook").onsubmit = async (e) => {
       e.preventDefault();
-      const payload = {
-        user_id: currentUser.id,
-        tanggal: document.getElementById("log-tanggal").value,
-        lahan: document.getElementById("log-lahan").value,
-        kompetensi: document.getElementById("log-kompetensi").value,
-        level: document.getElementById("log-level").value,
-        deskripsi: document.getElementById("log-deskripsi").value,
-      };
+      const btn = e.target.querySelector('button[type="submit"]');
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin"></i> Menghubungkan...';
 
-      const res = await postAPI("addLogbook", payload);
-      if (res.success) {
-        closeModal();
-        showToast(
-          "Berhasil Menyimpan",
-          "Logbook Anda telah berhasil direkam.",
-          "success",
-        );
-        logbookView(document.getElementById("content-area"));
+      showLoader(true);
+      try {
+        const res = await postAPI("addLogbook", payload);
+        showLoader(false);
+        if (res.success) {
+          closeModal();
+          showToast(
+            "Berhasil Menyimpan",
+            "Logbook Anda telah berhasil direkam.",
+            "success",
+          );
+          logbookView(document.getElementById("content-area"));
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      } catch (err) {
+        showLoader(false);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        showToast("Error", "Gagal mengirim data. Cek koneksi Anda.", "error");
       }
     };
   };
@@ -2460,6 +2480,8 @@ window.bukaModalInputNilai = async (mhsId, mhsNama) => {
 };
 
 window.prosesSimpanNilai = async (mhsId) => {
+  const btn = event ? event.currentTarget : null;
+  if (btn && btn.disabled) return;
   const inputs = document.querySelectorAll(".input-score");
   let hasError = false;
   const results = [];
@@ -2492,18 +2514,44 @@ window.prosesSimpanNilai = async (mhsId) => {
   if (results.length === 0)
     return showToast("Peringatan", "Belum ada nilai yang diinput", "warning");
 
-  showToast("Menyimpan", "Sedang memproses data...", "info");
-  const res = await postAPI("saveGrades", {
-    results,
-    grader_role: currentUser.role,
-    student_id: mhsId,
-  });
-  if (res.success) {
-    closeModal();
+  const originalHtml = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+  }
+
+  showToast("Menyimpan", "Sedang memproses data ke server...", "info");
+  showLoader(true);
+  try {
+    const res = await postAPI("saveGrades", {
+      results,
+      grader_role: currentUser.role,
+      student_id: mhsId,
+    });
+    showLoader(false);
+    if (res.success) {
+      closeModal();
+      showToast(
+        "Tersimpan",
+        "Seluruh nilai mahasiswa berhasil diperbarui",
+        "success",
+      );
+    } else {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    }
+  } catch (err) {
+    showLoader(false);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     showToast(
-      "Tersimpan",
-      "Seluruh nilai mahasiswa berhasil diperbarui",
-      "success",
+      "Error",
+      "Data gagal terkirim. Mohon periksa sinyal internet Anda.",
+      "error",
     );
   }
 };
@@ -5503,44 +5551,64 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   const u = document.getElementById("username").value;
   const p = document.getElementById("password").value;
   const hp = await hashPassword(p);
-  const res = await fetchAPI("login", {
-    username: u,
-    password: hp,
-    raw_password: p,
-  });
 
-  if (res.success) {
-    // PWA Database/Version Check: Force refresh if needed
-    const currentVersion = "2.0-supabase";
-    const savedVersion = localStorage.getItem("app_version");
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Memverifikasi...';
 
-    if (savedVersion !== currentVersion) {
-      localStorage.clear(); // Clear old cached data
-      localStorage.setItem("app_version", currentVersion);
+  try {
+    const res = await fetchAPI("login", {
+      username: u,
+      password: hp,
+      raw_password: p,
+    });
+
+    if (res.success) {
+      // PWA Database/Version Check: Force refresh if needed
+      const currentVersion = "2.0-supabase";
+      const savedVersion = localStorage.getItem("app_version");
+
+      if (savedVersion !== currentVersion) {
+        localStorage.clear(); // Clear old cached data
+        localStorage.setItem("app_version", currentVersion);
+        localStorage.setItem("eblogbook_user", JSON.stringify(res.user));
+
+        showToast(
+          "Sistem Diperbarui",
+          "Menyesuaikan database Supabase...",
+          "info",
+        );
+        setTimeout(() => {
+          window.location.reload(true); // Force reload from server
+        }, 1500);
+        return;
+      }
+
       localStorage.setItem("eblogbook_user", JSON.stringify(res.user));
-
       showToast(
-        "Sistem Diperbarui",
-        "Menyesuaikan database Supabase...",
-        "info",
+        "Otentikasi Berhasil",
+        `Selamat datang kembali, ${res.user.nama}`,
+        "success",
       );
-      setTimeout(() => {
-        window.location.reload(true); // Force reload from server
-      }, 1500);
-      return;
+      checkAuth();
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      showToast(
+        "Akses Ditolak",
+        res.message || "Terdapat kesalahan kredensial User/NIM dan Password",
+        "error",
+      );
     }
-
-    localStorage.setItem("eblogbook_user", JSON.stringify(res.user));
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
     showToast(
-      "Otentikasi Berhasil",
-      `Selamat datang kembali, ${res.user.nama}`,
-      "success",
-    );
-    checkAuth();
-  } else {
-    showToast(
-      "Akses Ditolak",
-      res.message || "Terdapat kesalahan kredensial User/NIM dan Password",
+      "Login Gagal",
+      "Terjadi masalah jaringan. Silakan coba lagi.",
       "error",
     );
   }
