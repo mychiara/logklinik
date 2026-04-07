@@ -177,41 +177,11 @@ window.supabaseFetchAPI = async (action, payload) => {
         };
       }
 
-      case "getUsers": {
-        const { data, error } = await supabaseClient
-          .from("users")
-          .select(
-            "id, username, nama, role, prodi, kelompok_id, tempat_id, angkatan, no_telp",
-          )
-          .order("nama", { ascending: true });
-        if (error) throw error;
-        return {
-          success: true,
-          data: (data || []).map((u) => ({
-            ...u,
-            kelompok: u.kelompok_id,
-            tempat_id: u.tempat_id || "-",
-          })),
-        };
-      }
-
-      case "getPendingLogs": {
-        const { data, error } = await supabaseClient
-          .from("logbook")
-          .select("*, users!inner(nama)")
-          .eq("status", "Menunggu Validasi")
-          .order("tanggal", { ascending: true });
-        if (error) throw error;
-        return {
-          success: true,
-          data: data.map((l) => ({ ...l, nama_mahasiswa: l.users.nama })),
-        };
-      }
-
       case "getAllPresensi": {
         const { data, error } = await supabaseClient
           .from("presensi")
-          .select("*, users!inner(nama, prodi)");
+          .select("*, users!inner(nama, prodi)")
+          .range(0, 4999);
         if (error) throw error;
         return {
           success: true,
@@ -243,65 +213,52 @@ window.supabaseFetchAPI = async (action, payload) => {
 
       case "getMendesakLogs": {
         const yesterday = new Date(Date.now() - 86400000).toISOString();
-        const { data, error } = await supabaseClient
+        let query = supabaseClient
           .from("logbook")
-          .select("*, users!inner(nama, tempat_id)")
+          .select("*, users!inner(nama)")
           .eq("status", "Menunggu Validasi")
           .lt("created_at", yesterday);
-        if (error) throw error;
 
-        let filtered = data || [];
         if (payload.tempat_id && payload.tempat_id !== "-") {
           const tIds = payload.tempat_id.split(",");
-          filtered = filtered.filter((l) =>
-            tIds.includes(String(l.users.tempat_id)),
-          );
+          query = query.in("lahan", tIds); // Use record-specific 'lahan' column
         }
 
-        return { success: true, data: filtered };
+        const { data, error } = await query
+          .order("tanggal", { ascending: true })
+          .range(0, 4999);
+        if (error) throw error;
+        return {
+          success: true,
+          data: (data || []).map((l) => ({
+            ...l,
+            nama_mahasiswa: l.users.nama,
+          })),
+        };
       }
 
       case "getCompetencyGap": {
         const tIds = payload.tempat_id ? payload.tempat_id.split(",") : [];
-        const angkFilter = payload.angkatan;
-
-        // Fetch logs (approved) for these hospitals, joined with user angkatan
-        let logsQuery = supabaseClient
+        const { data: logs, error: e1 } = await supabaseClient
           .from("logbook")
-          .select("kompetensi, users!inner(angkatan)")
+          .select("kompetensi")
           .in("lahan", tIds)
           .eq("status", "Disetujui");
-
-        if (angkFilter && angkFilter !== "Semua") {
-          logsQuery = logsQuery.eq("users.angkatan", angkFilter);
-        }
-
-        const { data: logs, error: e1 } = await logsQuery;
-
-        // Fetch competencies filtered by same angkatan (plus universal)
-        let kompQuery = supabaseClient
+        const { data: allKomp, error: e2 } = await supabaseClient
           .from("kompetensi")
-          .select("nama_skill, angkatan");
-        if (angkFilter && angkFilter !== "Semua") {
-          kompQuery = kompQuery.or(
-            `angkatan.eq.${angkFilter},angkatan.eq.Semua,angkatan.is.null`,
-          );
-        }
-
-        const { data: allKomp, error: e2 } = await kompQuery;
+          .select("nama_skill");
 
         if (e1 || e2) throw e1 || e2;
 
         const counts = {};
-        (logs || []).forEach(
+        logs.forEach(
           (l) => (counts[l.kompetensi] = (counts[l.kompetensi] || 0) + 1),
         );
 
         // Return competencies with 0 or low counts
-        const gaps = (allKomp || [])
+        const gaps = allKomp
           .map((k) => ({
             nama: k.nama_skill,
-            angkatan: k.angkatan || "Semua",
             count: counts[k.nama_skill] || 0,
           }))
           .sort((a, b) => a.count - b.count);
@@ -315,7 +272,8 @@ window.supabaseFetchAPI = async (action, payload) => {
           .from("logbook")
           .select("user_id, users!inner(nama)")
           .eq("status", "Disetujui")
-          .gt("created_at", lastWeek);
+          .gt("created_at", lastWeek)
+          .range(0, 4999);
         if (error) throw error;
 
         const board = {};
@@ -361,129 +319,135 @@ window.supabaseFetchAPI = async (action, payload) => {
         return { success: true, data };
       }
 
-      case "getKompetensi": {
-        // === TERKUNCI PER ROMBONGAN (ANGKATAN) ===
-        // Mahasiswa HANYA bisa melihat kompetensi sesuai rombongannya.
-        // Admin yang butuh semua data harus gunakan action "getKompetensiAll".
+      case "getAdminAnalytics": {
+        const today = new Date().toISOString().split("T")[0];
+        const [mhs, logs, pres, scores, prodis] = await Promise.all([
+          supabaseClient
+            .from("users")
+            .select("id", { count: "exact", head: true })
+            .eq("role", "mahasiswa"),
+          supabaseClient
+            .from("logbook")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "Disetujui"),
+          supabaseClient
+            .from("presensi")
+            .select("*", { count: "exact", head: true })
+            .eq("tanggal", today),
+          supabaseClient
+            .from("penilaian_akhir")
+            .select("total, users!inner(prodi)"),
+          supabaseClient.from("prodi").select("nama_prodi"),
+        ]);
 
-        const { data: userRow } = payload.user_id
-          ? await supabaseClient
-              .from("users")
-              .select("angkatan, role")
-              .eq("id", payload.user_id)
-              .single()
-          : { data: null };
-
-        const userAngkatan = userRow?.angkatan;
-        const userRole = userRow?.role || "";
-
-        // Admin & preseptor tetap bisa lihat semua (akses via getKompetensiAll)
-        // Untuk mahasiswa: SELALU filter — jika belum punya angkatan, hanya tampil "Semua"
-        let kompQuery = supabaseClient
-          .from("kompetensi")
-          .select("id, nama_skill, target_minimal, kategori, angkatan")
-          .order("kategori", { ascending: true })
-          .order("nama_skill", { ascending: true });
-
-        if (payload.user_id) {
-          // Jika punya angkatan → filter sesuai angkatan + universal
-          // Jika belum ada angkatan → hanya tampilkan universal (Semua / null)
-          if (userAngkatan && userAngkatan !== "-") {
-            kompQuery = kompQuery.or(
-              `angkatan.eq.${userAngkatan},angkatan.eq.Semua,angkatan.is.null`,
-            );
-          } else {
-            // Fallback: hanya kompetensi universal
-            kompQuery = kompQuery.or(`angkatan.eq.Semua,angkatan.is.null`);
-          }
-        }
-        // Tanpa user_id (misal admin) → tidak di-filter, data lengkap
-
-        const { data: kompData, error: kompErr } = await kompQuery;
-        if (kompErr) throw kompErr;
-
-        if (!payload.user_id) {
-          return { success: true, data: kompData || [] };
-        }
-
-        // Hitung pencapaian (logbook disetujui) per skill untuk student ini
-        const { data: logData } = await supabaseClient
-          .from("logbook")
-          .select("kompetensi")
-          .eq("user_id", payload.user_id)
-          .eq("status", "Disetujui");
-
-        const logCount = {};
-        (logData || []).forEach((l) => {
-          logCount[l.kompetensi] = (logCount[l.kompetensi] || 0) + 1;
+        // Calculate Average Performance per Prodi (Still fetch records for this, but only scoring ones)
+        // Note: Supabase limit is 1000 by default. If we have >1000 student final scores,
+        // we might need to handle this differently, but for 500 students it's safe.
+        const prodiStats = (prodis.data || []).map((p) => {
+          const prodiScores = (scores.data || []).filter(
+            (s) => s.users.prodi === p.nama_prodi,
+          );
+          const avg =
+            prodiScores.length > 0
+              ? (
+                  prodiScores.reduce((acc, s) => acc + (s.total || 0), 0) /
+                  prodiScores.length
+                ).toFixed(1)
+              : 0;
+          return { nama: p.nama_prodi, avg };
         });
 
         return {
           success: true,
-          angkatan: userAngkatan || null, // Kirim ke frontend untuk tampil di UI
-          data: (kompData || []).map((k) => ({
-            ...k,
-            pencapaian: logCount[k.nama_skill] || 0,
+          data: {
+            totalMhs: mhs.count || 0,
+            activeToday: pres.count || 0,
+            totalLogs: logs.count || 0,
+            avgLogs: mhs.count > 0 ? (logs.count / mhs.count).toFixed(1) : 0,
+            prodiStats: prodiStats,
+          },
+        };
+      }
+
+      case "getUsers": {
+        const { data, error } = await supabaseClient
+          .from("users")
+          .select(
+            "id, username, nama, role, prodi, kelompok_id, tempat_id, angkatan, no_telp",
+          )
+          .order("nama", { ascending: true })
+          .range(0, 4999); // Handle up to 5000 users for scalability
+        if (error) throw error;
+        return {
+          success: true,
+          data: (data || []).map((u) => ({
+            ...u,
+            kelompok: u.kelompok_id,
+            tempat_id: u.tempat_id || "-",
           })),
         };
       }
 
       case "getRekapLogbook": {
+        let mCol = supabaseClient
+          .from("users")
+          .select("id, nama, prodi")
+          .eq("role", "mahasiswa");
+
+        if (payload.ids && Array.isArray(payload.ids)) {
+          mCol = mCol.in("id", payload.ids);
+        } else {
+          mCol = mCol.range(0, 499); // Safe default for 500 students
+        }
+
+        let lCol = supabaseClient
+          .from("logbook")
+          .select("user_id, kompetensi")
+          .eq("status", "Disetujui");
+
+        if (payload.ids && Array.isArray(payload.ids)) {
+          lCol = lCol.in("user_id", payload.ids);
+        } else {
+          lCol = lCol.range(0, 4999);
+        }
+
         const [{ data: mhs }, { data: logs }, { data: komp }] =
           await Promise.all([
-            supabaseClient
-              .from("users")
-              .select("id, nama, prodi, angkatan")
-              .eq("role", "mahasiswa"),
-            supabaseClient
-              .from("logbook")
-              .select("user_id, kompetensi")
-              .eq("status", "Disetujui"),
+            mCol,
+            lCol,
             supabaseClient
               .from("kompetensi")
-              .select("nama_skill, target_minimal, kategori, angkatan"),
+              .select("nama_skill, target_minimal, kategori"),
           ]);
 
-        // Pre-index logs by user_id+kompetensi for O(1) lookup
         const logIndex = {};
         (logs || []).forEach((l) => {
           const key = `${l.user_id}|${l.kompetensi}`;
           logIndex[key] = (logIndex[key] || 0) + 1;
         });
 
-        const rekap = (mhs || []).map((u) => {
-          // Filter kompetensi sesuai angkatan mahasiswa ini
-          const relevantKomp = (komp || []).filter((k) => {
-            if (!k.angkatan || k.angkatan === "-" || k.angkatan === "Semua")
-              return true;
-            return k.angkatan == u.angkatan;
-          });
-          return {
-            user_id: u.id,
-            nama: u.nama,
-            prodi: u.prodi,
-            angkatan: u.angkatan,
-            rekap: relevantKomp.map((k) => {
-              const achieved = logIndex[`${u.id}|${k.nama_skill}`] || 0;
-              return {
-                nama_skill: k.nama_skill,
-                kategori: k.kategori,
-                target: k.target_minimal,
-                capaian: achieved,
-                status: achieved >= k.target_minimal ? "Tercapai" : "Belum",
-              };
-            }),
-          };
-        });
+        const rekap = (mhs || []).map((u) => ({
+          user_id: u.id,
+          nama: u.nama,
+          prodi: u.prodi,
+          rekap: (komp || []).map((k) => {
+            const achieved = logIndex[`${u.id}|${k.nama_skill}`] || 0;
+            return {
+              nama_skill: k.nama_skill,
+              kategori: k.kategori,
+              target: k.target_minimal,
+              capaian: achieved,
+              status: achieved >= k.target_minimal ? "Tercapai" : "Belum",
+            };
+          }),
+        }));
         return { success: true, data: rekap };
       }
 
       case "getPenilaianAkhir": {
         let query = supabaseClient
           .from("penilaian_akhir")
-          .select(
-            "*, users!inner(nama, prodi, angkatan, kelompok_id, kelompok(nama_kelompok))",
-          );
+          .select("*, users!inner(nama, prodi, angkatan)");
 
         if (payload.ids && Array.isArray(payload.ids)) {
           query = query.in("id", payload.ids);
@@ -516,7 +480,6 @@ window.supabaseFetchAPI = async (action, payload) => {
             nama: p.users.nama,
             prodi: p.users.prodi,
             angkatan: p.users.angkatan,
-            kelompok: p.users.kelompok ? p.users.kelompok.nama_kelompok : "-",
           })),
         };
       }
@@ -542,9 +505,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         // Step 2: Fetch user details for these students
         const { data: users, error: uErr } = await supabaseClient
           .from("users")
-          .select(
-            "id, username, nama, role, prodi, groups:kelompok(nama_kelompok)",
-          )
+          .select("id, username, nama, role, prodi, kelompok_id")
           .in("id", studentIds)
           .eq("role", "mahasiswa");
 
@@ -569,7 +530,7 @@ window.supabaseFetchAPI = async (action, payload) => {
           query = query.eq("users.kelompok_id", payload.kelompok_id);
         }
 
-        const { data, error } = await query;
+        const { data, error } = await query.range(0, 4999);
         if (error) throw error;
         return {
           success: true,
@@ -586,9 +547,9 @@ window.supabaseFetchAPI = async (action, payload) => {
         let query = supabaseClient.from("presensi").select("*");
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
         if (payload.tanggal) query = query.eq("tanggal", payload.tanggal);
-        const { data, error } = await query.order("tanggal", {
-          ascending: false,
-        });
+        const { data, error } = await query
+          .order("tanggal", { ascending: false })
+          .range(0, 4999);
         if (error) throw error;
         return { success: true, data: data || [] };
       }
@@ -596,9 +557,9 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getLogbook": {
         let query = supabaseClient.from("logbook").select("*");
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
-        const { data, error } = await query.order("tanggal", {
-          ascending: false,
-        });
+        const { data, error } = await query
+          .order("tanggal", { ascending: false })
+          .range(0, 4999);
         if (error) throw error;
         return { success: true, data: data || [] };
       }
@@ -717,7 +678,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
           if (payload.tempat_id && payload.tempat_id !== "-") {
             const tIds = payload.tempat_id.split(",");
-            logQuery = logQuery.in("users.tempat_id", tIds);
+            logQuery = logQuery.in("lahan", tIds);
           }
 
           query = logQuery.order("created_at", { ascending: false }).limit(20);
@@ -1104,11 +1065,22 @@ window.supabasePostAPI = async (action, payload) => {
       }
 
       case "generateJadwalKelompok": {
-        if (payload.clearExisting)
-          await supabaseClient
-            .from("jadwal")
-            .delete()
-            .neq("id", "00000000-0000-0000-0000-000000000000");
+        if (payload.clearExisting) {
+          if (payload.kelompokIds && payload.kelompokIds.length > 0) {
+            const { data: uC } = await supabaseClient
+              .from("users")
+              .select("id")
+              .in("kelompok_id", payload.kelompokIds);
+            const uids = (uC || []).map((u) => u.id);
+            if (uids.length > 0)
+              await supabaseClient.from("jadwal").delete().in("user_id", uids);
+          } else {
+            await supabaseClient
+              .from("jadwal")
+              .delete()
+              .neq("id", "00000000-0000-0000-0000-000000000000");
+          }
+        }
         const { data: users } = await supabaseClient
           .from("users")
           .select("id, kelompok_id");
@@ -1337,13 +1309,11 @@ window.supabasePostAPI = async (action, payload) => {
             (existingUsers || []).map((u) => String(u.id)),
           );
 
-          // 2. Berikan default password untuk user yang benar-benar baru jika kosong (Default: 123456)
-          const DEFAULT_PWD_HASH =
-            "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+          // 2. Berikan default password untuk user yang benar-benar baru jika kosong
           const processedUsers = payload.users.map((u) => {
             const isNew = !existingIds.has(String(u.id));
             if (isNew && !u.password) {
-              return { ...u, password: DEFAULT_PWD_HASH };
+              return { ...u, password: hashPassword("123456") };
             }
             return u;
           });

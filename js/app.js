@@ -47,11 +47,9 @@ window.EKLINIK_CACHE = {};
 async function fetchCachedAPI(action, payload = {}) {
   const cacheKey = `EKLINIK_CACHE_${action}`;
 
-  // NOTE: getKompetensi is intentionally excluded from no-payload cache
-  // because student requests always include user_id for angkatan filtering
   if (
     Object.keys(payload).length === 0 &&
-    ["getProdi", "getTempat", "getKelompok"].includes(action)
+    ["getProdi", "getTempat", "getKelompok", "getKompetensi"].includes(action)
   ) {
     // Check in-memory first
     if (window.EKLINIK_CACHE[action]) {
@@ -72,13 +70,18 @@ async function fetchCachedAPI(action, payload = {}) {
   if (
     res.success &&
     Object.keys(payload).length === 0 &&
-    ["getProdi", "getTempat", "getKelompok"].includes(action)
+    ["getProdi", "getTempat", "getKelompok", "getKompetensi"].includes(action)
   ) {
     window.EKLINIK_CACHE[action] = res.data;
     sessionStorage.setItem(cacheKey, JSON.stringify(res.data));
   }
 
   return res;
+}
+
+function clearCache(action) {
+  delete window.EKLINIK_CACHE[action];
+  sessionStorage.removeItem(`EKLINIK_CACHE_${action}`);
 }
 
 // API Helper
@@ -106,31 +109,6 @@ async function postAPI(action, payload = {}) {
     return { success: false, message: "Supabase belum diatur" };
   }
 
-  // Clear relevant cache if it's a mutation action
-  const mutationActions = [
-    "addMaster",
-    "editMaster",
-    "deleteMaster",
-    "clearMaster",
-    "importMaster",
-    "addUser",
-    "editUser",
-    "deleteUser",
-    "clearUsersByRole",
-    "importUsers",
-    "setKelompokBulk",
-    "importKelompokAssignment",
-    "generateJadwal",
-    "generateJadwalKelompok",
-    "saveSettings",
-    "saveGrades",
-    "clearAllGrades",
-  ];
-
-  if (mutationActions.includes(action)) {
-    clearAppCache();
-  }
-
   showLoader(true);
   try {
     const data = await supabasePostAPI(action, payload);
@@ -144,19 +122,6 @@ async function postAPI(action, payload = {}) {
       "error",
     );
     return { success: false, message: error.message };
-  }
-}
-
-// Global function to invalidate cache
-function clearAppCache() {
-  window.EKLINIK_CACHE = {};
-  // Clear only E-Klinik related session storage keys
-  for (let i = 0; i < sessionStorage.length; i++) {
-    const key = sessionStorage.key(i);
-    if (key && key.startsWith("EKLINIK_CACHE_")) {
-      sessionStorage.removeItem(key);
-      i--; // Adjust index after removal
-    }
   }
 }
 
@@ -235,18 +200,6 @@ function initDashboard() {
         text: "Informasi Praktik",
         view: "informasiPraktikView",
       },
-      {
-        id: "nav-sdki",
-        icon: "fa-book-medical",
-        text: "Aplikasi SDKI,SLKI,SIKI",
-        view: "aplikasiSDKIView",
-      },
-      {
-        id: "nav-ukom",
-        icon: "fa-user-nurse",
-        text: "Aplikasi Ukom Perawat",
-        view: "aplikasiUkomView",
-      },
     ],
     preseptor: [
       {
@@ -267,18 +220,6 @@ function initDashboard() {
         text: "Mahasiswa Bimbingan",
         view: "mahasiswaView",
       },
-      {
-        id: "nav-sdki",
-        icon: "fa-book-medical",
-        text: "Aplikasi SDKI,SLKI,SIKI",
-        view: "aplikasiSDKIView",
-      },
-      {
-        id: "nav-ukom",
-        icon: "fa-user-nurse",
-        text: "Aplikasi Ukom Perawat",
-        view: "aplikasiUkomView",
-      },
     ],
     preseptor_akademik: [
       {
@@ -298,18 +239,6 @@ function initDashboard() {
         icon: "fa-users",
         text: "Mahasiswa Bimbingan",
         view: "mahasiswaView",
-      },
-      {
-        id: "nav-sdki",
-        icon: "fa-book-medical",
-        text: "Aplikasi SDKI,SLKI,SIKI",
-        view: "aplikasiSDKIView",
-      },
-      {
-        id: "nav-ukom",
-        icon: "fa-user-nurse",
-        text: "Aplikasi Ukom Perawat",
-        view: "aplikasiUkomView",
       },
     ],
     admin: [
@@ -334,7 +263,7 @@ function initDashboard() {
       {
         id: "nav-semua",
         icon: "fa-database",
-        text: "Semua Data",
+        text: "Semua Data QR",
         view: "adminView",
       },
       {
@@ -392,16 +321,40 @@ function initDashboard() {
         view: "penilaianAkhirView",
       },
       {
-        id: "nav-gen-kelompok",
+        id: "nav-gen-kelompok-1",
         icon: "fa-calendar-days",
-        text: "Generate Per Kelompok",
-        view: "generatorKelompokView",
+        text: "Generate Per Kelompok 1",
+        view: "generatorKelompok1View",
       },
       {
-        id: "nav-jadwal",
+        id: "nav-jadwal-1",
         icon: "fa-table",
-        text: "Daftar Jadwal Praktik",
-        view: "jadwalAdminView",
+        text: "Daftar Jadwal Praktik 1",
+        view: "jadwalAdmin1View",
+      },
+      {
+        id: "nav-gen-kelompok-2",
+        icon: "fa-calendar-days",
+        text: "Generate Per Kelompok 2",
+        view: "generatorKelompok2View",
+      },
+      {
+        id: "nav-jadwal-2",
+        icon: "fa-table",
+        text: "Daftar Jadwal Praktik 2",
+        view: "jadwalAdmin2View",
+      },
+      {
+        id: "nav-gen-kelompok-3",
+        icon: "fa-calendar-days",
+        text: "Generate Per Kelompok 3",
+        view: "generatorKelompok3View",
+      },
+      {
+        id: "nav-jadwal-3",
+        icon: "fa-table",
+        text: "Daftar Jadwal Praktik 3",
+        view: "jadwalAdmin3View",
       },
       {
         id: "nav-laporan-admin",
@@ -658,161 +611,6 @@ async function informasiPraktikView(area) {
   }
 }
 
-// --- APLIKASI EKSTERNAL ---
-function aplikasiSDKIView(area) {
-  area.innerHTML = `
-    <div class="animate-fade-up">
-        <div class="card shadow-lg" style="border-radius: 20px; overflow: hidden; border: none; background: #fff;">
-            <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 40px 20px; text-align: center; color: white;">
-                <i class="fa-solid fa-book-medical fa-4x mb-3 animate-bounce-subtle" style="color: white;"></i>
-                <h2 style="font-weight: 800; font-size: 2rem; margin-bottom: 10px; color: white;">Aplikasi SDKI, SLKI, SIKI</h2>
-                <p style="opacity: 0.9; max-width: 600px; margin: 0 auto; font-size: 1.1rem; color: white;">Solusi Digital Terintegrasi untuk Diagnosis, Luaran, dan Intervensi Keperawatan Indonesia.</p>
-            </div>
-            <div class="card-body" style="padding: 30px;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 40px;">
-                    <!-- Section 1: Overview & Primary Features -->
-                    <div>
-                        <h3 style="color: var(--primary-dark); margin-bottom: 15px; font-weight: 800; border-left: 5px solid var(--primary); padding-left: 15px;">Manfaat & Keunggulan</h3>
-                        <p style="line-height: 1.6; color: #475569; margin-bottom: 25px; font-weight: 500;">Bagaimana aplikasi ini mendukung pembelajaran dan aktivitas keperawatan?</p>
-                        
-                        <div style="display: grid; gap: 20px;">
-                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                                <div style="background: var(--primary-light); color: var(--primary); width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                    <i class="fa-solid fa-list-check fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Standar 3S Lengkap</h4>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Referensi komprehensif SDKI (149), SLKI (137), dan SIKI (187) sesuai standar PPNI dalam satu genggaman.</p>
-                                </div>
-                            </div>
-
-                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                                <div style="background: #ecfdf5; color: #10b981; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                    <i class="fa-solid fa-brain fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Diagnosa Pintar</h4>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Algoritma cerdas yang memberikan rekomendasi diagnosa keperawatan instan berdasarkan data pengkajian Anda.</p>
-                                </div>
-                            </div>
-
-                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                                <div style="background: #fff7ed; color: #f59e0b; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                    <i class="fa-solid fa-stethoscope fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">75+ SOP Klinis</h4>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Panduan prosedur tindakan klinis detail (KMB, Anak, Maternitas, Jiwa, Gadar) lengkap dengan fitur Voice Over.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Section 2: Advanced Tools & Checkout -->
-                    <div>
-                        <div style="display: grid; gap: 20px; margin-top: 55px;">
-                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                                <div style="background: #eff6ff; color: #3b82f6; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                    <i class="fa-solid fa-calculator fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Kalkulator Medis</h4>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Hitung cepat dosis obat, tetesan infus, GFR, hingga skor risiko Braden & Morse secara akurat.</p>
-                                </div>
-                            </div>
-
-                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                                <div style="background: #fdf2f8; color: #db2777; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                    <i class="fa-solid fa-person-chalkboard fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Modul Edukasi</h4>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Template edukasi pasien & discharge planning siap pakai untuk meningkatkan kualitas asuhan medik.</p>
-                                </div>
-                            </div>
-
-                            <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                                <div style="background: #f5f3ff; color: #7c3aed; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                    <i class="fa-solid fa-file-signature fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 5px;">Dokumentasi SOAP</h4>
-                                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">Catat perkembangan harian pasien (CPPT) secara terstruktur & simpan riwayat catatan dengan aman.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="margin-top: 35px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); padding: 25px; border-radius: 20px; border: 1px solid #e2e8f0; text-align: center;">
-                            <h4 style="font-weight: 800; margin-bottom: 10px; color: var(--primary-dark);">Dapatkan Akses Penuh</h4>
-                            <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 20px;">Lisensi profesional di sdkipro.com</p>
-                            <a href="https://sdkipro.com" target="_blank" class="btn btn-primary btn-block btn-lg shadow-primary" style="border-radius: 12px; padding: 15px; color: white;">
-                                <i class="fa-solid fa-cart-shopping mr-2"></i> Langganan SDKI Pro Sekarang
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-  `;
-}
-
-function aplikasiUkomView(area) {
-  area.innerHTML = `
-    <div class="animate-fade-up">
-        <div class="card shadow-lg" style="border-radius: 20px; overflow: hidden; border: none; background: #fff;">
-            <div style="background: linear-gradient(135deg, #059669, #10b981); padding: 40px 20px; text-align: center; color: white;">
-                <i class="fa-solid fa-user-nurse fa-4x mb-3 animate-bounce-subtle" style="color: white;"></i>
-                <h2 style="font-weight: 800; font-size: 2rem; margin-bottom: 10px; color: white;">Bimbel Ukom Perawat</h2>
-                <p style="opacity: 0.9; max-width: 600px; margin: 0 auto; font-size: 1.1rem; color: white;">Persiapan Matang Menuju Lulus Uji Kompetensi (UKOM) 100% One Shot!</p>
-            </div>
-            <div class="card-body" style="padding: 30px;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
-                    <div>
-                        <h3 style="color: #065f46; margin-bottom: 15px; font-weight: 700;">Mengapa Harus Aplikasi Ini?</h3>
-                        <p style="line-height: 1.6; color: #475569;">UKOM adalah gerbang terakhir menjadi perawat profesional. Kami menghadirkan platform persiapan Uji Kompetensi Perawat (Ners & D3) terlengkap dengan metode belajar yang simpel, fokus pada kata kunci (keywords), efektif, dan terukur.</p>
-                        <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr; gap: 15px;">
-                            <div style="background: #f0fdfa; padding: 20px; border-radius: 12px; text-align: center; border: 1px dashed #10b981;">
-                                <i class="fa-solid fa-file-circle-check text-success fa-3x mb-3"></i>
-                                <div style="font-size: 1rem; font-weight: 700; color: #065f46;">Ribuan Bank Soal & Tryout</div>
-                                <div style="font-size: 0.85rem; color: #065f46; opacity: 0.8; margin-top: 5px;">Update berkala sesuai Blueprint terbaru</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="background: #f8fafc; padding: 25px; border-radius: 15px; border: 1px solid #e2e8f0;">
-                        <h4 style="font-weight: 700; margin-bottom: 15px; color: var(--text-strong);">Keunggulan Utama:</h4>
-                        <ul style="list-style: none; padding: 0; font-size: 0.95rem; color: #64748b; display: flex; flex-direction: column; gap: 15px;">
-                            <li style="display: flex; align-items: start; gap: 12px;">
-                                <i class="fa-solid fa-calendar-check text-success" style="margin-top: 4px;"></i>
-                                <div style="color: var(--text-body);"><strong>Metode Lengkap & Up-to-Date:</strong> Kurikulum disusun berdasarkan kisi-kisi resmi PPNI terbaru.</div>
-                            </li>
-                            <li style="display: flex; align-items: start; gap: 12px;">
-                                <i class="fa-solid fa-display text-primary" style="margin-top: 4px;"></i>
-                                <div style="color: var(--text-body);"><strong>Teknologi Belajar Kekinian:</strong> Akses platform modern interaktif yang memudahkan belajar di mana saja.</div>
-                            </li>
-                            <li style="display: flex; align-items: start; gap: 12px;">
-                                <i class="fa-solid fa-laptop-code text-info" style="margin-top: 4px;"></i>
-                                <div style="color: var(--text-body);"><strong>Simulasi Try Out Mirip Asli:</strong> Latihan berbasis teknologi modern 100% sesuai format ujian Kompetensi.</div>
-                            </li>
-                            <li style="display: flex; align-items: start; gap: 12px;">
-                                <i class="fa-solid fa-brain text-warning" style="margin-top: 4px;"></i>
-                                <div style="color: var(--text-body);"><strong>Metode Belajar Smart:</strong> Pendekatan interaktif untuk memahami materi dengan lebih cepat dan mudah.</div>
-                            </li>
-                        </ul>
-                        <div style="margin-top: 25px;">
-                            <a href="https://bimbel.masandigital.com" target="_blank" class="btn btn-success btn-block btn-lg shadow-success" style="border-radius: 12px; padding: 15px; background: #10b981; border: none; color: white;">
-                                <i class="fa-solid fa-rocket mr-2"></i> Daftar Bimbel Sekarang
-                            </a>
-                            <p style="text-center; font-size: 0.8rem; color: #94a3b8; margin-top: 10px; text-align: center;">Investasikan masa depan Anda untuk kelulusan UKOM.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-  `;
-}
-
 // Router Simple
 function loadView(viewName) {
   const area = document.getElementById("content-area");
@@ -865,30 +663,55 @@ async function dashboardView(area) {
         </div>
     `;
 
-  const [resStats, resMendesak, resLive, resGap, resBoard] = await Promise.all([
-    fetchAPI("getDashboardStats", {
-      user_id: currentUser.id,
-      role: currentUser.role,
-    }),
-    currentUser.role.includes("preseptor")
-      ? fetchAPI("getMendesakLogs", { tempat_id: currentUser.tempat_id })
-      : Promise.resolve({ success: false }),
-    currentUser.role.includes("preseptor")
-      ? fetchAPI("getLiveAttendance", { tempat_id: currentUser.tempat_id })
-      : Promise.resolve({ success: false }),
-    currentUser.role.includes("preseptor")
-      ? fetchAPI("getCompetencyGap", { tempat_id: currentUser.tempat_id })
-      : Promise.resolve({ success: false }),
-    currentUser.role.includes("preseptor")
-      ? fetchAPI("getSkillLeaderboard")
-      : Promise.resolve({ success: false }),
-  ]);
+  const [resStats, resMendesak, resLive, resGap, resBoard, resAdminAn, resS] =
+    await Promise.all([
+      fetchAPI("getDashboardStats", {
+        user_id: currentUser.id,
+        role: currentUser.role,
+      }),
+      currentUser.role.includes("preseptor")
+        ? fetchAPI("getMendesakLogs", { tempat_id: currentUser.tempat_id })
+        : Promise.resolve({ success: false }),
+      currentUser.role.includes("preseptor")
+        ? fetchAPI("getLiveAttendance", { tempat_id: currentUser.tempat_id })
+        : Promise.resolve({ success: false }),
+      currentUser.role.includes("preseptor")
+        ? fetchAPI("getCompetencyGap", { tempat_id: currentUser.tempat_id })
+        : Promise.resolve({ success: false }),
+      currentUser.role.includes("preseptor")
+        ? fetchAPI("getSkillLeaderboard")
+        : Promise.resolve({ success: false }),
+      currentUser.role === "admin"
+        ? fetchAPI("getAdminAnalytics")
+        : Promise.resolve({ success: false }),
+      fetchAPI("getSettings"),
+    ]);
 
   updateNotifBadge();
   const container = document.getElementById("dashboard-widgets");
   const urgentContainer = document.getElementById("urgent-notif-container");
   const liveArea = document.getElementById("preseptor-live-area");
   const extraArea = document.getElementById("preseptor-extra-area");
+
+  // Broadcast Message
+  const bMsg =
+    resS.success && resS.data
+      ? resS.data.find((s) => s.key === "broadcast_message")?.value || ""
+      : "";
+  if (bMsg) {
+    urgentContainer.innerHTML =
+      `
+        <div class="alert bg-primary text-white animate-fade-in mb-4 d-flex align-center gap-3" style="border-radius:12px; border:none; box-shadow:0 10px 15px -3px rgba(37,99,235,0.2);">
+            <div style="background:rgba(255,255,255,0.2); width:35px; height:35px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i class="fa-solid fa-bullhorn fa-sm"></i>
+            </div>
+            <div style="flex:1; font-size:0.9rem; font-weight:500;">
+                <span style="opacity:0.8; font-size:0.75rem; display:block; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Pengumuman Sistem</span>
+                ${escapeHTML(bMsg)}
+            </div>
+        </div>
+      ` + urgentContainer.innerHTML;
+  }
 
   if (!resStats.success || !resStats.data) {
     container.innerHTML = `<div class="alert alert-danger">Gagal memuat statistik.</div>`;
@@ -917,64 +740,25 @@ async function dashboardView(area) {
     if (resGap.success && resGap.data) {
       gapHtml = `
                 <div class="card shadow-sm border-0" style="border-radius:16px;">
-                    <div class="card-header bg-white d-flex justify-between align-center wrap gap-2">
-                        <div>
-                          <h4 class="mb-0 font-bold"><i class="fa-solid fa-chart-line text-primary"></i> Gap Analysis Kompetensi</h4>
-                          <p class="text-xs text-muted mb-0">Kompetensi yang paling jarang dilakukan</p>
-                        </div>
-                        <select id="select-gap-angkatan" class="form-control" style="width:140px; font-size:0.75rem; padding:4px 8px; height:auto" onchange="window.refreshGapDashboard(this.value)">
-                            <option value="Semua">Semua Angkatan</option>
-                            ${(() => {
-                              const yrs = [];
-                              const curr = new Date().getFullYear();
-                              for (let i = curr + 1; i >= curr - 3; i--)
-                                yrs.push(i);
-                              return yrs
-                                .map(
-                                  (y) => `<option value="${y}">${y}</option>`,
-                                )
-                                .join("");
-                            })()}
-                        </select>
+                    <div class="card-header bg-white">
+                        <h4 class="mb-0 font-bold"><i class="fa-solid fa-chart-line text-primary"></i> Gap Analysis Kompetensi</h4>
+                        <p class="text-xs text-muted mb-0">Kompetensi yang paling jarang dilakukan di lahan ini</p>
                     </div>
                     <div class="card-body" style="padding:1rem;">
                         ${resGap.data
-                          .map((g) => {
-                            let text = escapeHTML(g.nama) || "";
-                            let firstNumIdx = text.search(/[0-9]+\./);
-                            let titlePart = text;
-                            let listPart = "";
-
-                            if (firstNumIdx !== -1) {
-                              titlePart = text.substring(0, firstNumIdx).trim();
-                              listPart = text.substring(firstNumIdx);
-                            }
-
-                            let formattedList = listPart.replace(
-                              /([0-9]+\.)/g,
-                              '<br><span style="color:var(--primary); font-weight:700; margin-right:4px;">$1</span>',
-                            );
-
-                            return `
-                            <div class="mb-3" style="padding-bottom:8px; border-bottom:1px solid #f8fafc;">
-                                <div class="d-flex justify-between align-start mb-1 gap-2">
-                                    <div style="flex:1; line-height:1.4;">
-                                        <div class="d-flex align-center gap-2 wrap mb-1">
-                                          <div style="font-weight:700; color:var(--primary-dark); font-size:0.85rem; border-bottom: 1px dashed #e2e8f0; display:inline-block;">${titlePart}</div>
-                                          <span class="badge" style="font-size:0.65rem; padding:2px 6px; ${g.angkatan === "Semua" ? "background:#f0fdf4; color:#166534; border:1px solid #bbf7d0" : "background:#f5f3ff; color:#5b21b6; border:1px solid #ddd6fe"}">
-                                            ${g.angkatan === "Semua" ? "Universal" : g.angkatan}
-                                          </span>
-                                        </div>
-                                        <div style="font-size:0.8rem; color:var(--text-strong); padding-left:2px;">${formattedList}</div>
-                                    </div>
-                                    <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem; align-self:start;">${g.count}x</span>
+                          .map(
+                            (g) => `
+                            <div class="mb-2">
+                                <div class="d-flex justify-between text-xs mb-1">
+                                    <span class="text-truncate" style="max-width:180px">${g.nama}</span>
+                                    <span class="font-bold">${g.count}x</span>
                                 </div>
-                                <div style="height:3px; background:#f1f5f9; border-radius:10px; overflow:hidden; margin-top:6px;">
-                                    <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.5"></div>
+                                <div style="height:4px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
+                                    <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.6"></div>
                                 </div>
                             </div>
-                        `;
-                          })
+                        `,
+                          )
                           .join("")}
                     </div>
                 </div>
@@ -1159,6 +943,142 @@ async function dashboardView(area) {
       "#ef4444",
       "penilaianAkhirView",
     );
+
+    // ADMIN EXTRA: ANALYTICS & TOOLS (PREMIUM DESIGN)
+    if (resAdminAn.success && resAdminAn.data) {
+      const an = resAdminAn.data;
+      const attRate = Math.round((an.activeToday / an.totalMhs) * 100) || 0;
+
+      html += `
+            <div class="card border-0 mt-5 animate-fade-up" style="grid-column: 1 / -1; border-radius:24px; background:white; box-shadow:0 20px 40px -10px rgba(79, 70, 229, 0.1); overflow:hidden;">
+                 <div class="card-header border-0 py-4 px-5 d-flex justify-between align-center" style="background: linear-gradient(90deg, #4f46e5, #7c3aed); color:white;">
+                    <div class="d-flex align-center gap-3">
+                        <div style="background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;">
+                            <i class="fa-solid fa-chart-line fa-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 font-bold" style="letter-spacing:-0.5px; font-size:1.2rem;">Executive Dashboard Analitik</h4>
+                            <p class="text-xs mb-0" style="opacity:0.8">Institutional Monitoring & Clinical Quality Analytics</p>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.15); font-size:0.75rem; padding:4px 12px; border-radius:20px; font-weight:600; border:1px solid rgba(255,255,255,0.2);">
+                        <i class="fa-solid fa-clock-rotate-left mr-1"></i> Real-time Update
+                    </div>
+                 </div>
+                 <div class="card-body p-4" style="background:#fafafa;">
+                    <div class="grid-cards" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1.25rem;">
+                        
+                        <!-- Attendance Stats (EMERALD VIBRANT) -->
+                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius:24px; border:1px solid #10b98133; box-shadow:0 10px 15px -3px rgba(16, 185, 129, 0.1); min-height:180px; text-align:center;">
+                            <div class="d-flex justify-between align-center mb-3 w-100">
+                                <div style="flex:1"></div>
+                                <div class="text-xs font-black" style="color:#065f46; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Presensi Real-Time</div>
+                                <div style="flex:1; display:flex; justify-content:flex-end">
+                                    <div class="badge bg-success text-white px-2" style="font-size:0.6rem; border-radius:30px; box-shadow:0 4px 6px -1px rgba(16, 185, 129, 0.4); font-weight:800;">LIVE</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex align-end justify-center gap-2 mb-1">
+                                    <span class="h1 font-black m-0" style="color:#064e3b; letter-spacing:-2px; line-height:1;">${an.activeToday}</span>
+                                    <span class="font-black mb-1" style="font-size:1.2rem; color:#059669">/ ${an.totalMhs}</span>
+                                </div>
+                                <div class="text-xs font-extrabold" style="color:#059669; text-transform:uppercase;">Mahasiswa Terdaftar</div>
+                            </div>
+                            <div class="mt-auto w-100">
+                                <div style="height:12px; background:rgba(6, 78, 59, 0.08); border-radius:10px; overflow:hidden; position:relative; border:1px solid rgba(16, 185, 129, 0.15); margin-bottom:12px;">
+                                    <div style="width:${attRate}%; height:100%; background:linear-gradient(90deg, #10b981, #34d399); border-radius:10px; box-shadow:0 0 15px rgba(16,185,129,0.4)"></div>
+                                </div>
+                                <div class="d-flex justify-center align-center gap-3">
+                                    <span class="text-xs font-black" style="color:#065f46; opacity:0.8; text-transform:uppercase;">Institutional Presence:</span>
+                                    <span class="text-sm font-black" style="color:#059669">${attRate}% <i class="fa-solid fa-arrow-trend-up ml-1"></i></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Activity Stats (AZURE BLUE) -->
+                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius:24px; border:1px solid #3b82f633; box-shadow:0 10px 15px -3px rgba(59, 130, 246, 0.1); min-height:180px; text-align:center;">
+                            <div class="d-flex justify-between align-center mb-3 w-100">
+                                <div style="flex:1"></div>
+                                <div class="text-xs font-black" style="color:#1e40af; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Kedisiplinan Logbook</div>
+                                <div style="flex:1; display:flex; justify-content:flex-end">
+                                    <div class="badge bg-primary text-white px-2" style="font-size:0.6rem; border-radius:30px; font-weight:800;">AKTIVITAS</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex align-end justify-center gap-2 mb-1">
+                                    <span class="h1 font-black m-0" style="color:#1e3a8a; letter-spacing:-2px; line-height:1;">${an.avgLogs}</span>
+                                    <span class="font-black mb-1" style="font-size:1.2rem; color:#2563eb">Log</span>
+                                </div>
+                                <div class="text-xs font-extrabold" style="color:#2563eb; text-transform:uppercase;">Avg Logbook Akhir</div>
+                            </div>
+                            <div class="d-flex gap-2 mt-auto w-100">
+                                <div style="flex:1; background:rgba(255,255,255,0.65); padding:10px; border-radius:16px; border:1px solid rgba(59, 130, 246, 0.15); backdrop-filter:blur(4px); display:flex; flex-direction: column; align-items:center; justify-content:center;">
+                                    <div class="text-xs font-black mb-1" style="color:#1e40af; font-size:0.65rem;">TOTAL DISIPLIN</div>
+                                    <div class="h4 m-0 font-black" style="color:var(--primary); line-height:1;">${an.totalLogs}</div>
+                                </div>
+                                <div style="flex:1; background:rgba(255,255,255,0.65); padding:10px; border-radius:16px; border:1px solid rgba(59, 130, 246, 0.15); backdrop-filter:blur(4px); display:flex; flex-direction: column; align-items:center; justify-content:center;">
+                                    <div class="text-xs font-black mb-1" style="color:#5b21b6; font-size:0.65rem;">PRODUKTIVITAS</div>
+                                    <div class="h5 m-0 font-black" style="color:#7c3aed; line-height:1; letter-spacing:0.5px;">TINGGI</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Prodi Performance List (LAVENDER PINK) -->
+                        <div class="p-4 d-flex flex-column align-center" style="background:linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%); border-radius:24px; border:1px solid #d946ef33; box-shadow:0 10px 15px -3px rgba(217, 70, 239, 0.1); grid-column: span 2; text-align:center;">
+                            <div class="text-xs font-black mb-4" style="color:#701a75; text-transform:uppercase; letter-spacing:1px; opacity:0.8;">Clinical Average Scoring per Prodi</div>
+                            <div class="d-flex gap-3 wrap justify-center">
+                                ${an.prodiStats
+                                  .map(
+                                    (p) => `
+                                    <div style="background:rgba(255,255,255,0.75); border:1px solid rgba(217, 70, 239, 0.2); border-radius:20px; padding:18px 24px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.03); min-width:220px; backdrop-filter:blur(10px); transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;" onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 20px 25px -5px rgba(217, 70, 239, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.03)';">
+                                        <div class="text-xs font-extrabold mb-3" style="color:#a21caf; letter-spacing:0.3px; text-transform:uppercase;">${p.nama}</div>
+                                        <div class="d-flex align-center justify-center gap-3">
+                                            <span class="h2 font-black m-0" style="color:#4a044e; letter-spacing:-1.5px; line-height:1;">${p.avg}</span>
+                                            <div style="width:42px; height:42px; border-radius:14px; background:linear-gradient(135deg, #d946ef, #a21caf); color:white; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 15px rgba(162, 28, 175, 0.3); transform: rotate(-5deg);">
+                                                <i class="fa-solid fa-trophy fa-sm"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `,
+                                  )
+                                  .join("")}
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- Broadcast Hub (Premium Glassy Design) -->
+            <div class="card border-0 mt-4 animate-fade-up" style="grid-column: 1 / -1; border-radius:24px; background:linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color:white; overflow:hidden; position:relative;">
+                 <div style="position:absolute; top:-50px; right:-50px; width:200px; height:200px; background:rgba(124, 58, 237, 0.2); border-radius:50%; filter:blur(60px);"></div>
+                 <div style="position:absolute; bottom:-40px; left:-40px; width:150px; height:150px; background:rgba(79, 70, 229, 0.3); border-radius:50%; filter:blur(50px);"></div>
+                 
+                 <div class="card-body d-flex align-center gap-1 py-5 px-5" style="position:relative; z-index:1;">
+                    <div style="flex:1">
+                        <div class="d-flex align-center gap-3 mb-2">
+                             <div style="width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.3)">
+                                <i class="fa-solid fa-bullhorn fa-sm text-white"></i>
+                             </div>
+                             <h4 class="m-0 font-bold" style="letter-spacing:-0.5px;">Broadcast Hub Central</h4>
+                        </div>
+                        <p class="text-sm mb-0" style="opacity:0.8; max-width:480px;">Kirim pengumuman vital ke layar Utama seluruh entitas (Mahasiswa & Preseptor) dalam satu klik.</p>
+                    </div>
+                    
+                    <div class="d-flex gap-3 align-center" style="background:rgba(255,255,255,0.1); padding:10px; border-radius:20px; border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(10px);">
+                        <input type="text" id="bc-message" class="form-control" style="width:340px; height:46px; border:none; border-radius:14px; background:rgba(255,255,255,0.1); color:white; padding-left:20px; font-size:0.95rem;" placeholder="Ketik pengumuman penting di sini...">
+                        <button class="btn" style="height:46px; width:100px; background:white; color:#1e1b4b; border-radius:14px; font-weight:800; border:none; box-shadow:0 10px 20px -5px rgba(255,255,255,0.3); transition:all 0.3s;" onclick="eksekusiBroadcast()">
+                            <i class="fa-solid fa-paper-plane mr-2"></i> KIRIM
+                        </button>
+                    </div>
+                 </div>
+            </div>
+            <style>
+                #bc-message::placeholder { color: rgba(255,255,255,0.5); }
+                #bc-message:focus { outline:none; background:rgba(255,255,255,0.15); }
+                .btn:active { transform: scale(0.95); }
+            </style>
+        `;
+    }
   } else if (currentUser.role.includes("preseptor")) {
     html += createWidget(
       "fa-solid fa-user-check",
@@ -1795,22 +1715,6 @@ async function kompetensiView(area) {
   const chartsBody = document.getElementById("kompetensi-charts-body");
   if (!chartsBody) return;
 
-  // Tampilkan badge rombongan mahasiswa
-  const rombonganBadge = res.angkatan
-    ? `<div style="margin-bottom:1.2rem; padding:10px 16px; background:linear-gradient(135deg,#ede9fe,#ddd6fe); border-radius:10px; border-left:4px solid #7c3aed; display:flex; align-items:center; gap:10px;">
-        <i class="fa-solid fa-layer-group" style="color:#7c3aed; font-size:1.2rem;"></i>
-        <div>
-          <div style="font-weight:700; color:#5b21b6; font-size:0.9rem;">Kompetensi Rombongan Praktik Anda</div>
-          <div style="font-size:0.8rem; color:#6d28d9;">Angkatan <strong>${res.angkatan}</strong> — Data hanya menampilkan kompetensi sesuai rombongan Anda</div>
-        </div>
-      </div>`
-    : `<div style="margin-bottom:1.2rem; padding:10px 16px; background:#fef3c7; border-radius:10px; border-left:4px solid #f59e0b; display:flex; align-items:center; gap:10px;">
-        <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i>
-        <div style="font-size:0.85rem; color:#92400e;">Rombongan praktik belum ditetapkan. Kompetensi yang ditampilkan adalah kompetensi universal. Hubungi admin untuk penetapan angkatan.</div>
-      </div>`;
-
-  chartsBody.insertAdjacentHTML("afterbegin", rombonganBadge);
-
   if (res.success && res.data.length > 0) {
     // Kelompokkan berdasarkan kategori
     const grouped = {};
@@ -1919,8 +1823,8 @@ async function nilaiMahasiswaView(area) {
         </div>
     `;
 
-  // Kita gunakan endpoint getPenilaianAkhir yang sudah ada, lalu filter by user id di server
-  const res = await fetchAPI("getPenilaianAkhir", { user_id: currentUser.id });
+  // Kita gunakan endpoint getPenilaianAkhir yang sudah ada, lalu filter by user id
+  const res = await fetchAPI("getPenilaianAkhir");
   const container = document.getElementById("nilai-mhs-content");
 
   if (res.success && res.data) {
@@ -2208,9 +2112,10 @@ async function mahasiswaView(area) {
   const tableBody = document.querySelector("#table-mhs-bimb tbody");
   if (!tableBody) return;
 
-  const [resAssigned, resTempat] = await Promise.all([
+  const [resAssigned, resTempat, resGroups] = await Promise.all([
     fetchAPI("getAssignedStudents", { tempat_id: currentUser.tempat_id }),
     fetchCachedAPI("getTempat"),
+    fetchAPI("getKelompok"),
   ]);
 
   if (!resAssigned.success) {
@@ -2342,9 +2247,12 @@ async function mahasiswaView(area) {
       if (displayData.length > 0) {
         tableBody.innerHTML = displayData
           .map((u, idx) => {
-            const myRekap = rekap[u.id] || [];
+            const myData = (resRekap.data || []).find(
+              (x) => x.user_id === u.id,
+            );
+            const myRekap = myData ? myData.rekap || [] : [];
             const completed = myRekap.filter(
-              (r) => r.status === "Selesai",
+              (r) => r.status === "Tercapai",
             ).length;
             const targets = myRekap.length;
             const pct =
@@ -2352,16 +2260,22 @@ async function mahasiswaView(area) {
             const progressColor =
               pct >= 100 ? "var(--success)" : "var(--primary)";
 
+            const myKel = (resGroups.data || []).find(
+              (g) => g.id === u.kelompok_id,
+            );
+            const kelNama = myKel ? myKel.nama_kelompok : "Tanpa Kelompok";
+
             return `
                     <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
                         <td>
-                            <div class="d-flex align-center gap-2">
+                            <div class="d-flex align-center gap-3">
                                 <div style="width:35px;height:35px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem">
                                     ${u.nama.charAt(0)}
                                 </div>
-                                <div>
-                                    <div class="font-bold">${u.nama}</div>
-                                    <div class="text-xs text-muted"><i class="fa-solid fa-users"></i> ${u.groups?.nama_kelompok || "Tanpa Kelompok"}</div>
+                                <div style="flex:1">
+                                    <div class="font-bold" style="color:var(--text-strong)">${u.nama}</div>
+                                    <div class="text-xs text-muted mb-1"><i class="fa-solid fa-users"></i> ${kelNama}</div>
+                                    <div class="text-xs font-medium" style="color:var(--primary)">${u.username || u.id}</div>
                                 </div>
                                 ${u.sudahDinilai ? '<i class="fa-solid fa-circle-check text-success" title="Sudah memiliki nilai final"></i>' : ""}
                             </div>
@@ -2561,23 +2475,10 @@ async function penilaianAkhirView(area) {
                         </div>
                     </div>
                     <div class="d-flex align-center gap-2 wrap">
-                        <div class="filter-group d-flex align-center gap-2" style="position:relative">
-                             <div class="custom-multi-select" id="kelompok-check-container">
-                                 <button class="btn btn-outline btn-sm d-flex align-center gap-2" onclick="document.getElementById('kelompok-check-list').classList.toggle('hidden')" style="background:white; border:1px solid #cbd5e1; padding: 0.5rem 1rem;">
-                                    <i class="fa-solid fa-filter-list text-primary"></i> 
-                                    <span>Filter Kelompok</span>
-                                    <span id="kelompok-select-count" class="badge bg-primary text-white" style="font-size:0.7rem; padding:2px 6px;">0</span>
-                                 </button>
-                                 <div id="kelompok-check-list" class="hidden animate-fade-in" style="position:absolute; top:45px; right:0; z-index:1000; background:white; border:1px solid #e2e8f0; border-radius:12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); width:280px; max-height:350px; overflow-y:auto; padding:15px;">
-                                     <div class="d-flex justify-between align-center mb-3">
-                                         <strong style="font-size:0.85rem">Pilih Kelompok</strong>
-                                         <button class="btn-icon-ghost" onclick="resetKelompokFilter()" title="Reset Filter"><i class="fa-solid fa-rotate-left text-muted"></i></button>
-                                     </div>
-                                     <div id="kelompok-options-area" class="d-flex flex-column gap-1">
-                                         <!-- Checkboxes dynamically generated -->
-                                     </div>
-                                 </div>
-                             </div>
+                        <div class="filter-group d-flex align-center gap-2">
+                             <select id="filter-prodi-assessment" class="form-control" style="width:180px; padding:0.4rem;">
+                                <option value="all">Semua Prodi</option>
+                            </select>
                         </div>
                         <div class="btn-group d-flex gap-2">
                              <button class="btn btn-outline btn-sm" onclick="exportAssessmentCSV()"><i class="fa-solid fa-file-csv"></i> CSV</button>
@@ -2592,16 +2493,15 @@ async function penilaianAkhirView(area) {
                             <thead>
                                 <tr>
                                     <th>Nama Mahasiswa</th>
-                                    <th>Kelompok</th>
-                                    <th>Skor</th>
-                                    <th>Kontrib.</th>
-                                    <th>Skor</th>
-                                    <th>Kontrib.</th>
+                                    <th>Prodi</th>
+                                    <th>Praktikum (40%)</th>
+                                    <th>ASKEP (40%)</th>
+                                    <th>Sikap (20%)</th>
                                     <th>NILAI AKHIR</th>
                                     <th>STATUS</th>
                                 </tr>
                             </thead>
-                            <tbody><tr><td colspan="8" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menghitung skor...</td></tr></tbody>
+                            <tbody><tr><td colspan="7" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menghitung skor...</td></tr></tbody>
                         </table>
                     </div>
                  </div>
@@ -2610,9 +2510,9 @@ async function penilaianAkhirView(area) {
     `;
 
   showLoader(true);
-  const [allRes, resKelompok] = await Promise.all([
+  const [allRes, prodiRes] = await Promise.all([
     fetchAPI("getPenilaianAkhir"),
-    fetchCachedAPI("getKelompok"),
+    fetchAPI("getProdi"),
   ]);
   showLoader(false);
 
@@ -2620,6 +2520,7 @@ async function penilaianAkhirView(area) {
     return showToast("Gagal", "Gagal memuat data penilaian", "error");
 
   const tableBody = document.querySelector("#table-final-scores tbody");
+  const prodiSelect = document.getElementById("filter-prodi-assessment");
   const thresholdInfo = document.getElementById("status-threshold-info");
 
   const activeThreshold = allRes.threshold || 75;
@@ -2631,15 +2532,17 @@ async function penilaianAkhirView(area) {
 
   thresholdInfo.innerHTML = `Rumus: (Prak ${w.prak}%) + (ASKEP ${w.askep}%) + (Sikap ${w.sikap}%). <strong>Nilai = ${wKlinik}% Klinik + ${wAkademik}% Akademik</strong>. Batas Lulus: <strong>${activeThreshold}</strong>`;
 
+  // Update Table Headers
   const tableHeader = document.querySelector("#table-final-scores thead tr");
   tableHeader.innerHTML = `
         <th rowspan="2">Nama Mahasiswa</th>
-        <th rowspan="2">Kelompok</th>
+        <th rowspan="2">Prodi</th>
         <th colspan="2" class="text-center" style="background:#e0f2fe; border-bottom:1px solid #bae6fd;">Preseptor Klinik (${wKlinik}%)</th>
         <th colspan="2" class="text-center" style="background:#fef3c7; border-bottom:1px solid #fde68a;">Preseptor Akademik (${wAkademik}%)</th>
         <th rowspan="2">NILAI AKHIR</th>
         <th rowspan="2">STATUS</th>
     `;
+  // Add sub-header row
   const subHeaderRow = document.createElement("tr");
   subHeaderRow.innerHTML = `
         <th style="background:#e0f2fe; font-size:0.75rem">Skor</th>
@@ -2649,6 +2552,15 @@ async function penilaianAkhirView(area) {
     `;
   tableHeader.parentElement.appendChild(subHeaderRow);
 
+  if (prodiRes.success && prodiRes.data) {
+    prodiRes.data.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p.nama_prodi;
+      opt.textContent = p.nama_prodi;
+      prodiSelect.appendChild(opt);
+    });
+  }
+
   const renderAssessmentTable = (data) => {
     window.dtAssessmentView = data;
     if (!data || data.length === 0) {
@@ -2656,7 +2568,12 @@ async function penilaianAkhirView(area) {
       return;
     }
 
-    data.sort((a, b) => (a.nama || "").localeCompare(b.nama || ""));
+    // Sort data by nama alphabetically
+    data.sort((a, b) => {
+      const nameA = a.nama || "";
+      const nameB = b.nama || "";
+      return nameA.localeCompare(nameB);
+    });
 
     tableBody.innerHTML = data
       .map((row, idx) => {
@@ -2667,7 +2584,7 @@ async function penilaianAkhirView(area) {
         return `
                 <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
                     <td><strong>${row.nama}</strong><br><small class="text-muted">${row.username}</small></td>
-                    <td><span class="badge bg-primary-soft text-primary" style="font-weight:600">${row.kelompok || "-"}</span></td>
+                    <td><span class="badge bg-primary-soft text-primary" style="font-weight:600">${row.prodi || "-"}</span></td>
                     <td style="background:#f0f9ff">${row.klinik_total.toFixed(2)}</td>
                     <td style="background:#f0f9ff"><strong>${((row.klinik_total * wKlinik) / 100).toFixed(2)}</strong></td>
                     <td style="background:#fffbeb">${row.akademik_total.toFixed(2)}</td>
@@ -2680,59 +2597,20 @@ async function penilaianAkhirView(area) {
       .join("");
   };
 
-  if (resKelompok.success && resKelompok.data) {
-    const optionsArea = document.getElementById("kelompok-options-area");
-    optionsArea.innerHTML = resKelompok.data
-      .map(
-        (k) => `
-            <label class="d-flex align-center gap-2" style="cursor:pointer; font-size:0.82rem; padding:6px 10px; border-radius:8px; transition:all 0.2s" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
-                <input type="checkbox" class="kelompok-filter-check" value="${k.nama_kelompok}" onchange="window.filterAssessmentMulti()">
-                <span>${k.nama_kelompok}</span>
-            </label>
-        `,
-      )
-      .join("");
-  }
-
-  window.filterAssessmentMulti = () => {
-    const checked = Array.from(
-      document.querySelectorAll(".kelompok-filter-check:checked"),
-    ).map((cb) => cb.value);
-    const countBadge = document.getElementById("kelompok-select-count");
-    countBadge.textContent = checked.length;
-
-    if (checked.length === 0) {
-      renderAssessmentTable(window.rawAssessmentData);
-    } else {
-      const filtered = window.rawAssessmentData.filter((d) =>
-        checked.includes(d.kelompok),
-      );
-      renderAssessmentTable(filtered);
-    }
-  };
-
-  window.resetKelompokFilter = () => {
-    document
-      .querySelectorAll(".kelompok-filter-check")
-      .forEach((cb) => (cb.checked = false));
-    window.filterAssessmentMulti();
-    document.getElementById("kelompok-check-list").classList.add("hidden");
-  };
-
   if (allRes.success) {
     window.rawAssessmentData = allRes.data;
     renderAssessmentTable(window.rawAssessmentData);
   }
 
-  // Close dropdown when clicking outside
-  const closeDropdown = (e) => {
-    const container = document.getElementById("kelompok-check-container");
-    const list = document.getElementById("kelompok-check-list");
-    if (container && !container.contains(e.target)) {
-      list.classList.add("hidden");
+  prodiSelect.onchange = (e) => {
+    const val = e.target.value;
+    if (val === "all") {
+      renderAssessmentTable(window.rawAssessmentData);
+    } else {
+      const filtered = window.rawAssessmentData.filter((d) => d.prodi === val);
+      renderAssessmentTable(filtered);
     }
   };
-  document.addEventListener("click", closeDropdown);
 }
 
 window.exportAssessmentCSV = () => {
@@ -2742,7 +2620,7 @@ window.exportAssessmentCSV = () => {
   const headers = [
     "Nama",
     "NIM",
-    "Kelompok",
+    "Prodi",
     "Skor Klinik",
     `Kontrib. Klinik (${wK}%)`,
     "Skor Akademik",
@@ -2753,13 +2631,13 @@ window.exportAssessmentCSV = () => {
   const rows = window.dtAssessmentView.map((r) => [
     r.nama,
     r.username,
-    r.kelompok || "-",
+    r.prodi || "-",
     r.klinik_total.toFixed(2),
     ((r.klinik_total * wK) / 100).toFixed(2),
     r.akademik_total.toFixed(2),
     ((r.akademik_total * wA) / 100).toFixed(2),
     r.total.toFixed(2),
-    r.total >= activeThreshold ? "LULUS" : "TIDAK LULUS",
+    r.total >= window.lastAssessmentThreshold ? "LULUS" : "TIDAK LULUS",
   ]);
 
   downloadCSV(
@@ -2832,6 +2710,85 @@ window.hapusSemuaNilai = async () => {
     }
   }
 };
+
+window.eksekusiGenerateJadwal = async (batchNum = null) => {
+  const kelIds = Array.from(
+    document.querySelectorAll('input[name="sel-kelompok"]:checked'),
+  ).map((cb) => cb.value);
+
+  const selects = document.querySelectorAll(".select-tempat-preview");
+  const assignments = [];
+
+  selects.forEach((sel) => {
+    const kelId = sel.getAttribute("data-kelompok");
+    const staseNo = parseInt(sel.getAttribute("data-stase"));
+    const tempatId = sel.value;
+    const staseInfo = window.currentStaseConfig.find(
+      (s) => s.stase === staseNo,
+    );
+
+    if (tempatId) {
+      assignments.push({
+        kelompok_id: kelId,
+        tempat_id: tempatId,
+        tgl_mulai: staseInfo.start,
+        tgl_selesai: staseInfo.end,
+      });
+    }
+  });
+
+  if (assignments.length === 0)
+    return showToast(
+      "Warning",
+      "Tidak ada pemetaan tempat yang dipilih",
+      "warning",
+    );
+
+  const clearExisting = document.getElementById("check-clear-jadwal").checked;
+  const shiftCount = document.getElementById(
+    "input-jumlah-shift-kelompok",
+  ).value;
+  const startTime = document.getElementById("input-jam-mulai-kelompok").value;
+
+  if (
+    confirm("Simpan jadwal ini ke database? Perubahan tidak dapat dibatalkan.")
+  ) {
+    showLoader(true);
+    if (batchNum) {
+      await postAPI("saveSettings", {
+        [`batch_kelompok_${batchNum}`]: kelIds.join(","),
+      });
+    }
+    const res = await postAPI("generateJadwalKelompok", {
+      assignments,
+      clearExisting,
+      shiftCount,
+      startTime,
+      batch: batchNum,
+      kelompokIds: kelIds,
+    });
+    showLoader(false);
+    if (res.success) {
+      showToast("Berhasil", res.message, "success");
+      loadView(batchNum ? `jadwalAdmin${batchNum}View` : "jadwalAdminView");
+    } else {
+      showToast("Gagal", res.message, "error");
+    }
+  }
+};
+
+window.selectAllKelompok = (state) => {
+  document
+    .querySelectorAll('input[name="sel-kelompok"]')
+    .forEach((cb) => (cb.checked = state));
+};
+
+// BATCH VIEW FACTORIES
+[1, 2, 3].forEach((n) => {
+  window[`generatorKelompok${n}View`] = (area) =>
+    generatorKelompokView(area, n);
+  window[`jadwalAdmin${n}View`] = (area) => jadwalAdminView(area, n);
+});
 
 window.backupDataJSON = async () => {
   showLoader(true);
@@ -3316,16 +3273,30 @@ async function adminLaporanView(area) {
 }
 
 // ============ GENERATE JADWAL VIEW ============
-async function generatorKelompokView(area) {
+async function generatorKelompokView(area, batchNum = null) {
+  const batchSuffix = batchNum ? ` ${batchNum}` : "";
   area.innerHTML = `
         <div class="animate-fade-up">
             <div class="card mb-4" style="border-top: 4px solid var(--primary);">
                 <div class="card-header">
-                    <h3 class="m-0"><i class="fa-solid fa-calendar-days text-primary"></i> Generator Jadwal Praktik Kelompok</h3>
-                    <p class="text-muted mt-1" style="font-size:0.85rem;">Buat jadwal penempatan stase secara massal berdasarkan Kelompok.</p>
+                    <h3 class="m-0"><i class="fa-solid fa-calendar-days text-primary"></i> Generator Jadwal Praktik Kelompok${batchSuffix}</h3>
+                    <p class="text-muted mt-1" style="font-size:0.85rem;">Buat jadwal penempatan stase secara massal berdasarkan Kelompok${batchSuffix}.</p>
                 </div>
                 <div class="card-body">
                     <form id="form-generate-jadwal">
+                        <div class="form-group mb-4">
+                            <div class="d-flex justify-between align-center mb-2">
+                                <label class="m-0">Pilih Kelompok untuk Batch ini</label>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-xs btn-outline" onclick="selectAllKelompok(true)">Pilih Semua</button>
+                                    <button type="button" class="btn btn-xs btn-outline" onclick="selectAllKelompok(false)">Hapus Semua</button>
+                                </div>
+                            </div>
+                            <div id="kelompok-selector-container" class="d-flex flex-wrap gap-2 p-3 bg-light rounded" style="max-height: 200px; overflow-y: auto;">
+                                <i class="fa-solid fa-spinner fa-spin text-primary"></i> Memuat daftar kelompok...
+                            </div>
+                        </div>
+
                         <div class="grid" style="grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:1rem">
                             <div class="form-group mb-0">
                                 <label>Tanggal Mulai Periode Pertama</label>
@@ -3376,7 +3347,7 @@ async function generatorKelompokView(area) {
                         </table>
                     </div>
                     <div class="d-flex justify-end mt-4">
-                        <button class="btn btn-success" onclick="eksekusiGenerateJadwal()">
+                        <button class="btn btn-success" onclick="eksekusiGenerateJadwal(${batchNum})">
                             <i class="fa-solid fa-floppy-disk"></i> Simpan ke Database
                         </button>
                     </div>
@@ -3386,15 +3357,41 @@ async function generatorKelompokView(area) {
     `;
 
   showLoader(true);
-  const [resKelompok, resTempat] = await Promise.all([
-    fetchCachedAPI("getKelompok"),
+  const [resKelompok, resTempat, resSettings] = await Promise.all([
+    fetchAPI("getKelompok"),
     fetchCachedAPI("getTempat"),
+    fetchAPI("getSettings"),
   ]);
   showLoader(false);
 
   if (!resKelompok.success || !resTempat.success) {
     showToast("Error", "Gagal memuat master data (Kelompok/Tempat)", "error");
     return;
+  }
+
+  const settingKey = batchNum ? `batch_kelompok_${batchNum}` : null;
+  const savedKelompokIds =
+    settingKey && resSettings.success
+      ? (resSettings.data.find((s) => s.key === settingKey)?.value || "").split(
+          ",",
+        )
+      : [];
+
+  const kelSelector = document.getElementById("kelompok-selector-container");
+  if (kelSelector) {
+    kelSelector.innerHTML = resKelompok.data
+      .map((k) => {
+        const isChecked = savedKelompokIds.includes(String(k.id))
+          ? "checked"
+          : "";
+        return `
+                <label class="d-flex align-center gap-2 p-2 rounded cursor-pointer hover-bg-primary-soft border" style="background:white; min-width:150px;">
+                    <input type="checkbox" name="sel-kelompok" value="${k.id}" ${isChecked}>
+                    <span class="text-sm font-bold">${k.nama_kelompok}</span>
+                </label>
+            `;
+      })
+      .join("");
   }
 
   window.masterKelompokForJadwal = resKelompok.data;
@@ -3415,7 +3412,7 @@ async function generatorKelompokView(area) {
     for (let i = 1; i <= count; i++) {
       let startD = new Date(baseDate);
       let endD = new Date(baseDate);
-      endD.setDate(baseDate.getDate() + 6); // 1 week is 7 days inclusive
+      endD.setDate(baseDate.getDate() + 6);
 
       const formatD = (d) => {
         const year = d.getFullYear();
@@ -3443,7 +3440,6 @@ async function generatorKelompokView(area) {
                 </div>
             `;
 
-      // Advance by 7 days for the next rotation
       baseDate.setDate(baseDate.getDate() + 7);
     }
     container.innerHTML = html;
@@ -3456,22 +3452,24 @@ async function generatorKelompokView(area) {
   document
     .getElementById("input-tanggal-mulai")
     .addEventListener("input", renderStaseConfig);
-  renderStaseConfig(); // initial
+  renderStaseConfig();
 }
 
 window.generatePreviewJadwal = () => {
-  const staseCount = parseInt(
-    document.getElementById("input-jumlah-stase").value,
+  const kelIds = Array.from(
+    document.querySelectorAll('input[name="sel-kelompok"]:checked'),
+  ).map((cb) => cb.value);
+  if (kelIds.length === 0)
+    return showToast("Peringatan", "Pilih minimal satu kelompok", "warning");
+
+  const kelompokList = window.masterKelompokForJadwal.filter((k) =>
+    kelIds.includes(String(k.id)),
   );
-  const kelompokList = window.masterKelompokForJadwal || [];
   const tempatList = window.masterTempatForJadwal || [];
 
-  if (kelompokList.length === 0)
-    return showToast(
-      "Peringatan",
-      "Belum ada master kelompok mahasiswa!",
-      "warning",
-    );
+  if (kelompokList.length === 0) {
+    return showToast("Peringatan", "Kelompok tidak ditemukan", "warning");
+  }
   if (tempatList.length === 0)
     return showToast(
       "Peringatan",
@@ -3479,18 +3477,20 @@ window.generatePreviewJadwal = () => {
       "warning",
     );
 
+  const staseCount =
+    parseInt(document.getElementById("input-jumlah-stase").value) || 0;
   const staseData = [];
   for (let i = 1; i <= staseCount; i++) {
-    const start = document.querySelector(
-      `.stase-start[data-stase="${i}"]`,
-    ).value;
-    const end = document.querySelector(`.stase-end[data-stase="${i}"]`).value;
-    if (!start || !end)
+    const startEl = document.querySelector(`.stase-start[data-stase="${i}"]`);
+    const endEl = document.querySelector(`.stase-end[data-stase="${i}"]`);
+    if (!startEl || !endEl || !startEl.value || !endEl.value)
       return showToast(
         "Validasi",
         `Harap lengkapi tanggal untuk stase ${i}`,
         "error",
       );
+    const start = startEl.value;
+    const end = endEl.value;
     if (new Date(start) > new Date(end))
       return showToast(
         "Validasi",
@@ -3514,11 +3514,6 @@ window.generatePreviewJadwal = () => {
   headHtml += `</tr>`;
   tableHead.innerHTML = headHtml;
 
-  // Build tempat options
-  const tempatSelect = tempatList
-    .map((t) => `<option value="${t.id}">${t.nama_tempat}</option>`)
-    .join("");
-
   // Body
   let bodyHtml = "";
   kelompokList.forEach((k, idx) => {
@@ -3527,7 +3522,6 @@ window.generatePreviewJadwal = () => {
             <td style="text-align:center"><span class="badge bg-primary-soft text-primary">${k.jumlah_anggota || 0}</span></td>
         `;
     staseData.forEach((s, sIdx) => {
-      // Default Round-Robin logic for initial selection
       const defaultTempatIdx = (idx + sIdx) % tempatList.length;
       const t = tempatList[defaultTempatIdx];
 
@@ -3549,69 +3543,7 @@ window.generatePreviewJadwal = () => {
     .getElementById("preview-jadwal-container")
     .classList.remove("hidden");
 
-  // Store stase parameters globally to be accessed later during save
   window.currentStaseConfig = staseData;
-};
-
-window.eksekusiGenerateJadwal = async () => {
-  const selects = document.querySelectorAll(".select-tempat-preview");
-  const assignments = [];
-
-  // Construct assignments payload
-  selects.forEach((sel) => {
-    const kelId = sel.getAttribute("data-kelompok");
-    const staseNo = parseInt(sel.getAttribute("data-stase"));
-    const tempatId = sel.value;
-    const staseInfo = window.currentStaseConfig.find(
-      (s) => s.stase === staseNo,
-    );
-
-    if (tempatId) {
-      assignments.push({
-        kelompok_id: kelId,
-        tempat_id: tempatId,
-        tgl_mulai: staseInfo.start,
-        tgl_selesai: staseInfo.end,
-      });
-    }
-  });
-
-  if (assignments.length === 0)
-    return showToast(
-      "Warning",
-      "Tidak ada pemetaan tempat yang dipilih",
-      "warning",
-    );
-
-  const clearExisting = document.getElementById("check-clear-jadwal").checked;
-  const shiftCount = document.getElementById(
-    "input-jumlah-shift-kelompok",
-  ).value;
-  const startTime = document.getElementById("input-jam-mulai-kelompok").value;
-
-  if (
-    !confirm(
-      `Anda akan membuat ${assignments.length} pusingan jadwal grup.\n\nLanjutkan proses penyimpanan?`,
-    )
-  )
-    return;
-
-  showLoader(true);
-  showToast("Memproses", "Menyusun jadwal...", "info");
-  const res = await postAPI("generateJadwalKelompok", {
-    assignments,
-    clearExisting,
-    shiftCount,
-    startTime,
-  });
-  showLoader(false);
-
-  if (res.success) {
-    showToast("Berhasil", res.message, "success");
-    document.getElementById("preview-jadwal-container").classList.add("hidden");
-  } else {
-    showToast("Gagal", res.message, "error");
-  }
 };
 
 async function rekapLogbookAdminView(area) {
@@ -3620,13 +3552,10 @@ async function rekapLogbookAdminView(area) {
             <div class="card">
                 <div class="card-header d-flex justify-between align-center wrap gap-3">
                     <h3 class="m-0"><i class="fa-solid fa-chart-pie text-primary"></i> Rekapan Logbook Mahasiswa</h3>
-                    <div class="d-flex gap-2 wrap">
-                        <select id="filter-angkatan-rekap" class="form-control" style="width:180px; font-size:0.85rem;" onchange="renderRekapTable()">
-                          <option value="">Semua Angkatan</option>
-                        </select>
-                        <div class="input-with-icon" style="width:220px;">
+                    <div class="d-flex gap-2">
+                        <div class="input-with-icon" style="width:250px;">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="search-rekap" class="form-control" placeholder="Cari nama mahasiswa..." oninput="renderRekapTable()">
+                            <input type="text" id="search-rekap" class="form-control" placeholder="Cari nama mahasiswa...">
                         </div>
                         <button class="btn btn-outline btn-sm" onclick="exportRekapCSV()"><i class="fa-solid fa-file-csv"></i> Unduh Rekap</button>
                     </div>
@@ -3655,112 +3584,90 @@ async function rekapLogbookAdminView(area) {
   window.dtRekapLog = [];
   if (res.success && res.data) {
     window.dtRekapLog = res.data;
-
-    // Populate angkatan filter
-    const angkatanSet = new Set();
-    res.data.forEach((m) => {
-      if (m.angkatan && m.angkatan !== "-") angkatanSet.add(m.angkatan);
-    });
-    const selRekap = document.getElementById("filter-angkatan-rekap");
-    if (selRekap) {
-      [...angkatanSet].sort().forEach((a) => {
-        const opt = document.createElement("option");
-        opt.value = a;
-        opt.textContent = `Angkatan ${a}`;
-        selRekap.appendChild(opt);
-      });
-    }
-
-    window.renderRekapTable = () => {
-      const q = (
-        document.getElementById("search-rekap")?.value || ""
-      ).toLowerCase();
-      const angkFilter =
-        document.getElementById("filter-angkatan-rekap")?.value || "";
-      const filtered = res.data.filter((m) => {
-        const matchNama = m.nama.toLowerCase().includes(q);
-        const matchAngk = !angkFilter || m.angkatan == angkFilter;
-        return matchNama && matchAngk;
-      });
-
-      if (filtered.length === 0) {
+    const render = (data) => {
+      if (data.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Tidak ada data ditemukan</td></tr>`;
         return;
       }
-      tableBody.innerHTML = filtered
-        .map((m) => {
+      tableBody.innerHTML = data
+        .map((m, idx) => {
           const totalTercapai = m.rekap.filter(
             (r) => r.status === "Tercapai",
           ).length;
           const totalTarget = m.rekap.length;
-          const angkatanBadge =
-            m.angkatan && m.angkatan !== "-"
-              ? `<span class="badge" style="font-size:0.72rem; background:#ede9fe; color:#6d28d9; margin-top:4px; display:inline-block;"><i class="fa-solid fa-users"></i> Angkatan ${m.angkatan}</span>`
-              : "";
 
           return `
-              <tr class="animate-fade-up">
-                  <td style="width:250px; vertical-align:top">
-                      <strong>${m.nama}</strong><br>
-                      <small class="text-muted">${m.prodi}</small>
-                      ${angkatanBadge}
-                      <div class="mt-2">
-                           <span class="badge ${totalTercapai === totalTarget ? "bg-success" : "bg-warning"}" style="font-size:0.75rem">
-                              ${totalTercapai} / ${totalTarget} Kompetensi
-                           </span>
-                      </div>
-                      <button class="btn btn-primary-soft btn-sm mt-3" onclick="toggleRekapDetail('${m.user_id}')" id="btn-toggle-${m.user_id}">
-                          <i class="fa-solid fa-eye"></i> Lihat Detail
-                      </button>
-                  </td>
-                  <td>
-                      <div id="rekap-detail-${m.user_id}" class="hidden">
-                          ${(() => {
-                            const gRekap = {};
-                            m.rekap.forEach((r) => {
-                              const kat =
-                                r.kategori && r.kategori !== "-"
-                                  ? r.kategori
-                                  : "Umum";
-                              if (!gRekap[kat]) gRekap[kat] = [];
-                              gRekap[kat].push(r);
-                            });
-                            return Object.keys(gRekap)
-                              .map(
-                                (kat) => `
-                              <div style="margin-bottom:1rem;">
-                                  <div style="font-weight:700; font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
-                                      <i class="fa-solid fa-folder-open text-primary" style="margin-right:6px;"></i>${kat}
-                                  </div>
-                                  <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
-                                      ${gRekap[kat]
-                                        .map(
-                                          (r) => `
-                                      <div style="padding:10px; border-radius:8px; background:var(--bg-main); border-left:4px solid ${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}">
-                                          <div style="font-weight:600; font-size:0.8rem; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${r.nama_skill}</div>
-                                          <div class="d-flex justify-between align-center mt-2">
-                                              <span class="badge ${r.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.75rem">${r.capaian} / ${r.target}</span>
-                                              <small style="color:${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}; font-weight:700; font-size:0.75rem">${r.status.toUpperCase()}</small>
-                                          </div>
-                                      </div>`,
-                                        )
-                                        .join("")}
-                                  </div>
-                              </div>`,
-                              )
-                              .join("");
-                          })()}
-                      </div>
-                      <div id="rekap-summary-text-${m.user_id}" class="text-muted" style="font-size:0.85rem">
-                          <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
-                      </div>
-                  </td>
-              </tr>`;
+                <tr class="animate-fade-up">
+                    <td style="width:250px; vertical-align:top">
+                        <strong>${m.nama}</strong><br>
+                        <small class="text-muted">${m.prodi}</small>
+                        <div class="mt-2">
+                             <span class="badge ${totalTercapai === totalTarget ? "bg-success" : "bg-warning"}" style="font-size:0.75rem">
+                                ${totalTercapai} / ${totalTarget} Kompetensi
+                             </span>
+                        </div>
+                        <button class="btn btn-primary-soft btn-sm mt-3" onclick="toggleRekapDetail('${m.user_id}')" id="btn-toggle-${m.user_id}">
+                            <i class="fa-solid fa-eye"></i> Lihat Detail
+                        </button>
+                    </td>
+                    <td>
+                        <div id="rekap-detail-${m.user_id}" class="hidden">
+                            ${(() => {
+                              // Group rekap by kategori
+                              const gRekap = {};
+                              m.rekap.forEach((r) => {
+                                const kat =
+                                  r.kategori && r.kategori !== "-"
+                                    ? r.kategori
+                                    : "Umum";
+                                if (!gRekap[kat]) gRekap[kat] = [];
+                                gRekap[kat].push(r);
+                              });
+                              return Object.keys(gRekap)
+                                .map(
+                                  (kat) => `
+                                    <div style="margin-bottom:1rem;">
+                                        <div style="font-weight:700; font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
+                                            <i class="fa-solid fa-folder-open text-primary" style="margin-right:6px;"></i>${kat}
+                                        </div>
+                                        <div class="grid-skills-rekap" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
+                                            ${gRekap[kat]
+                                              .map(
+                                                (r) => `
+                                                <div class="skill-rekap-card" style="padding:10px; border-radius:8px; background:var(--bg-main); border-left: 4px solid ${r.status === "Tercapai" ? "#22c55e" : "#ef4444"};">
+                                                    <div style="font-weight:600; font-size:0.8rem; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${r.nama_skill}</div>
+                                                    <div class="d-flex justify-between align-center mt-2">
+                                                        <span class="badge ${r.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.75rem">${r.capaian} / ${r.target}</span>
+                                                        <small style="color:${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}; font-weight:700; font-size:0.75rem">${r.status.toUpperCase()}</small>
+                                                    </div>
+                                                </div>
+                                            `,
+                                              )
+                                              .join("")}
+                                        </div>
+                                    </div>
+                                `,
+                                )
+                                .join("");
+                            })()}
+                        </div>
+                        <div id="rekap-summary-text-${m.user_id}" class="text-muted" style="font-size:0.85rem">
+                            <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
+                        </div>
+                    </td>
+                </tr>
+            `;
         })
         .join("");
     };
 
-    window.renderRekapTable();
+    render(res.data);
+
+    document.getElementById("search-rekap").oninput = (e) => {
+      const q = e.target.value.toLowerCase();
+      const filtered = res.data.filter((m) => m.nama.toLowerCase().includes(q));
+      render(filtered);
+    };
   } else {
     tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Gagal memuat rekap data</td></tr>`;
   }
@@ -3902,6 +3809,7 @@ window.bukaModalKelompok = (id = null, currentNama = "") => {
     const action = isEdit ? "editMaster" : "addMaster";
     const res = await postAPI(action, payload);
     if (res.success) {
+      clearCache("getKelompok");
       closeModal();
       showToast("Berhasil", res.message, "success");
       loadView("kelompokAdminView");
@@ -4056,26 +3964,11 @@ async function renderUserManagement(area, roleFilter, title, icon) {
         <div class="animate-fade-up">
             <div class="card">
                 <div class="card-header d-flex align-center justify-between wrap gap-3">
-                    <div class="d-flex align-center gap-3 wrap flex-1">
+                    <div class="d-flex align-center gap-3 wrap">
                         <h3 class="m-0"><i class="fa-solid ${icon} text-primary"></i> Manajemen ${title}</h3>
-                        <div class="d-flex gap-2 wrap align-center flex-1">
-                          ${
-                            roleFilter === "mahasiswa"
-                              ? `
-                            <select id="filter-user-prodi" class="form-control" style="width:180px; font-size:0.85rem;" onchange="window.filterUsersByCriteria()">
-                              <option value="">Semua Prodi</option>
-                            </select>
-                            <select id="filter-user-angkatan" class="form-control" style="width:160px; font-size:0.85rem;" onchange="window.filterUsersByCriteria()">
-                              <option value="">Semua Angkatan</option>
-                            </select>
-                          `
-                              : ""
-                          }
-                          <div class="input-with-icon" style="min-width:200px; flex:1;">
-                              <i class="fa-solid fa-magnifying-glass"></i>
-                              <input type="text" id="search-users" class="form-control" placeholder="Cari nama atau ID..." style="padding-top:0.4rem; padding-bottom:0.4rem;" oninput="window.filterUsersByCriteria()">
-                          </div>
-                          <span id="user-count-badge" class="badge bg-primary" style="font-size:0.8rem; white-space:nowrap;"></span>
+                        <div class="input-with-icon" style="width:250px;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-users" class="form-control" placeholder="Cari nama atau ID..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
                         </div>
                     </div>
                     <div class="d-flex gap-2">
@@ -4160,58 +4053,20 @@ async function renderUserManagement(area, roleFilter, title, icon) {
   if (resUsers.success && resUsers.data && resUsers.data.length > 0) {
     const filteredByRole = resUsers.data.filter((u) => u.role === roleFilter);
     window["adminUsersData_" + roleFilter] = filteredByRole;
-
-    // Populate Filters
-    if (roleFilter === "mahasiswa") {
-      const prodSet = new Set(),
-        angkSet = new Set();
-      filteredByRole.forEach((u) => {
-        if (u.prodi && u.prodi !== "-") prodSet.add(u.prodi);
-        if (u.angkatan && u.angkatan !== "-") angkSet.add(u.angkatan);
-      });
-      const selProd = document.getElementById("filter-user-prodi");
-      const selAngk = document.getElementById("filter-user-angkatan");
-      if (selProd)
-        [...prodSet].sort().forEach((p) => {
-          const o = document.createElement("option");
-          o.value = p;
-          o.textContent = p;
-          selProd.appendChild(o);
-        });
-      if (selAngk)
-        [...angkSet].sort().forEach((a) => {
-          const o = document.createElement("option");
-          o.value = a;
-          o.textContent = `Angkatan ${a}`;
-          selAngk.appendChild(o);
-        });
-    }
-
-    window.filterUsersByCriteria = () => {
-      const q = (
-        document.getElementById("search-users")?.value || ""
-      ).toLowerCase();
-      const pFil = document.getElementById("filter-user-prodi")?.value || "";
-      const aFil = document.getElementById("filter-user-angkatan")?.value || "";
-
-      const results = filteredByRole.filter((u) => {
-        const matchQ =
-          (u.nama || "").toLowerCase().includes(q) ||
-          (u.username || "").toLowerCase().includes(q);
-        const matchP = !pFil || u.prodi === pFil;
-        const matchA = !aFil || u.angkatan == aFil;
-        return matchQ && matchP && matchA;
-      });
-
-      const badge = document.getElementById("user-count-badge");
-      if (badge) badge.textContent = `${results.length} data`;
-      renderUsers(results);
-    };
-
-    window.filterUsersByCriteria();
+    renderUsers(filteredByRole);
   } else {
     tableBody.innerHTML = `<tr><td colspan="${roleFilter === "mahasiswa" ? 5 : 4}" class="empty-table"><i class="fa-solid fa-users-slash fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data ${title}</td></tr>`;
   }
+
+  document.getElementById("search-users").oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    const results = window["adminUsersData_" + roleFilter].filter(
+      (u) =>
+        u.nama.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q),
+    );
+    renderUsers(results);
+  };
 }
 
 window.bukaModalUser = async (roleFilter, id = null) => {
@@ -4819,139 +4674,27 @@ window.repairUserDatabase = async () => {
     const res = await postAPI("repairUsers");
     showLoader(false);
     if (res.success) {
-      showToast("Berhasil", res.message, "success");
-      loadView("settingsAdminView");
-    }
-  }
-};
-
-window.tempatAdminView = async (area) => {
-  area.innerHTML = `
-    <div class="animate-fade-up">
-      <div class="card">
-        <div class="card-header d-flex justify-between align-center wrap gap-2">
-          <h3><i class="fa-solid fa-hospital text-primary"></i> Master Tempat Praktik</h3>
-          <div class="d-flex gap-2 wrap">
-            <button class="btn btn-outline btn-sm" onclick="downloadMasterTemplate('tempat')"><i class="fa-solid fa-file-csv"></i> Template CSV</button>
-            <label class="btn btn-outline btn-sm m-0" style="cursor:pointer">
-              <i class="fa-solid fa-file-import"></i> Import CSV
-              <input type="file" accept=".csv" class="hidden" onchange="handleImportMasterCSV(event, 'tempat')">
-            </label>
-            <button class="btn btn-danger-soft btn-sm" onclick="clearMasterData('tempat', 'Tempat Praktik')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
-            <button class="btn btn-primary btn-sm" onclick="bukaModalMaster('tempat', 'Tempat Praktik')"><i class="fa-solid fa-plus"></i> Tambah Baru</button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="table-responsive">
-            <table id="table-master-tempat">
-              <thead>
-                <tr>
-                  <th>Nama Tempat Praktik</th>
-                  <th><i class="fa-solid fa-user-doctor" style="color:var(--primary)"></i> Preseptor Klinik</th>
-                  <th><i class="fa-solid fa-chalkboard-teacher" style="color:#f59e0b"></i> Preseptor Akademik</th>
-                  <th style="text-align:right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody><tr><td colspan="4" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const [resTempat, resUsers] = await Promise.all([
-    fetchAPI("getTempat"),
-    fetchAPI("getUsers"),
-  ]);
-
-  const tableBody = document.querySelector("#table-master-tempat tbody");
-  if (resTempat.success && resTempat.data && resTempat.data.length > 0) {
-    window.adminMasterData_tempat = resTempat.data;
-
-    const pkMap = {};
-    const paMap = {};
-    if (resUsers.success && resUsers.data) {
-      resUsers.data.forEach((u) => {
-        if (
-          (u.role === "preseptor" || u.role === "preseptor_akademik") &&
-          u.tempat_id &&
-          u.tempat_id !== "-"
-        ) {
-          const tids = u.tempat_id.split(",");
-          tids.forEach((tid) => {
-            const trimmed = tid.trim();
-            if (u.role === "preseptor") {
-              if (!pkMap[trimmed]) pkMap[trimmed] = [];
-              pkMap[trimmed].push(u.nama);
-            } else {
-              if (!paMap[trimmed]) paMap[trimmed] = [];
-              paMap[trimmed].push(u.nama);
-            }
-          });
-        }
-      });
-    }
-
-    const htmlRows = resTempat.data.map((row, idx) => {
-      const pkNames = pkMap[row.id] || [];
-      const paNames = paMap[row.id] || [];
-
-      const pkHtml =
-        pkNames.length > 0
-          ? pkNames
-              .map(
-                (n) =>
-                  `<span class="badge bg-primary" style="font-size:0.8em; margin:2px 4px 2px 0; padding:0.3rem 0.6rem;">${escapeHTML(n)}</span>`,
-              )
-              .join("")
-          : '<span style="color:#94a3b8; font-size:0.85em;">\u2014 Belum ditetapkan</span>';
-
-      const paHtml =
-        paNames.length > 0
-          ? paNames
-              .map(
-                (n) =>
-                  `<span class="badge" style="font-size:0.8em; margin:2px 4px 2px 0; padding:0.3rem 0.6rem; background:#fef3c7; color:#92400e; border:1px solid #fde68a;">${escapeHTML(n)}</span>`,
-              )
-              .join("")
-          : '<span style="color:#94a3b8; font-size:0.85em;">\u2014 Belum ditetapkan</span>';
-
-      let text = escapeHTML(row.nama_tempat) || "";
-      let firstNumIdx = text.search(/[0-9]+\./);
-      let titlePart = text;
-      let listPart = "";
-      if (firstNumIdx !== -1) {
-        titlePart = text.substring(0, firstNumIdx).trim();
-        listPart = text.substring(firstNumIdx);
-      }
-      let formattedList = listPart.replace(
-        /([0-9]+\.)/g,
-        '<br><span style="color:var(--primary); font-weight:700; margin-right:8px; display:inline-block; width:20px;">$1</span>',
+      clearCache("getKelompok");
+      showToast(
+        "Berhasil",
+        `Berhasil mengimpor ${finalGroups.length} kelompok`,
+        "success",
       );
-
-      return `
-        <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
-          <td>
-            <div style="margin-bottom:4px;"><strong style="color:var(--primary-dark); font-size:1.05em; border-bottom:1px dashed #cbd5e1">${titlePart}</strong></div>
-            <div style="line-height:1.7; color:var(--text-strong); padding-left:5px;">${formattedList}</div>
-          </td>
-          <td>${pkHtml}</td>
-          <td>${paHtml}</td>
-          <td style="text-align:right">
-            <button class="btn btn-icon-ghost" onclick="bukaModalMaster('tempat', 'Tempat Praktik', '${row.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
-            <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('tempat', '${row.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
-          </td>
-        </tr>
-      `;
-    });
-
-    tableBody.innerHTML = htmlRows.join("");
-  } else {
-    tableBody.innerHTML =
-      '<tr><td colspan="4" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data</td></tr>';
+      loadView("kelompokAdminView");
+    }
   }
 };
+
+window.tempatAdminView = (area) =>
+  renderMasterData(
+    area,
+    "tempat",
+    "Tempat Praktik",
+    "fa-hospital",
+    ["Nama Tempat Praktik"],
+    ["nama_tempat"],
+    "getTempat",
+  );
 window.prodiAdminView = (area) =>
   renderMasterData(
     area,
@@ -4962,177 +4705,16 @@ window.prodiAdminView = (area) =>
     ["nama_prodi"],
     "getProdi",
   );
-window.kompetensiAdminView = async (area) => {
-  area.innerHTML = `
-    <div class="animate-fade-up">
-      <div class="card">
-        <div class="card-header d-flex justify-between align-center wrap gap-2">
-          <h3><i class="fa-solid fa-list-check text-primary"></i> Master Kompetensi / Skill</h3>
-          <div class="d-flex gap-2 wrap">
-            <button class="btn btn-outline btn-sm" onclick="downloadMasterTemplate('kompetensi')"><i class="fa-solid fa-file-csv"></i> Template CSV</button>
-            <label class="btn btn-outline btn-sm m-0" style="cursor:pointer">
-              <i class="fa-solid fa-file-import"></i> Import CSV
-              <input type="file" accept=".csv" class="hidden" onchange="handleImportMasterCSV(event, 'kompetensi')">
-            </label>
-            <button class="btn btn-danger-soft btn-sm" onclick="clearMasterData('kompetensi', 'Kompetensi')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
-            <button class="btn btn-primary btn-sm" onclick="bukaModalMaster('kompetensi', 'Kompetensi / Skill')"><i class="fa-solid fa-plus"></i> Tambah Baru</button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="d-flex gap-2 wrap mb-3 align-center" style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
-            <i class="fa-solid fa-filter" style="color:var(--primary);"></i>
-            <select id="filter-komp-angkatan" class="form-control" style="width:200px; font-size:0.85rem;" onchange="filterKompetensiTable()">
-              <option value="">Semua Rombongan</option>
-            </select>
-            <select id="filter-komp-kategori" class="form-control" style="width:180px; font-size:0.85rem;" onchange="filterKompetensiTable()">
-              <option value="">Semua Kategori</option>
-            </select>
-            <div class="input-with-icon" style="flex:1; min-width:180px;">
-              <i class="fa-solid fa-magnifying-glass"></i>
-              <input type="text" id="search-komp" class="form-control" placeholder="Cari nama skill..." oninput="filterKompetensiTable()">
-            </div>
-            <span id="komp-count-badge" class="badge bg-primary" style="font-size:0.8rem; white-space:nowrap;"></span>
-          </div>
-          <div class="table-responsive">
-            <table id="table-master-kompetensi">
-              <thead>
-                <tr>
-                  <th>Nama Kompetensi</th>
-                  <th style="width:110px; text-align:center;">Target</th>
-                  <th style="width:140px;">Kategori</th>
-                  <th style="width:140px;">Rombongan</th>
-                  <th style="text-align:right; width:80px;">Aksi</th>
-                </tr>
-              </thead>
-              <tbody><tr><td colspan="5" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const res = await fetchAPI("getKompetensiAll");
-  const tableBody = document.querySelector("#table-master-kompetensi tbody");
-  if (!res.success || !res.data || res.data.length === 0) {
-    tableBody.innerHTML =
-      '<tr><td colspan="5" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data kompetensi</td></tr>';
-    return;
-  }
-
-  window.adminMasterData_kompetensi = res.data;
-
-  // Populate filter dropdowns
-  const angkatanSet = new Set();
-  const kategoriSet = new Set();
-  res.data.forEach((r) => {
-    if (r.angkatan && r.angkatan !== "-") angkatanSet.add(r.angkatan);
-    if (r.kategori && r.kategori !== "-") kategoriSet.add(r.kategori);
-  });
-
-  const selAngk = document.getElementById("filter-komp-angkatan");
-  const selKat = document.getElementById("filter-komp-kategori");
-
-  [...angkatanSet].sort().forEach((a) => {
-    const opt = document.createElement("option");
-    opt.value = a;
-    opt.textContent =
-      a === "Semua" ? "Universal (Semua Rombongan)" : `Angkatan ${a}`;
-    selAngk.appendChild(opt);
-  });
-  // Add "Universal" option
-  const uOpt = document.createElement("option");
-  uOpt.value = "__universal__";
-  uOpt.textContent = "Universal (kosong / Semua)";
-  selAngk.appendChild(uOpt);
-
-  [...kategoriSet].sort().forEach((k) => {
-    const opt = document.createElement("option");
-    opt.value = k;
-    opt.textContent = k;
-    selKat.appendChild(opt);
-  });
-
-  // Render function
-  window.filterKompetensiTable = () => {
-    const angkFilter = selAngk.value;
-    const katFilter = selKat.value;
-    const q = (
-      document.getElementById("search-komp")?.value || ""
-    ).toLowerCase();
-
-    const filtered = res.data.filter((r) => {
-      const matchAngk = !angkFilter
-        ? true
-        : angkFilter === "__universal__"
-          ? !r.angkatan || r.angkatan === "-" || r.angkatan === "Semua"
-          : r.angkatan == angkFilter || r.angkatan === "Semua";
-      const matchKat = !katFilter || r.kategori === katFilter;
-      const matchQ = !q || (r.nama_skill || "").toLowerCase().includes(q);
-      return matchAngk && matchKat && matchQ;
-    });
-
-    const badge = document.getElementById("komp-count-badge");
-    if (badge) badge.textContent = `${filtered.length} skill`;
-
-    if (filtered.length === 0) {
-      tableBody.innerHTML =
-        '<tr><td colspan="5" class="empty-table">Tidak ada data sesuai filter</td></tr>';
-      return;
-    }
-
-    tableBody.innerHTML = filtered
-      .map((row, idx) => {
-        let text = escapeHTML(row.nama_skill) || "";
-        let firstNumIdx = text.search(/[0-9]+\./);
-        let titlePart = text;
-        let listPart = "";
-
-        if (firstNumIdx !== -1) {
-          titlePart = text.substring(0, firstNumIdx).trim();
-          listPart = text.substring(firstNumIdx);
-        }
-
-        let formattedList = listPart.replace(
-          /([0-9]+\.)/g,
-          '<br><span style="color:var(--primary); font-weight:700; margin-right:8px; display:inline-block; width:20px;">$1</span>',
-        );
-
-        const angkatanVal =
-          row.angkatan && row.angkatan !== "-" ? row.angkatan : null;
-        const angkatanBadge =
-          angkatanVal === "Semua" || !angkatanVal
-            ? `<span class="badge" style="font-size:0.78em; background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:0.3rem 0.6rem;"><i class="fa-solid fa-globe" style="margin-right:4px;"></i>Universal</span>`
-            : `<span class="badge" style="font-size:0.78em; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; padding:0.3rem 0.6rem;"><i class="fa-solid fa-layer-group" style="margin-right:4px;"></i>${escapeHTML(angkatanVal)}</span>`;
-
-        const katBadge =
-          row.kategori && row.kategori !== "-"
-            ? `<span class="badge" style="font-size:0.78em; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; padding:0.3rem 0.6rem;">${escapeHTML(row.kategori)}</span>`
-            : `<span style="color:#94a3b8; font-size:0.85em;">\u2014</span>`;
-
-        return `
-        <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
-          <td>
-            <div style="margin-bottom:4px;"><strong style="color:var(--primary-dark); font-size:1em; border-bottom:1px dashed #cbd5e1">${titlePart}</strong></div>
-            <div style="line-height:1.6; color:var(--text-strong); padding-left:2px; font-size:0.9rem;">${formattedList}</div>
-          </td>
-          <td style="text-align:center;">
-            <span class="badge bg-primary" style="font-size:0.9em; padding:0.4rem 0.8rem;">${row.target_minimal ?? "-"}</span>
-          </td>
-          <td>${katBadge}</td>
-          <td>${angkatanBadge}</td>
-          <td style="text-align:right;">
-            <button class="btn btn-icon-ghost" onclick="bukaModalMaster('kompetensi', 'Kompetensi / Skill', '${row.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
-            <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('kompetensi', '${row.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
-          </td>
-        </tr>
-      `;
-      })
-      .join("");
-  };
-
-  window.filterKompetensiTable();
-};
+window.kompetensiAdminView = (area) =>
+  renderMasterData(
+    area,
+    "kompetensi",
+    "Kompetensi / Skill",
+    "fa-list-check",
+    ["Nama Kompetensi", "Target Minimal", "Kategori", "Angkatan"],
+    ["nama_skill", "target_minimal", "kategori", "angkatan"],
+    "getKompetensiAll",
+  );
 window.bimbPraktikumAdminView = (area) =>
   renderMasterData(
     area,
@@ -5494,6 +5076,11 @@ window.deleteMaster = async (type, id) => {
   if (confirm("Yakin ingin menghapus master data ini secara permanen?")) {
     const res = await postAPI("deleteMaster", { type, id });
     if (res.success) {
+      if (type === "kelompok") clearCache("getKelompok");
+      if (type === "tempat") clearCache("getTempat");
+      if (type === "prodi") clearCache("getProdi");
+      if (type === "kompetensi") clearCache("getKompetensi");
+
       showToast("Terhapus", "Data berhasil dihapus dari sistem", "success");
       const views = {
         kelompok: "kelompokAdminView",
@@ -5520,7 +5107,19 @@ window.clearMasterData = async (type, title) => {
       const res = await postAPI("clearMaster", { type: type });
       showLoader(false);
       if (res.success) {
-        showToast("Berhasil", res.message, "success");
+        const cacheMap = {
+          kelompok: "getKelompok",
+          tempat: "getTempat",
+          prodi: "getProdi",
+          kompetensi: "getKompetensi",
+        };
+        if (cacheMap[type]) clearCache(cacheMap[type]);
+
+        showToast(
+          "Terhapus",
+          `Semua data ${title} telah dibersihkan`,
+          "success",
+        );
         const views = {
           kelompok: "kelompokAdminView",
           tempat: "tempatAdminView",
@@ -5898,13 +5497,14 @@ function changePasswordView(area) {
   };
 }
 
-// ADMIN: GENERATE JADWAL
-async function jadwalAdminView(area) {
+// ADMIN: JADWAL MATRIKS
+async function jadwalAdminView(area, batchNum = null) {
+  const batchSuffix = batchNum ? ` ${batchNum}` : "";
   area.innerHTML = `
         <div class="animate-fade-up">
             <div class="card">
                 <div class="card-header d-flex justify-between align-center wrap gap-2">
-                    <h3><i class="fa-solid fa-calendar-days text-primary"></i> Jadwal Praktik Mahasiswa</h3>
+                    <h3><i class="fa-solid fa-calendar-days text-primary"></i> Jadwal Praktik Mahasiswa${batchSuffix}</h3>
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline btn-sm" onclick="exportJadwalExcel()">
                             <i class="fa-solid fa-file-excel text-success"></i> Unduh Excel
@@ -5919,18 +5519,12 @@ async function jadwalAdminView(area) {
                         <span class="text-sm" style="color:#475569">
                             <i class="fa-solid fa-circle-info text-primary"></i> Info: <strong>P</strong> = Pagi, <strong>S</strong> = Siang, <strong>M</strong> = Malam
                         </span>
-                        <div class="d-flex gap-2 align-center wrap">
-                            <div class="input-with-icon" style="width:210px;">
-                              <i class="fa-solid fa-layer-group" style="color:var(--primary)"></i>
-                              <select id="filter-angkatan-jadwal" class="form-control" style="font-size:0.85rem;" onchange="filterJadwalByAngkatan()">
-                                <option value="">Semua Rombongan</option>
-                              </select>
-                            </div>
+                        <div class="d-flex gap-2">
                             <button class="btn btn-sm" style="background:#e2e8f0; color:#475569;" onclick="document.querySelectorAll('.table-responsive').forEach(el=>el.scrollBy({left: -300, behavior: 'smooth'}))">
-                                <i class="fa-solid fa-chevron-left"></i> Kiri
+                                <i class="fa-solid fa-chevron-left"></i> Geser Tabel Ke Kiri
                             </button>
                             <button class="btn btn-sm" style="background:#e2e8f0; color:#475569;" onclick="document.querySelectorAll('.table-responsive').forEach(el=>el.scrollBy({left: 300, behavior: 'smooth'}))">
-                                Kanan <i class="fa-solid fa-chevron-right"></i>
+                                Geser Tabel Ke Kanan <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
                     </div>
@@ -5947,39 +5541,14 @@ async function jadwalAdminView(area) {
         </div>
     `;
 
-  const [resJadwal, resUsers] = await Promise.all([
+  const [resJadwal, resUsers, resSettings] = await Promise.all([
     fetchAPI("getJadwal"),
     fetchAPI("getUsers"),
+    batchNum ? fetchAPI("getSettings") : Promise.resolve({ success: false }),
   ]);
 
   const wrapper = document.querySelector("#jadwal-table-wrapper");
   window.dtJadwalAdmin = [];
-
-  // Build preseptor maps per tempat_id
-  const preseptorKlinikMap = {};
-  const preseptorAkademikMap = {};
-  if (resUsers.success && resUsers.data) {
-    resUsers.data.forEach((u) => {
-      if (
-        (u.role === "preseptor" || u.role === "preseptor_akademik") &&
-        u.tempat_id &&
-        u.tempat_id !== "-"
-      ) {
-        const tids = u.tempat_id.split(",");
-        tids.forEach((tid) => {
-          const trimmed = tid.trim();
-          if (u.role === "preseptor") {
-            if (!preseptorKlinikMap[trimmed]) preseptorKlinikMap[trimmed] = [];
-            preseptorKlinikMap[trimmed].push(u.nama);
-          } else {
-            if (!preseptorAkademikMap[trimmed])
-              preseptorAkademikMap[trimmed] = [];
-            preseptorAkademikMap[trimmed].push(u.nama);
-          }
-        });
-      }
-    });
-  }
 
   if (
     resJadwal.success &&
@@ -5987,9 +5556,28 @@ async function jadwalAdminView(area) {
     resJadwal.data.length > 0 &&
     resUsers.success
   ) {
-    window.dtJadwalAdmin = resJadwal.data;
+    let schedules = resJadwal.data;
     const users = resUsers.data;
-    const schedules = resJadwal.data;
+
+    if (batchNum && resSettings.success) {
+      const settingKey = `batch_kelompok_${batchNum}`;
+      const batchKelIds = (
+        resSettings.data.find((s) => s.key === settingKey)?.value || ""
+      ).split(",");
+
+      if (batchKelIds.length > 0 && batchKelIds[0] !== "") {
+        schedules = schedules.filter((s) => {
+          const u = users.find((usr) => usr.id == s.user_id);
+          return u && batchKelIds.includes(String(u.kelompok_id));
+        });
+      }
+    }
+
+    window.dtJadwalAdmin = schedules;
+    if (schedules.length === 0) {
+      wrapper.innerHTML = `<div class="empty-table">Tidak ada jadwal untuk batch ini.</div>`;
+      return;
+    }
 
     // Group schedules by explicit Kelompok ID
     const groupsTemp = {};
@@ -6122,16 +5710,7 @@ async function jadwalAdminView(area) {
 
         blocks.forEach((block, blockIdx) => {
           if (index === 0) {
-            const pkList = preseptorKlinikMap[block.tempat_id] || [];
-            const paList = preseptorAkademikMap[block.tempat_id] || [];
-            let preseptorHtml = "";
-            if (pkList.length > 0) {
-              preseptorHtml += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #e2e8f0; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-user-doctor" style="color:var(--primary); margin-right:4px;"></i>PK: ${pkList.join(", ")}</div>`;
-            }
-            if (paList.length > 0) {
-              preseptorHtml += `<div style="margin-top:4px; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-chalkboard-teacher" style="color:#f59e0b; margin-right:4px;"></i>PA: ${paList.join(", ")}</div>`;
-            }
-            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}${preseptorHtml}</td>`;
+            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}</td>`;
           }
 
           block.dates.forEach((dStr) => {
@@ -6178,28 +5757,6 @@ async function jadwalAdminView(area) {
     });
 
     wrapper.innerHTML = htmlOut;
-
-    // Populate angkatan filter dropdown from actual groups
-    const angkatanSet = new Set();
-    groups.forEach((g) => {
-      g.users.forEach((u) => {
-        if (u.angkatan && u.angkatan !== "-") angkatanSet.add(u.angkatan);
-      });
-    });
-    const sel = document.getElementById("filter-angkatan-jadwal");
-    if (sel) {
-      [...angkatanSet].sort().forEach((a) => {
-        const opt = document.createElement("option");
-        opt.value = a;
-        opt.textContent = `Angkatan ${a}`;
-        sel.appendChild(opt);
-      });
-    }
-
-    // Store groups for filtering
-    window._jadwalGroups = groups;
-    window._jadwalPreseptorKlinikMap = preseptorKlinikMap;
-    window._jadwalPreseptorAkademikMap = preseptorAkademikMap;
   } else {
     wrapper.innerHTML = `
             <div class="table-responsive">
@@ -6209,151 +5766,6 @@ async function jadwalAdminView(area) {
             </div>`;
   }
 }
-
-// Filter jadwal berdasarkan angkatan yang dipilih
-window.filterJadwalByAngkatan = () => {
-  const filterVal = document.getElementById("filter-angkatan-jadwal").value;
-  const groups = window._jadwalGroups || [];
-  const preseptorKlinikMap = window._jadwalPreseptorKlinikMap || {};
-  const preseptorAkademikMap = window._jadwalPreseptorAkademikMap || {};
-  const wrapper = document.querySelector("#jadwal-table-wrapper");
-  if (!wrapper) return;
-
-  // Filter groups by angkatan of their members
-  const filtered = filterVal
-    ? groups.filter((g) => g.users.some((u) => u.angkatan == filterVal))
-    : groups;
-
-  if (filtered.length === 0) {
-    wrapper.innerHTML = `<div class="empty-table p-4 text-center"><i class="fa-solid fa-filter-circle-xmark fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Tidak ada jadwal untuk angkatan ini</div>`;
-    return;
-  }
-
-  let htmlOut = "";
-  filtered.forEach((group, groupIdx) => {
-    // For filtered view, also filter users by angkatan
-    const groupUsers = filterVal
-      ? group.users.filter((u) => u.angkatan == filterVal)
-      : group.users;
-    if (groupUsers.length === 0) return;
-
-    const dates = [...new Set(group.schedules.map((s) => s.tanggal))].sort();
-    const blocks = [];
-    let currentBlockDates = [],
-      currentTempat = null,
-      currentTempatName = null;
-    dates.forEach((d) => {
-      const schedToday = group.schedules.find((s) => s.tanggal === d);
-      if (!schedToday) return;
-      const tId = schedToday.tempat_id;
-      const tName = schedToday.nama_tempat;
-      if (currentBlockDates.length === 0) {
-        currentBlockDates.push(d);
-        currentTempat = tId;
-        currentTempatName = tName;
-      } else {
-        if (tId === currentTempat) {
-          currentBlockDates.push(d);
-        } else {
-          blocks.push({
-            tempat_id: currentTempat,
-            nama_tempat: currentTempatName,
-            dates: currentBlockDates,
-          });
-          currentBlockDates = [d];
-          currentTempat = tId;
-          currentTempatName = tName;
-        }
-      }
-    });
-    if (currentBlockDates.length > 0)
-      blocks.push({
-        tempat_id: currentTempat,
-        nama_tempat: currentTempatName,
-        dates: currentBlockDates,
-      });
-
-    const headerStyle =
-      "background:#f8fafc; color:var(--text-strong); font-weight:700; text-transform:uppercase; font-size:0.75rem; border:1px solid #cbd5e1;";
-    let headHtml1 = `<tr style="${headerStyle}">`;
-    let headHtml2 = `<tr style="${headerStyle}">`;
-    headHtml1 += `<th rowspan="2" style="width:40px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NO</th><th rowspan="2" style="width:250px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NAMA MAHASISWA</th><th rowspan="2" style="width:130px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1;">NIM</th>`;
-    blocks.forEach((block) => {
-      headHtml1 += `<th rowspan="2" style="width:180px; text-align:center; vertical-align:middle; border:1px solid #cbd5e1; white-space:normal">TEMPAT PRAKTIK</th><th colspan="${block.dates.length}" style="text-align:center; border:1px solid #cbd5e1;">JADWAL</th>`;
-      block.dates.forEach((dStr) => {
-        const dObj = new Date(dStr);
-        const mStr = [
-          "JAN",
-          "FEB",
-          "MAR",
-          "APR",
-          "MEI",
-          "JUN",
-          "JUL",
-          "AGS",
-          "SEP",
-          "OKT",
-          "NOV",
-          "DES",
-        ][dObj.getMonth()];
-        headHtml2 += `<th style="text-align:center; width:65px; border:1px solid #cbd5e1; padding:6px 4px; font-size:0.7rem;">${dObj.getDate()} ${mStr}</th>`;
-      });
-    });
-    headHtml1 += `</tr>`;
-    headHtml2 += `</tr>`;
-
-    let bodyHtml = "";
-    groupUsers.forEach((u, index) => {
-      bodyHtml += `<tr style="background:#fff;">`;
-      bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; padding:8px 4px;">${index + 1}</td>`;
-      bodyHtml += `<td style="border:1px solid #cbd5e1; padding:8px 12px; white-space:normal; font-weight:500;">${u.nama.toUpperCase()}</td>`;
-      bodyHtml += `<td style="border:1px solid #cbd5e1; padding:8px 8px; text-align:center;">${u.username}</td>`;
-      blocks.forEach((block) => {
-        if (index === 0) {
-          const pkList = preseptorKlinikMap[block.tempat_id] || [];
-          const paList = preseptorAkademikMap[block.tempat_id] || [];
-          let preseptorHtml = "";
-          if (pkList.length > 0)
-            preseptorHtml += `<div style="margin-top:8px; padding-top:6px; border-top:1px dashed #e2e8f0; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-user-doctor" style="color:var(--primary); margin-right:4px;"></i>PK: ${pkList.join(", ")}</div>`;
-          if (paList.length > 0)
-            preseptorHtml += `<div style="margin-top:4px; font-size:0.72rem; font-weight:500; color:#475569;"><i class="fa-solid fa-chalkboard-teacher" style="color:#f59e0b; margin-right:4px;"></i>PA: ${paList.join(", ")}</div>`;
-          bodyHtml += `<td rowspan="${groupUsers.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding:10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}${preseptorHtml}</td>`;
-        }
-        block.dates.forEach((dStr) => {
-          const s = group.schedules.find(
-            (x) => x.user_id == u.id && x.tanggal === dStr,
-          );
-          let shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
-          let shiftStyle = "";
-          if (s && s.shift) {
-            if (s.shift == 1) {
-              shiftText = "P";
-              shiftStyle = "color:var(--text-strong); font-weight:700;";
-            } else if (s.shift == 2) {
-              shiftText = "S";
-              shiftStyle = "color:var(--text-strong); font-weight:700;";
-            } else if (s.shift == 3) {
-              shiftText = "M";
-              shiftStyle = "color:var(--text-strong); font-weight:700;";
-            }
-          }
-          bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; ${shiftStyle}">${shiftText}</td>`;
-        });
-      });
-      bodyHtml += `</tr>`;
-    });
-
-    htmlOut += `<div class="table-responsive animate-fade-up" style="margin-bottom:2.5rem; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; box-shadow:var(--shadow-sm);">
-      <table class="table-compact text-sm" style="width:max-content; border-collapse:collapse; background:white;">
-        <thead style="position:sticky; top:0; z-index:10;">${headHtml1}${headHtml2}</thead>
-        <tbody>${bodyHtml}</tbody>
-      </table></div>`;
-  });
-
-  wrapper.innerHTML =
-    htmlOut ||
-    `<div class="empty-table p-4 text-center">Tidak ada data untuk rombongan ini</div>`;
-};
 
 window.exportJadwalPDF = async () => {
   if (!window.dtJadwalAdmin || window.dtJadwalAdmin.length === 0)
@@ -6367,29 +5779,6 @@ window.exportJadwalPDF = async () => {
 
   const users = resUsers.data;
   const schedules = window.dtJadwalAdmin;
-
-  // Build preseptor maps per tempat_id for PDF
-  const pdfPKMap = {};
-  const pdfPAMap = {};
-  users.forEach((u) => {
-    if (
-      (u.role === "preseptor" || u.role === "preseptor_akademik") &&
-      u.tempat_id &&
-      u.tempat_id !== "-"
-    ) {
-      const tids = u.tempat_id.split(",");
-      tids.forEach((tid) => {
-        const trimmed = tid.trim();
-        if (u.role === "preseptor") {
-          if (!pdfPKMap[trimmed]) pdfPKMap[trimmed] = [];
-          pdfPKMap[trimmed].push(u.nama);
-        } else {
-          if (!pdfPAMap[trimmed]) pdfPAMap[trimmed] = [];
-          pdfPAMap[trimmed].push(u.nama);
-        }
-      });
-    }
-  });
 
   // Grouping identical to HTML table logic
   const groupsTemp = {};
@@ -6522,12 +5911,7 @@ window.exportJadwalPDF = async () => {
       const rowData = [index + 1, u.nama, u.username];
 
       blocks.forEach((block, bIdx) => {
-        let tempatLabel = block.nama_tempat;
-        const pdfPK = pdfPKMap[block.tempat_id] || [];
-        const pdfPA = pdfPAMap[block.tempat_id] || [];
-        if (pdfPK.length > 0) tempatLabel += `\nPK: ${pdfPK.join(", ")}`;
-        if (pdfPA.length > 0) tempatLabel += `\nPA: ${pdfPA.join(", ")}`;
-        rowData.push(tempatLabel); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
+        rowData.push(block.nama_tempat); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
 
         block.dates.forEach((dStr) => {
           const s = group.schedules.find(
@@ -7310,9 +6694,9 @@ window.bukaModalPreceptorNotes = async (studentId, studentNama) => {
     e.preventDefault();
     const deskripsi = document.getElementById("pn-deskripsi").value;
     showLoader(true);
-    const postRes = await postAPI("addLaporan", {
+    const postRes = await postAPI("saveReport", {
       student_id: studentId,
-      user_id: currentUser.id,
+      user_id_pelapor: currentUser.id,
       nama_pelapor: currentUser.nama,
       role_pelapor: currentUser.role,
       tipe_kejadian: "Preceptor Note",
@@ -7355,63 +6739,27 @@ function renderNotesList(notes) {
     .join("");
 }
 
-// Global Refresh Helper for Preseptor Dashboard Gap
-window.refreshGapDashboard = async (angkatan) => {
-  const container = document.querySelector("#preseptor-extra-area .card-body");
-  if (!container) return;
+// ADMIN: BROADCAST SYSTEM
+window.eksekusiBroadcast = async () => {
+  const msg = document.getElementById("bc-message").value;
+  if (!msg)
+    return showToast(
+      "Kosong",
+      "Tuliskan pesan pengumuman terlebih dahulu.",
+      "warning",
+    );
 
-  container.innerHTML = `<p class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memperbarui filter...</p>`;
+  showLoader(true);
+  const res = await fetchAPI("updateBroadcast", { message: msg });
+  showLoader(false);
 
-  const res = await fetchAPI("getCompetencyGap", {
-    tempat_id: currentUser.tempat_id,
-    angkatan: angkatan,
-  });
-
-  if (res.success && res.data) {
-    if (res.data.length === 0) {
-      container.innerHTML = `<p class="empty-table"><i class="fa-solid fa-folder-open"></i> Tidak ada gap data di filter ini.</p>`;
-      return;
-    }
-
-    container.innerHTML = res.data
-      .map((g) => {
-        let text = escapeHTML(g.nama) || "";
-        let firstNumIdx = text.search(/[0-9]+\./);
-        let titlePart = text;
-        let listPart = "";
-
-        if (firstNumIdx !== -1) {
-          titlePart = text.substring(0, firstNumIdx).trim();
-          listPart = text.substring(firstNumIdx);
-        }
-
-        let formattedList = listPart.replace(
-          /([0-9]+\.)/g,
-          '<br><span style="color:var(--primary); font-weight:700; margin-right:4px;">$1</span>',
-        );
-
-        const isUniversal = g.angkatan === "Semua" || !g.angkatan;
-
-        return `
-            <div class="mb-3" style="padding-bottom:8px; border-bottom:1px solid #f8fafc;">
-                <div class="d-flex justify-between align-start mb-1 gap-2">
-                    <div style="flex:1; line-height:1.4;">
-                        <div class="d-flex align-center gap-2 wrap mb-1">
-                          <div style="font-weight:700; color:var(--primary-dark); font-size:0.85rem; border-bottom: 1px dashed #e2e8f0; display:inline-block;">${titlePart}</div>
-                          <span class="badge" style="font-size:0.65rem; padding:2px 6px; ${isUniversal ? "background:#f0fdf4; color:#166534; border:1px solid #bbf7d0" : "background:#f5f3ff; color:#5b21b6; border:1px solid #ddd6fe"}">
-                            ${isUniversal ? "Universal" : g.angkatan}
-                          </span>
-                        </div>
-                        <div style="font-size:0.8rem; color:var(--text-strong); padding-left:2px;">${formattedList}</div>
-                    </div>
-                    <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem; align-self:start;">${g.count}x</span>
-                </div>
-                <div style="height:3px; background:#f1f5f9; border-radius:10px; overflow:hidden; margin-top:6px;">
-                    <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.5"></div>
-                </div>
-            </div>
-        `;
-      })
-      .join("");
+  if (res.success) {
+    showToast(
+      "Berhasil",
+      "Pengumuman telah disiarkan ke seluruh pengguna.",
+      "success",
+    );
+    document.getElementById("bc-message").value = "";
+    loadView("dashboardView");
   }
 };
