@@ -181,14 +181,22 @@
             <button id="toggle-sidebar" class="mobile-only btn-icon-ghost">
               <i class="fa-solid fa-bars-staggered"></i>
             </button>
-            <div class="topbar-breadcrumb">
-              <span class="text-muted"><i class="fa-solid fa-house fa-sm"></i> /</span>
-              <strong id="topbar-title-text" class="ml-1">Dashboard</strong>
+            <div class="topbar-breadcrumb" style="display: flex; flex-direction: column; justify-content: center; line-height: 1.1;">
+              <div>
+                <span class="text-muted"><i class="fa-solid fa-house fa-sm"></i> /</span>
+                <strong id="topbar-title-text" class="ml-1">Dashboard</strong>
+              </div>
+              <!-- Mobile only credit under title -->
+              <div class="mobile-only" style="margin-top: 2px;">
+                 <span class="responsive-credit" style="font-weight: 800; background: linear-gradient(to right, #fff, #fbbf24, #f472b6, #60a5fa, #fbbf24, #fff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: shine 4s linear infinite; display: inline-block;">
+                    by Mas Andy - masandigital.com
+                 </span>
+              </div>
             </div>
           </div>
           
-          <div class="topbar-center desktop-only" style="flex: 1; text-align: center;">
-             <span style="font-size: 1.05rem; font-weight: 800; background: linear-gradient(to right, #fff, #fbbf24, #f472b6, #60a5fa, #fbbf24, #fff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: shine 4s linear infinite; text-shadow: 0 0 10px rgba(255,255,255,0.1);">
+          <div class="topbar-center desktop-only" style="flex: 1; text-align: center; overflow: hidden; white-space: nowrap;">
+             <span class="responsive-credit" style="font-weight: 800; background: linear-gradient(to right, #fff, #fbbf24, #f472b6, #60a5fa, #fbbf24, #fff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: shine 4s linear infinite; text-shadow: 0 0 10px rgba(255,255,255,0.1); display: inline-block;">
                 by Mas Andy - <a href="https://masandigital.com" target="_blank" style="color: inherit; text-decoration: none; -webkit-text-fill-color: transparent;">masandigital.com</a>
              </span>
           </div>
