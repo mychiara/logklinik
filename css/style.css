@@ -1353,6 +1353,17 @@ tbody tr:hover {
   }
 }
 
+.responsive-credit {
+  font-size: 1.05rem;
+}
+
+@media (max-width: 992px) {
+  .responsive-credit {
+    font-size: 0.7rem;
+    letter-spacing: -0.1px;
+  }
+}
+
 /* Custom scrollbar for better aesthetics */
 ::-webkit-scrollbar {
   width: 8px;
