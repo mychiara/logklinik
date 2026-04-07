@@ -2755,9 +2755,22 @@ window.eksekusiGenerateJadwal = async (batchNum = null) => {
   ) {
     showLoader(true);
     if (batchNum) {
-      await postAPI("saveSettings", {
-        [`batch_kelompok_${batchNum}`]: kelIds.join(","),
-      });
+      // ENSURE EXCLUSIVITY: Remove these kelIds from other batches first
+      const currentSets = await fetchAPI("getSettings");
+      const updates = {};
+      if (currentSets.success) {
+        [1, 2, 3].forEach((b) => {
+          const key = `batch_kelompok_${b}`;
+          let val = (currentSets.data.find((s) => s.key === key)?.value || "")
+            .split(",")
+            .map((id) => id.trim())
+            .filter((id) => id !== "" && !kelIds.includes(id));
+          updates[key] = val.join(",");
+        });
+      }
+      // Now set for this batch
+      updates[`batch_kelompok_${batchNum}`] = kelIds.join(",");
+      await postAPI("saveSettings", updates);
     }
     const res = await postAPI("generateJadwalKelompok", {
       assignments,
@@ -5539,7 +5552,7 @@ async function jadwalAdminView(area, batchNum = null) {
                 <div class="card-body">
                     <div class="d-flex justify-between align-center mb-3 wrap gap-3" style="background:#f1f5f9; padding:12px; border-radius:8px;">
                         <span class="text-sm" style="color:#475569">
-                            <i class="fa-solid fa-circle-info text-primary"></i> Info: <strong>P</strong> = Pagi, <strong>S</strong> = Siang, <strong>M</strong> = Malam
+                            <i class="fa-solid fa-circle-info text-primary"></i> Info: <strong>P</strong> = Pagi, <strong>S</strong> = Siang, <strong>M</strong> = Malam, <strong>L</strong> = Libur (Hari Minggu)
                         </span>
                         <div class="d-flex gap-2">
                             <button class="btn btn-sm" style="background:#e2e8f0; color:#475569;" onclick="document.querySelectorAll('.table-responsive').forEach(el=>el.scrollBy({left: -300, behavior: 'smooth'}))">
@@ -5563,21 +5576,38 @@ async function jadwalAdminView(area, batchNum = null) {
         </div>
     `;
 
-  const [resJadwal, resUsers, resSettings] = await Promise.all([
-    fetchAPI("getJadwal"),
+  const [resUsers, resSettings] = await Promise.all([
     fetchAPI("getUsers"),
     batchNum ? fetchAPI("getSettings") : Promise.resolve({ success: false }),
+  ]);
+
+  let filterUserIds = null;
+  if (batchNum && resSettings.success) {
+    const settingKey = `batch_kelompok_${batchNum}`;
+    const batchKelIds = (
+      resSettings.data.find((s) => s.key === settingKey)?.value || ""
+    )
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id !== "");
+
+    if (batchKelIds.length > 0) {
+      filterUserIds = resUsers.data
+        .filter((u) => batchKelIds.includes(String(u.kelompok_id)))
+        .map((u) => u.id);
+    } else {
+      filterUserIds = ["none"]; // Ensure it fetches nothing if no groups assigned
+    }
+  }
+
+  const [resJadwal] = await Promise.all([
+    fetchAPI("getJadwal", { user_id: filterUserIds }),
   ]);
 
   const wrapper = document.querySelector("#jadwal-table-wrapper");
   window.dtJadwalAdmin = [];
 
-  if (
-    resJadwal.success &&
-    resJadwal.data &&
-    resJadwal.data.length > 0 &&
-    resUsers.success
-  ) {
+  if (resJadwal.success && resJadwal.data && resUsers.success) {
     let schedules = resJadwal.data;
     const users = resUsers.data;
 
@@ -5734,29 +5764,44 @@ async function jadwalAdminView(area, batchNum = null) {
           if (index === 0) {
             bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}</td>`;
           }
-
           block.dates.forEach((dStr) => {
             const s = group.schedules.find(
               (x) => x.user_id == u.id && x.tanggal === dStr,
             );
+            const dObj_cell = new Date(dStr);
+            const isSunday = dObj_cell.getDay() === 0;
+
             let shiftText = "";
             let shiftStyle = "";
-            if (s && s.shift) {
-              if (s.shift == 1 || s.shift == "1") {
-                shiftText = "P";
-                shiftStyle = "color:var(--text-strong); font-weight:700;";
-              } else if (s.shift == 2 || s.shift == "2") {
-                shiftText = "S";
-                shiftStyle = "color:var(--text-strong); font-weight:700;";
-              } else if (s.shift == 3 || s.shift == "3") {
-                shiftText = "M";
-                shiftStyle = "color:var(--text-strong); font-weight:700;";
-              } else
-                shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
+
+            if (isSunday) {
+              shiftText = "L";
+              shiftStyle =
+                "text-align:center; border:1px solid #cbd5e1; background:#fee2e2; color:#ef4444; font-weight:800;";
             } else {
-              shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
+              if (s && s.shift) {
+                if (s.shift == 1 || s.shift == "1") {
+                  shiftText = "P";
+                  shiftStyle =
+                    "text-align:center; border:1px solid #cbd5e1; color:var(--text-strong); font-weight:700;";
+                } else if (s.shift == 2 || s.shift == "2") {
+                  shiftText = "S";
+                  shiftStyle =
+                    "text-align:center; border:1px solid #cbd5e1; color:var(--text-strong); font-weight:700;";
+                } else if (s.shift == 3 || s.shift == "3") {
+                  shiftText = "M";
+                  shiftStyle =
+                    "text-align:center; border:1px solid #cbd5e1; color:var(--text-strong); font-weight:700;";
+                } else {
+                  shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
+                  shiftStyle = "text-align:center; border:1px solid #cbd5e1;";
+                }
+              } else {
+                shiftText = `<span style="color:#94a3b8; font-size:0.7rem;">-</span>`;
+                shiftStyle = "text-align:center; border:1px solid #cbd5e1;";
+              }
             }
-            bodyHtml += `<td style="text-align:center; border:1px solid #cbd5e1; ${shiftStyle}">${shiftText}</td>`;
+            bodyHtml += `<td style="${shiftStyle}">${shiftText}</td>`;
           });
         });
 
@@ -5940,7 +5985,11 @@ window.exportJadwalPDF = async () => {
             (x) => x.user_id == u.id && x.tanggal === dStr,
           );
           let shiftText = "Libur";
-          if (s && s.shift) {
+          const isSun = new Date(dStr).getDay() === 0;
+
+          if (isSun) {
+            shiftText = "L";
+          } else if (s && s.shift) {
             if (s.shift == 1 || s.shift == "1") shiftText = "P";
             else if (s.shift == 2 || s.shift == "2") shiftText = "S";
             else if (s.shift == 3 || s.shift == "3") shiftText = "M";
@@ -5995,8 +6044,17 @@ window.exportJadwalPDF = async () => {
         }
 
         // Colorize Libur
-        if (data.section === "body" && data.cell.raw === "Libur") {
-          data.cell.styles.textColor = [37, 99, 235]; // Blue
+        if (
+          data.section === "body" &&
+          (data.cell.raw === "Libur" || data.cell.raw === "L")
+        ) {
+          data.cell.styles.textColor = [239, 68, 68]; // Red for L or Libur
+          if (data.cell.raw === "L") {
+            data.cell.styles.fillColor = [254, 226, 226]; // Red background for Sunday
+            data.cell.styles.fontStyle = "bold";
+          } else {
+            data.cell.styles.textColor = [37, 99, 235]; // Normal Libur is Blue
+          }
         }
       },
     });

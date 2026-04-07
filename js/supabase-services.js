@@ -181,7 +181,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         const { data, error } = await supabaseClient
           .from("presensi")
           .select("*, users!inner(nama, prodi)")
-          .range(0, 4999);
+          .range(0, 49999);
         if (error) throw error;
         return {
           success: true,
@@ -226,7 +226,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         const { data, error } = await query
           .order("tanggal", { ascending: true })
-          .range(0, 4999);
+          .range(0, 49999);
         if (error) throw error;
         return {
           success: true,
@@ -273,7 +273,7 @@ window.supabaseFetchAPI = async (action, payload) => {
           .select("user_id, users!inner(nama)")
           .eq("status", "Disetujui")
           .gt("created_at", lastWeek)
-          .range(0, 4999);
+          .range(0, 49999);
         if (error) throw error;
 
         const board = {};
@@ -370,17 +370,33 @@ window.supabaseFetchAPI = async (action, payload) => {
       }
 
       case "getUsers": {
-        const { data, error } = await supabaseClient
-          .from("users")
-          .select(
-            "id, username, nama, role, prodi, kelompok_id, tempat_id, angkatan, no_telp",
-          )
-          .order("nama", { ascending: true })
-          .range(0, 4999); // Handle up to 5000 users for scalability
-        if (error) throw error;
+        let allData = [];
+        let from = 0;
+        const step = 2000;
+        let finished = false;
+
+        while (!finished) {
+          const { data, error } = await supabaseClient
+            .from("users")
+            .select(
+              "id, username, nama, role, prodi, kelompok_id, tempat_id, angkatan, no_telp",
+            )
+            .order("nama", { ascending: true })
+            .range(from, from + step - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allData = allData.concat(data);
+          }
+          if (!data || data.length < step) {
+            finished = true;
+          } else {
+            from += step;
+          }
+        }
         return {
           success: true,
-          data: (data || []).map((u) => ({
+          data: allData.map((u) => ({
             ...u,
             kelompok: u.kelompok_id,
             tempat_id: u.tempat_id || "-",
@@ -408,7 +424,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         if (payload.ids && Array.isArray(payload.ids)) {
           lCol = lCol.in("user_id", payload.ids);
         } else {
-          lCol = lCol.range(0, 4999);
+          lCol = lCol.range(0, 49999);
         }
 
         const [{ data: mhs }, { data: logs }, { data: komp }] =
@@ -514,27 +530,45 @@ window.supabaseFetchAPI = async (action, payload) => {
       }
 
       case "getJadwal": {
-        let query = supabaseClient
-          .from("jadwal")
-          .select(
-            "*, users!inner(nama, kelompok_id), tempat_praktik!inner(nama_tempat)",
-          );
+        let allData = [];
+        let from = 0;
+        const step = 2000;
+        let finished = false;
 
-        if (payload.user_id) {
-          if (Array.isArray(payload.user_id)) {
-            query = query.in("user_id", payload.user_id);
-          } else {
-            query = query.eq("user_id", payload.user_id);
+        while (!finished) {
+          let query = supabaseClient
+            .from("jadwal")
+            .select(
+              "*, users!inner(nama, kelompok_id), tempat_praktik!inner(nama_tempat)",
+            );
+
+          if (payload.user_id) {
+            if (Array.isArray(payload.user_id)) {
+              query = query.in("user_id", payload.user_id);
+            } else {
+              query = query.eq("user_id", payload.user_id);
+            }
+          } else if (payload.kelompok_id) {
+            query = query.eq("users.kelompok_id", payload.kelompok_id);
           }
-        } else if (payload.kelompok_id) {
-          query = query.eq("users.kelompok_id", payload.kelompok_id);
+
+          const { data, error } = await query.range(from, from + step - 1);
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allData = allData.concat(data);
+          }
+
+          if (!data || data.length < step) {
+            finished = true;
+          } else {
+            from += step;
+          }
         }
 
-        const { data, error } = await query.range(0, 4999);
-        if (error) throw error;
         return {
           success: true,
-          data: data.map((j) => ({
+          data: allData.map((j) => ({
             ...j,
             nama: j.users.nama,
             kelompok_id: j.users.kelompok_id,
@@ -549,7 +583,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         if (payload.tanggal) query = query.eq("tanggal", payload.tanggal);
         const { data, error } = await query
           .order("tanggal", { ascending: false })
-          .range(0, 4999);
+          .range(0, 49999);
         if (error) throw error;
         return { success: true, data: data || [] };
       }
@@ -559,7 +593,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
         const { data, error } = await query
           .order("tanggal", { ascending: false })
-          .range(0, 4999);
+          .range(0, 49999);
         if (error) throw error;
         return { success: true, data: data || [] };
       }
