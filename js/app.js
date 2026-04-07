@@ -3274,6 +3274,17 @@ async function adminLaporanView(area) {
 
 // ============ GENERATE JADWAL VIEW ============
 async function generatorKelompokView(area, batchNum = null) {
+  window.filterKelompokSelector = (query) => {
+    const container = document.getElementById("kelompok-selector-container");
+    if (!container) return;
+    const items = container.querySelectorAll("label");
+    const q = (query || "").toLowerCase();
+    items.forEach((item) => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? "flex" : "none";
+    });
+  };
+
   const batchSuffix = batchNum ? ` ${batchNum}` : "";
   area.innerHTML = `
         <div class="animate-fade-up">
@@ -3287,13 +3298,16 @@ async function generatorKelompokView(area, batchNum = null) {
                         <div class="form-group mb-4">
                             <div class="d-flex justify-between align-center mb-2">
                                 <label class="m-0">Pilih Kelompok untuk Batch ini</label>
-                                <div class="d-flex gap-2">
+                                <div class="d-flex gap-2 align-center">
+                                    <input type="text" id="search-kelompok" class="form-control form-control-sm" style="width: 200px;" placeholder="🔍 Cari Kelompok..." onkeyup="filterKelompokSelector(this.value)">
                                     <button type="button" class="btn btn-xs btn-outline" onclick="selectAllKelompok(true)">Pilih Semua</button>
                                     <button type="button" class="btn btn-xs btn-outline" onclick="selectAllKelompok(false)">Hapus Semua</button>
                                 </div>
                             </div>
-                            <div id="kelompok-selector-container" class="d-flex flex-wrap gap-2 p-3 bg-light rounded" style="max-height: 200px; overflow-y: auto;">
-                                <i class="fa-solid fa-spinner fa-spin text-primary"></i> Memuat daftar kelompok...
+                            <div class="table-responsive" style="border-radius:8px">
+                                <div id="kelompok-selector-container" class="grid-cards p-3 bg-light" style="display: grid; grid-template-columns: repeat(10, 1fr); min-width: 1500px; max-height: 350px; overflow-y: auto; gap: 0.5rem;">
+                                    <i class="fa-solid fa-spinner fa-spin text-primary"></i> Memuat daftar kelompok...
+                                </div>
                             </div>
                         </div>
 
@@ -3379,15 +3393,23 @@ async function generatorKelompokView(area, batchNum = null) {
 
   const kelSelector = document.getElementById("kelompok-selector-container");
   if (kelSelector) {
-    kelSelector.innerHTML = resKelompok.data
+    // Sort Kelompok numerically
+    const sortedGroups = resKelompok.data.sort((a, b) =>
+      a.nama_kelompok.localeCompare(b.nama_kelompok, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+
+    kelSelector.innerHTML = sortedGroups
       .map((k) => {
         const isChecked = savedKelompokIds.includes(String(k.id))
           ? "checked"
           : "";
         return `
-                <label class="d-flex align-center gap-2 p-2 rounded cursor-pointer hover-bg-primary-soft border" style="background:white; min-width:150px;">
+                <label class="d-flex align-center gap-2 p-1 rounded cursor-pointer hover-bg-primary-soft border" style="background:white;">
                     <input type="checkbox" name="sel-kelompok" value="${k.id}" ${isChecked}>
-                    <span class="text-sm font-bold">${k.nama_kelompok}</span>
+                    <span class="text-xs font-bold" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${k.nama_kelompok}</span>
                 </label>
             `;
       })
