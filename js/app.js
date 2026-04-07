@@ -612,6 +612,25 @@ async function informasiPraktikView(area) {
 }
 
 // Router Simple
+window.togglePublishNilai = async (batch, status) => {
+  const val = status ? "1" : "0";
+  showLoader(true);
+  const res = await postAPI("saveSettings", {
+    [`publish_nilai_${batch}`]: val,
+  });
+  showLoader(false);
+  if (res.success) {
+    showToast(
+      "Berhasil",
+      `Pengumuman Nilai Batch ${batch} ${status ? "diaktifkan" : "dinonaktifkan"}.`,
+      "success",
+    );
+    loadView("settingsAdminView");
+  } else {
+    showToast("Gagal", res.message, "error");
+  }
+};
+
 function loadView(viewName) {
   const area = document.getElementById("content-area");
   area.innerHTML = ""; // clear
@@ -1824,13 +1843,53 @@ async function nilaiMahasiswaView(area) {
     `;
 
   // Kita gunakan endpoint getPenilaianAkhir yang sudah ada, lalu filter by user id
-  const res = await fetchAPI("getPenilaianAkhir");
+  const [res, resSets] = await Promise.all([
+    fetchAPI("getPenilaianAkhir"),
+    fetchAPI("getSettings"),
+  ]);
   const container = document.getElementById("nilai-mhs-content");
 
-  if (res.success && res.data) {
+  if (res.success && res.data && resSets.success) {
     const myData = res.data.find((d) => d.id === currentUser.id);
     const wKlinik = res.weights?.w_klinik || 50;
     const wAkademik = res.weights?.w_akademik || 50;
+
+    // Determine my batch
+    let myBatch = null;
+    if (currentUser.kelompok_id) {
+      [1, 2, 3].forEach((b) => {
+        const batchKey = `batch_kelompok_${b}`;
+        const kelIds = (
+          resSets.data.find((s) => s.key === batchKey)?.value || ""
+        )
+          .split(",")
+          .map((id) => id.trim());
+        if (kelIds.includes(String(currentUser.kelompok_id))) {
+          myBatch = b;
+        }
+      });
+    }
+
+    const publishKey = myBatch ? `publish_nilai_${myBatch}` : null;
+    const isPublished = publishKey
+      ? resSets.data.find((s) => s.key === publishKey)?.value === "1"
+      : false;
+
+    if (!isPublished) {
+      container.innerHTML = `
+            <div class="animate-pulse" style="padding: 40px; text-align:center;">
+                <div class="icon-box" style="width:80px; height:80px; margin: 0 auto 20px; background:#fef3c7; color:#b45309; font-size: 2rem;">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h3 style="color:#1e293b; margin-bottom:10px">Nilai Belum Diumumkan</h3>
+                <p class="text-muted" style="max-width:400px; margin:0 auto">Mohon Maaf, nilai Anda untuk Batch ${myBatch || ""} saat ini sedang dalam proses verifikasi oleh Admin dan belum diumumkan.</p>
+                <div class="badge bg-warning-soft text-warning mt-4" style="padding: 10px 20px; font-size:0.9rem">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Hubungi Admin untuk info lebih lanjut
+                </div>
+            </div>
+        `;
+      return;
+    }
 
     if (myData) {
       const statusClass =
@@ -4589,6 +4648,30 @@ async function settingsAdminView(area) {
                         </div>
                         <div id="weight-preseptor-error" class="hidden alert bg-danger-soft text-danger p-2 mb-3" style="font-size:0.8rem">
                              <i class="fa-solid fa-triangle-exclamation"></i> Total Klinik + Akademik saat ini <span id="current-preseptor-total">0</span>%. Harus 100%.
+                        </div>
+
+                        <hr class="my-4" style="opacity:0.1">
+                        <h4 class="mb-3"><i class="fa-solid fa-bullhorn text-primary"></i> Kontrol Pengumuman Nilai</h4>
+                        <p class="text-sm text-muted mb-3">Tentukan batch mana yang sudah diizinkan melihat nilai akhir mereka.</p>
+                        <div class="grid-cards mb-4" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                            ${[1, 2, 3]
+                              .map((b) => {
+                                const isPublished =
+                                  resSets.data.find(
+                                    (s) => s.key === `publish_nilai_${b}`,
+                                  )?.value === "1";
+                                return `
+                                    <div class="p-3 border rounded d-flex flex-column gap-2 align-center text-center ${isPublished ? "bg-success-soft" : "bg-light"}" style="border-radius:12px; border:1px solid ${isPublished ? "#bbf7d0" : "#e2e8f0"} !important;">
+                                        <span class="font-bold text-sm">BATCH ${b}</span>
+                                        <label class="switch">
+                                            <input type="checkbox" onchange="togglePublishNilai(${b}, this.checked)" ${isPublished ? "checked" : ""}>
+                                            <span class="slider round"></span>
+                                        </label>
+                                        <span class="text-xs ${isPublished ? "text-success font-bold" : "text-muted"}">${isPublished ? "DIUMUMKAN" : "DISEMBUNYIKAN"}</span>
+                                    </div>
+                                `;
+                              })
+                              .join("")}
                         </div>
 
                         <hr class="my-4" style="opacity:0.1">
