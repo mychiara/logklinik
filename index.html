@@ -58,6 +58,37 @@
       </div>
     </div>
 
+    <!-- PWA Gatekeeper Wall -->
+    <div id="pwa-gatekeeper" class="hidden">
+      <div class="gatekeeper-card animate-fade-up">
+        <div class="gatekeeper-icon">
+          <i class="fa-solid fa-mobile-screen-button"></i>
+          <i class="fa-solid fa-arrow-down install-arrow"></i>
+        </div>
+        <h2>Aplikasi Khusus Mobile!</h2>
+        <p>E-Klinik dirancang sebagai aplikasi <strong>fullscreen</strong> untuk kenyamanan Anda. Agar sinkronisasi offline bekerja optimal, Anda <strong>wajib menginstal</strong> web ini ke layar HP (Home Screen).</p>
+        
+        <div id="pwa-install-actions">
+           <!-- Android / Chrome -->
+           <button id="btn-install-pwa" class="btn btn-primary hidden" style="width: 100%; border-radius: 50px; font-weight: 700; height: 50px; font-size: 1.05rem; box-shadow: 0 10px 20px -5px rgba(139, 92, 246, 0.4); justify-content:center;">
+             <i class="fa-solid fa-download mr-2"></i> Install App Sekarang
+           </button>
+           
+           <!-- Manual Instructions (iOS / Fallback) -->
+           <div id="pwa-manual-instruct" class="hidden">
+             <div style="background: rgba(139, 92, 246, 0.08); padding: 15px; border-radius: 12px; margin-top: 10px; text-align: left; border: 1px dashed rgba(139, 92, 246, 0.3);">
+               <div style="font-weight: 700; margin-bottom: 8px; color: var(--primary-dark);"><i class="fa-brands fa-apple"></i> Pengguna iPhone/iPad:</div>
+               <ol style="margin: 0; padding-left: 20px; font-size: 0.85rem; line-height: 1.5; color: var(--text-strong);">
+                 <li>Ketuk icon <strong>Share</strong> (kotak panah atas) di bar penelusuran.</li>
+                 <li>Gulir bawah lalu pilih <strong>"Add to Home Screen"</strong>.</li>
+                 <li>Buka aplikasi lewat icon E-Klinik di HP.</li>
+               </ol>
+             </div>
+           </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Login Section -->
     <section id="login-section" class="login-wrapper">
       <div class="login-container">
