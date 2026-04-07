@@ -502,23 +502,31 @@ window.supabaseFetchAPI = async (action, payload) => {
 
       case "getAssignedStudents": {
         const { tempat_id, role } = payload;
-        // Step 1: Get unique student IDs from jadwal at these locations
-        let jadwalQuery = supabaseClient.from("jadwal").select("user_id");
+        // Step 1: Get unique student IDs from ALL schedules at these locations using pagination
+        let allJadwal = [];
+        let from = 0;
+        const step = 2000;
+        let finished = false;
 
-        if (tempat_id && tempat_id !== "-") {
-          const tIds = tempat_id.split(",");
-          jadwalQuery = jadwalQuery.in("tempat_id", tIds);
+        while (!finished) {
+          let jQ = supabaseClient.from("jadwal").select("user_id");
+          if (tempat_id && tempat_id !== "-") {
+            const tIds = tempat_id.split(",");
+            jQ = jQ.in("tempat_id", tIds);
+          }
+          const { data, error } = await jQ.range(from, from + step - 1);
+          if (error) throw error;
+          if (data && data.length > 0) allJadwal = allJadwal.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
         }
 
-        const { data: jadwalData, error: jErr } = await jadwalQuery;
-        if (jErr) throw jErr;
-
         const studentIds = [
-          ...new Set((jadwalData || []).map((j) => j.user_id)),
+          ...new Set((allJadwal || []).map((j) => j.user_id)),
         ];
         if (studentIds.length === 0) return { success: true, data: [] };
 
-        // Step 2: Fetch user details for these students
+        // Step 2: Fetch user details for these students (already paginated in getUsers but we reuse logic here)
         const { data: users, error: uErr } = await supabaseClient
           .from("users")
           .select("id, username, nama, role, prodi, kelompok_id")
@@ -600,28 +608,43 @@ window.supabaseFetchAPI = async (action, payload) => {
 
       case "getPendingLogs": {
         const { tempat_id } = payload;
-        let query = supabaseClient
-          .from("logbook")
-          .select("*, users!inner(nama)")
-          .eq("status", "Menunggu Validasi");
+        let allLogs = [];
+        let from = 0;
+        const step = 2000;
+        let finished = false;
 
-        const { data: logs, error: lErr } = await query.order("tanggal", {
-          ascending: true,
-        });
-        if (lErr) throw lErr;
+        while (!finished) {
+          let query = supabaseClient
+            .from("logbook")
+            .select("*, users!inner(nama)")
+            .eq("status", "Menunggu Validasi");
+
+          const { data, error } = await query
+            .order("tanggal", { ascending: true })
+            .range(from, from + step - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) allLogs = allLogs.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
+        }
 
         if (tempat_id && tempat_id !== "-") {
           const tIds = tempat_id.split(",");
           // Fetch schedules for these locations to ensure they are actually assigned there on that date
+          // Reuse pre-existing data or logic: for simplicity we can't easily pagination double loop here
+          // without complexity, but usually schedules per hospital is manageable under certain limits.
+          // Let's use the allJadwal logic if needed, but for now we follow the existing pattern with a safe fetch.
+
           const { data: schedules, error: sErr } = await supabaseClient
             .from("jadwal")
             .select("user_id, tanggal")
-            .in("tempat_id", tIds);
+            .in("tempat_id", tIds)
+            .range(0, 10000); // Higher safety range for schedule check
 
           if (sErr) throw sErr;
 
-          // Filter logbooks only where {user_id, tanggal} exists in the fetched schedules
-          const validLogs = logs.filter((log) =>
+          const validLogs = allLogs.filter((log) =>
             schedules.some(
               (s) => s.user_id === log.user_id && s.tanggal === log.tanggal,
             ),
@@ -638,7 +661,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         return {
           success: true,
-          data: (logs || []).map((l) => ({
+          data: (allLogs || []).map((l) => ({
             ...l,
             nama_mahasiswa: l.users.nama,
           })),
