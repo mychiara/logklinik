@@ -4983,7 +4983,43 @@ async function jadwalAdminView(area, batchNum = null) {
 
         blocks.forEach((block, blockIdx) => {
           if (index === 0) {
-            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">${block.nama_tempat}</td>`;
+            // Find Preceptors for this location
+            const preceptors = users.filter(
+              (usr) =>
+                usr.role === "preseptor" || usr.role === "preseptor_akademik",
+            );
+            const preClinic = preceptors
+              .filter(
+                (p) =>
+                  p.role === "preseptor" &&
+                  (p.tempat_id || "")
+                    .split(",")
+                    .map((id) => id.trim())
+                    .includes(String(block.tempat_id)),
+              )
+              .map((p) => p.nama.toUpperCase());
+            const preAkad = preceptors
+              .filter(
+                (p) =>
+                  p.role === "preseptor_akademik" &&
+                  (p.tempat_id || "")
+                    .split(",")
+                    .map((id) => id.trim())
+                    .includes(String(block.tempat_id)),
+              )
+              .map((p) => p.nama.toUpperCase());
+
+            const preceptorHtml = `
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #cbd5e1; font-size: 0.65rem; font-weight: normal; color: #64748b; text-align: left;">
+                <div style="margin-bottom:2px"><strong>PRE. KLINIK:</strong><br>${preClinic.length > 0 ? preClinic.join(", ") : "-"}</div>
+                <div><strong>PRE. AKADEMIK:</strong><br>${preAkad.length > 0 ? preAkad.join(", ") : "-"}</div>
+              </div>
+            `;
+
+            bodyHtml += `<td rowspan="${group.users.length}" style="text-align:center; vertical-align:middle; border:1px solid #cbd5e1; background:#fff; padding: 10px; white-space:normal; font-weight:600; color:var(--primary-dark);">
+                ${block.nama_tempat}
+                ${preceptorHtml}
+            </td>`;
           }
 
           block.dates.forEach((dStr) => {
@@ -5200,7 +5236,35 @@ window.exportJadwalPDF = async () => {
       const rowData = [index + 1, u.nama, u.username];
 
       blocks.forEach((block, bIdx) => {
-        rowData.push(block.nama_tempat); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
+        // Find Preceptors for PDF
+        const preceptors = users.filter(
+          (usr) =>
+            usr.role === "preseptor" || usr.role === "preseptor_akademik",
+        );
+        const preClinic = preceptors
+          .filter(
+            (p) =>
+              p.role === "preseptor" &&
+              (p.tempat_id || "")
+                .split(",")
+                .map((id) => id.trim())
+                .includes(String(block.tempat_id)),
+          )
+          .map((p) => p.nama.toUpperCase());
+        const preAkad = preceptors
+          .filter(
+            (p) =>
+              p.role === "preseptor_akademik" &&
+              (p.tempat_id || "")
+                .split(",")
+                .map((id) => id.trim())
+                .includes(String(block.tempat_id)),
+          )
+          .map((p) => p.nama.toUpperCase());
+
+        const preceptorText = `\nPre Clinic: ${preClinic.length > 0 ? preClinic.join(", ") : "-"}\nPre Akad: ${preAkad.length > 0 ? preAkad.join(", ") : "-"}`;
+
+        rowData.push(block.nama_tempat + preceptorText); // In AutoTable we might repeat it unless we use rowSpan hooks later, but repeating is safer for PDFs
 
         block.dates.forEach((dStr) => {
           const s = group.schedules.find(
