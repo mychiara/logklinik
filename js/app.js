@@ -687,6 +687,7 @@ async function dashboardView(area) {
       fetchAPI("getDashboardStats", {
         user_id: currentUser.id,
         role: currentUser.role,
+        tempat_id: currentUser.tempat_id,
       }),
       currentUser.role.includes("preseptor")
         ? fetchAPI("getMendesakLogs", { tempat_id: currentUser.tempat_id })
@@ -765,19 +766,43 @@ async function dashboardView(area) {
                       </div>
                       <div class="card-body" style="padding:1rem;">
                           ${resGap.data
-                            .map(
-                              (g) => `
-                              <div class="mb-2">
-                                  <div class="d-flex justify-between text-xs mb-1">
-                                      <span class="text-truncate" style="max-width:180px">${g.nama}</span>
-                                      <span class="font-bold">${g.count}x</span>
-                                  </div>
-                                  <div style="height:4px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
-                                      <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.6"></div>
-                                  </div>
-                              </div>
-                          `,
-                            )
+                            .map((g, idx) => {
+                              let text = g.nama || "";
+                              let firstNumIdx = text.search(/[0-9]+\./);
+                              let formattedText = text;
+
+                              if (firstNumIdx !== -1) {
+                                let titlePart = text
+                                  .substring(0, firstNumIdx)
+                                  .trim();
+                                let listPart = text.substring(firstNumIdx);
+                                formattedText =
+                                  titlePart +
+                                  "<div style='margin-top:4px; padding-left:5px; color:var(--text-strong);'>" +
+                                  listPart.replace(
+                                    /([0-9]+\.)/g,
+                                    '<br><span style="color:var(--primary); font-weight:700; margin-right:5px; display:inline-block;">$1</span>',
+                                  ) +
+                                  "</div>";
+                              }
+
+                              return `
+                                <div class="d-flex gap-2 mb-3" style="align-items:flex-start;">
+                                    <div style="width:24px; height:24px; background:var(--primary-light); color:var(--primary); border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.7rem; flex-shrink:0; margin-top:2px;">
+                                        ${idx + 1}
+                                    </div>
+                                    <div style="flex:1; overflow:hidden;">
+                                        <div class="d-flex justify-between text-xs mb-2">
+                                            <div style="line-height:1.6; padding-right:15px;">${formattedText}</div>
+                                            <span class="font-bold whitespace-nowrap" style="color:var(--primary-dark)">${g.count}x</span>
+                                        </div>
+                                        <div style="height:5px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
+                                            <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.7; border-radius:10px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            })
                             .join("")}
                       </div>
                   </div>
