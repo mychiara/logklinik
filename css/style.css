@@ -173,11 +173,20 @@ a {
 .justify-between {
   justify-content: space-between;
 }
+.justify-end {
+  justify-content: flex-end;
+}
+.align-center {
+  align-items: center;
+}
 .justify-center {
   justify-content: center;
 }
 .wrap {
   flex-wrap: wrap;
+}
+.gap-1 {
+  gap: 0.25rem;
 }
 .gap-2 {
   gap: 0.5rem;
@@ -1408,9 +1417,52 @@ tbody tr:hover {
   }
 }
 
-/* DESKTOP OPTIMIZATION DONE VIA SCALE */
+/* ---------- PAGINATION ---------- */
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  margin-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+.pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.pagination-controls {
+  display: flex;
+  gap: 5px;
+}
+.page-btn {
+  padding: 5px 12px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-strong);
+  transition: all 0.2s;
+}
+.page-btn:hover {
+  background: var(--bg-main);
+  border-color: var(--primary-light);
+}
+.page-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
-  .content-area {
-    padding: 1rem;
+  .pagination-container {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
   }
 }

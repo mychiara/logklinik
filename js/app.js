@@ -3279,9 +3279,15 @@ async function adminLaporanView(area) {
   area.innerHTML = `
           <div class="animate-fade-up">
               <div class="card">
-                  <div class="card-header">
-                      <h3 class="m-0"><i class="fa-solid fa-triangle-exclamation text-danger"></i> Daftar Laporan Kejadian</h3>
-                      <p class="text-muted mt-1" style="font-size:0.85rem;">Gunakan halaman ini untuk memantau laporan dari mahasiswa dan preseptor klinik.</p>
+                  <div class="card-header d-flex justify-between align-center wrap gap-2">
+                      <div>
+                          <h3 class="m-0"><i class="fa-solid fa-triangle-exclamation text-danger"></i> Daftar Laporan Kejadian</h3>
+                          <p class="text-muted mt-1" style="font-size:0.85rem;">Gunakan halaman ini untuk memantau laporan dari mahasiswa dan preseptor klinik.</p>
+                      </div>
+                      <div class="input-with-icon" style="width:250px;">
+                          <i class="fa-solid fa-magnifying-glass"></i>
+                          <input type="text" id="search-laporan" class="form-control" placeholder="Cari laporan..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+                      </div>
                   </div>
                   <div class="card-body">
                       <div class="table-responsive">
@@ -3302,6 +3308,7 @@ async function adminLaporanView(area) {
                               </tbody>
                           </table>
                       </div>
+                      <div class="pagination-container" id="pagination-laporan"></div>
                   </div>
               </div>
           </div>
@@ -3311,9 +3318,60 @@ async function adminLaporanView(area) {
   const tbody = document.querySelector("#table-laporan tbody");
   if (!tbody) return;
 
-  if (res.success && res.data.length > 0) {
-    tbody.innerHTML = res.data
-      .reverse()
+  let currentPage = 1;
+  const itemsPerPage = 10;
+  let allData = [];
+  let currentFilteredData = [];
+
+  const renderPagination = () => {
+    const totalPages = Math.ceil(currentFilteredData.length / itemsPerPage);
+    const container = document.getElementById("pagination-laporan");
+    if (!container) return;
+
+    if (totalPages <= 1) {
+      container.innerHTML = "";
+      return;
+    }
+
+    let buttons = `
+      <div class="pagination-info">Menampilkan ${Math.min(currentFilteredData.length, (currentPage - 1) * itemsPerPage + 1)}-${Math.min(currentFilteredData.length, currentPage * itemsPerPage)} dari ${currentFilteredData.length} laporan</div>
+      <div class="pagination-controls">
+        <button class="page-btn" ${currentPage === 1 ? "disabled" : ""} onclick="changeLaporanPage(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+    `;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - 2 && i <= currentPage + 2)
+      ) {
+        buttons += `<button class="page-btn ${i === currentPage ? "active" : ""}" onclick="changeLaporanPage(${i})">${i}</button>`;
+      } else if (i === currentPage - 3 || i === currentPage + 3) {
+        buttons += `<span style="padding: 5px 8px; color: #cbd5e1;">...</span>`;
+      }
+    }
+
+    buttons += `
+        <button class="page-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="changeLaporanPage(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    `;
+    container.innerHTML = buttons;
+  };
+
+  const render = (data, page = 1) => {
+    currentPage = page;
+    currentFilteredData = data;
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const paginatedItems = data.slice(start, end);
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-table">Tidak ada laporan ditemukan.</td></tr>`;
+      document.getElementById("pagination-laporan").innerHTML = "";
+      return;
+    }
+
+    tbody.innerHTML = paginatedItems
       .map((l) => {
         const statusColor = l.status === "Baru" ? "bg-danger" : "bg-success";
         return `
@@ -3358,9 +3416,31 @@ async function adminLaporanView(area) {
               `;
       })
       .join("");
+    renderPagination();
+  };
+
+  window.changeLaporanPage = (page) => {
+    render(currentFilteredData, page);
+  };
+
+  if (res.success && res.data.length > 0) {
+    allData = [...res.data].reverse();
+    render(allData);
   } else {
     tbody.innerHTML = `<tr><td colspan="7" class="empty-table">Belum ada laporan kejadian.</td></tr>`;
   }
+
+  document.getElementById("search-laporan").oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    const results = allData.filter(
+      (l) =>
+        l.nama_pelapor.toLowerCase().includes(q) ||
+        l.tipe_kejadian.toLowerCase().includes(q) ||
+        l.deskripsi.toLowerCase().includes(q) ||
+        (l.nama_terlapor || "").toLowerCase().includes(q),
+    );
+    render(results, 1);
+  };
 
   window.updateStatusLaporan = async (id, status) => {
     if (!confirm(`Tandai laporan ini sebagai ${status}?`)) return;
@@ -3714,6 +3794,7 @@ async function rekapLogbookAdminView(area) {
                               <tbody><tr><td colspan="2" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menganalisis logbook...</td></tr></tbody>
                           </table>
                       </div>
+                      <div class="pagination-container" id="pagination-rekap-log"></div>
                   </div>
               </div>
           </div>
@@ -3723,96 +3804,151 @@ async function rekapLogbookAdminView(area) {
   const tableBody = document.querySelector("#table-rekap-log tbody");
   if (!tableBody) return;
 
+  let currentPage = 1;
+  const itemsPerPage = 10;
   window.dtRekapLog = [];
+  let currentFilteredData = [];
+
+  const renderPagination = () => {
+    const totalPages = Math.ceil(currentFilteredData.length / itemsPerPage);
+    const container = document.getElementById(`pagination-rekap-log`);
+    if (!container) return;
+
+    if (totalPages <= 1) {
+      container.innerHTML = "";
+      return;
+    }
+
+    let buttons = `
+      <div class="pagination-info">Menampilkan ${Math.min(currentFilteredData.length, (currentPage - 1) * itemsPerPage + 1)}-${Math.min(currentFilteredData.length, currentPage * itemsPerPage)} dari ${currentFilteredData.length} mahasiswa</div>
+      <div class="pagination-controls">
+        <button class="page-btn" ${currentPage === 1 ? "disabled" : ""} onclick="changeRekapPage(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+    `;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - 2 && i <= currentPage + 2)
+      ) {
+        buttons += `<button class="page-btn ${i === currentPage ? "active" : ""}" onclick="changeRekapPage(${i})">${i}</button>`;
+      } else if (i === currentPage - 3 || i === currentPage + 3) {
+        buttons += `<span style="padding: 5px 8px; color: #cbd5e1;">...</span>`;
+      }
+    }
+
+    buttons += `
+        <button class="page-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="changeRekapPage(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    `;
+    container.innerHTML = buttons;
+  };
+
+  const render = (data, page = 1) => {
+    currentPage = page;
+    currentFilteredData = data;
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const paginatedItems = data.slice(start, end);
+
+    if (data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Tidak ada data ditemukan</td></tr>`;
+      document.getElementById("pagination-rekap-log").innerHTML = "";
+      return;
+    }
+
+    tableBody.innerHTML = paginatedItems
+      .map((m, idx) => {
+        const totalTercapai = m.rekap.filter(
+          (r) => r.status === "Tercapai",
+        ).length;
+        const totalTarget = m.rekap.length;
+
+        return `
+                <tr class="animate-fade-up">
+                    <td style="width:250px; vertical-align:top">
+                        <strong>${m.nama}</strong><br>
+                        <small class="text-muted">${m.prodi}</small>
+                        <div class="mt-2">
+                            <span class="badge ${totalTercapai === totalTarget ? "bg-success" : "bg-warning"}" style="font-size:0.75rem">
+                                ${totalTercapai} / ${totalTarget} Kompetensi
+                            </span>
+                        </div>
+                        <button class="btn btn-primary-soft btn-sm mt-3" onclick="toggleRekapDetail('${m.user_id}')" id="btn-toggle-${m.user_id}">
+                            <i class="fa-solid fa-eye"></i> Lihat Detail
+                        </button>
+                    </td>
+                    <td>
+                        <div id="rekap-detail-${m.user_id}" class="hidden">
+                            ${(() => {
+                              // Group rekap by kategori
+                              const gRekap = {};
+                              m.rekap.forEach((r) => {
+                                const kat =
+                                  r.kategori && r.kategori !== "-"
+                                    ? r.kategori
+                                    : "Umum";
+                                if (!gRekap[kat]) gRekap[kat] = [];
+                                gRekap[kat].push(r);
+                              });
+                              return Object.keys(gRekap)
+                                .map(
+                                  (kat) => `
+                                    <div style="margin-bottom:1rem;">
+                                        <div style="font-weight:700; font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
+                                            <i class="fa-solid fa-folder-open text-primary" style="margin-right:6px;"></i>${kat}
+                                        </div>
+                                        <div class="grid-skills-rekap" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
+                                            ${gRekap[kat]
+                                              .map(
+                                                (r) => `
+                                                <div class="skill-rekap-card" style="padding:10px; border-radius:8px; background:var(--bg-main); border-left: 4px solid ${r.status === "Tercapai" ? "#22c55e" : "#ef4444"};">
+                                                    <div style="font-weight:600; font-size:0.8rem; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${r.nama_skill}</div>
+                                                    <div class="d-flex justify-between align-center mt-2">
+                                                        <span class="badge ${r.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.75rem">${r.capaian} / ${r.target}</span>
+                                                        <small style="color:${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}; font-weight:700; font-size:0.75rem">${r.status.toUpperCase()}</small>
+                                                    </div>
+                                                </div>
+                                            `,
+                                              )
+                                              .join("")}
+                                        </div>
+                                    </div>
+                                `,
+                                )
+                                .join("");
+                            })()}
+                        </div>
+                        <div id="rekap-summary-text-${m.user_id}" class="text-muted" style="font-size:0.85rem">
+                            <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
+                        </div>
+                    </td>
+                </tr>
+            `;
+      })
+      .join("");
+    renderPagination();
+  };
+
+  window.changeRekapPage = (page) => {
+    render(currentFilteredData, page);
+  };
+
   if (res.success && res.data) {
     window.dtRekapLog = res.data;
-    const render = (data) => {
-      if (data.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Tidak ada data ditemukan</td></tr>`;
-        return;
-      }
-      tableBody.innerHTML = data
-        .map((m, idx) => {
-          const totalTercapai = m.rekap.filter(
-            (r) => r.status === "Tercapai",
-          ).length;
-          const totalTarget = m.rekap.length;
-
-          return `
-                  <tr class="animate-fade-up">
-                      <td style="width:250px; vertical-align:top">
-                          <strong>${m.nama}</strong><br>
-                          <small class="text-muted">${m.prodi}</small>
-                          <div class="mt-2">
-                              <span class="badge ${totalTercapai === totalTarget ? "bg-success" : "bg-warning"}" style="font-size:0.75rem">
-                                  ${totalTercapai} / ${totalTarget} Kompetensi
-                              </span>
-                          </div>
-                          <button class="btn btn-primary-soft btn-sm mt-3" onclick="toggleRekapDetail('${m.user_id}')" id="btn-toggle-${m.user_id}">
-                              <i class="fa-solid fa-eye"></i> Lihat Detail
-                          </button>
-                      </td>
-                      <td>
-                          <div id="rekap-detail-${m.user_id}" class="hidden">
-                              ${(() => {
-                                // Group rekap by kategori
-                                const gRekap = {};
-                                m.rekap.forEach((r) => {
-                                  const kat =
-                                    r.kategori && r.kategori !== "-"
-                                      ? r.kategori
-                                      : "Umum";
-                                  if (!gRekap[kat]) gRekap[kat] = [];
-                                  gRekap[kat].push(r);
-                                });
-                                return Object.keys(gRekap)
-                                  .map(
-                                    (kat) => `
-                                      <div style="margin-bottom:1rem;">
-                                          <div style="font-weight:700; font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
-                                              <i class="fa-solid fa-folder-open text-primary" style="margin-right:6px;"></i>${kat}
-                                          </div>
-                                          <div class="grid-skills-rekap" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
-                                              ${gRekap[kat]
-                                                .map(
-                                                  (r) => `
-                                                  <div class="skill-rekap-card" style="padding:10px; border-radius:8px; background:var(--bg-main); border-left: 4px solid ${r.status === "Tercapai" ? "#22c55e" : "#ef4444"};">
-                                                      <div style="font-weight:600; font-size:0.8rem; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${r.nama_skill}</div>
-                                                      <div class="d-flex justify-between align-center mt-2">
-                                                          <span class="badge ${r.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.75rem">${r.capaian} / ${r.target}</span>
-                                                          <small style="color:${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}; font-weight:700; font-size:0.75rem">${r.status.toUpperCase()}</small>
-                                                      </div>
-                                                  </div>
-                                              `,
-                                                )
-                                                .join("")}
-                                          </div>
-                                      </div>
-                                  `,
-                                  )
-                                  .join("");
-                              })()}
-                          </div>
-                          <div id="rekap-summary-text-${m.user_id}" class="text-muted" style="font-size:0.85rem">
-                              <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
-                          </div>
-                      </td>
-                  </tr>
-              `;
-        })
-        .join("");
-    };
-
     render(res.data);
-
-    document.getElementById("search-rekap").oninput = (e) => {
-      const q = e.target.value.toLowerCase();
-      const filtered = res.data.filter((m) => m.nama.toLowerCase().includes(q));
-      render(filtered);
-    };
   } else {
-    tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Gagal memuat rekap data</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Belum ada data rekap logbook</td></tr>`;
   }
+
+  document.getElementById("search-rekap").oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    const results = window.dtRekapLog.filter(
+      (m) =>
+        m.nama.toLowerCase().includes(q) || m.prodi.toLowerCase().includes(q),
+    );
+    render(results, 1);
+  };
 }
 
 window.toggleRekapDetail = (userId) => {
@@ -3871,7 +4007,13 @@ async function kelompokAdminView(area) {
           <div class="animate-fade-up">
               <div class="card">
                   <div class="card-header d-flex justify-between align-center wrap gap-2">
-                      <h3><i class="fa-solid fa-users-rectangle text-primary"></i> Kelompok Mahasiswa</h3>
+                      <div class="d-flex align-center gap-3 wrap">
+                          <h3 class="m-0"><i class="fa-solid fa-users-rectangle text-primary"></i> Kelompok Mahasiswa</h3>
+                          <div class="input-with-icon" style="width:250px;">
+                              <i class="fa-solid fa-magnifying-glass"></i>
+                              <input type="text" id="search-kelompok" class="form-control" placeholder="Cari kelompok..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+                          </div>
+                      </div>
                       <div class="d-flex gap-2 wrap">
                           <button class="btn btn-outline btn-sm" onclick="downloadKelompokTemplate()"><i class="fa-solid fa-download"></i> Template</button>
                           <label class="btn btn-warning btn-sm m-0" style="cursor:pointer">
@@ -3895,6 +4037,7 @@ async function kelompokAdminView(area) {
                               <tbody><tr><td colspan="3" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
                           </table>
                       </div>
+                      <div class="pagination-container" id="pagination-kelompok"></div>
                   </div>
               </div>
           </div>
@@ -3902,25 +4045,99 @@ async function kelompokAdminView(area) {
 
   const res = await fetchAPI("getKelompok");
   const tableBody = document.querySelector("#table-kelompok tbody");
-  if (res.success && res.data && res.data.length > 0) {
-    tableBody.innerHTML = res.data
+  if (!tableBody) return;
+
+  let currentPage = 1;
+  const itemsPerPage = 15;
+  let allData = [];
+  let currentFilteredData = [];
+
+  const renderPagination = () => {
+    const totalPages = Math.ceil(currentFilteredData.length / itemsPerPage);
+    const container = document.getElementById("pagination-kelompok");
+    if (!container) return;
+
+    if (totalPages <= 1) {
+      container.innerHTML = "";
+      return;
+    }
+
+    let buttons = `
+      <div class="pagination-info">Menampilkan ${Math.min(currentFilteredData.length, (currentPage - 1) * itemsPerPage + 1)}-${Math.min(currentFilteredData.length, currentPage * itemsPerPage)} dari ${currentFilteredData.length} kelompok</div>
+      <div class="pagination-controls">
+        <button class="page-btn" ${currentPage === 1 ? "disabled" : ""} onclick="changeKelompokPage(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+    `;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - 2 && i <= currentPage + 2)
+      ) {
+        buttons += `<button class="page-btn ${i === currentPage ? "active" : ""}" onclick="changeKelompokPage(${i})">${i}</button>`;
+      } else if (i === currentPage - 3 || i === currentPage + 3) {
+        buttons += `<span style="padding: 5px 8px; color: #cbd5e1;">...</span>`;
+      }
+    }
+
+    buttons += `
+        <button class="page-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="changeKelompokPage(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    `;
+    container.innerHTML = buttons;
+  };
+
+  const render = (data, page = 1) => {
+    currentPage = page;
+    currentFilteredData = data;
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const paginatedItems = data.slice(start, end);
+
+    if (data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="3" class="empty-table">Tidak ada kelompok ditemukan</td></tr>`;
+      document.getElementById("pagination-kelompok").innerHTML = "";
+      return;
+    }
+
+    tableBody.innerHTML = paginatedItems
       .map(
         (k, idx) => `
               <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
                   <td><strong><i class="fa-solid fa-users-rectangle" style="color:var(--primary)"></i> ${k.nama_kelompok}</strong></td>
                   <td><span class="badge bg-primary" style="font-size:0.95em">${k.jumlah_anggota || 0} mahasiswa</span></td>
                   <td style="text-align:right">
-                      <button class="btn btn-icon-ghost" onclick="aturAnggotaKelompok('${k.id}', '${k.nama_kelompok}')"><i class="fa-solid fa-user-plus" title="Atur Anggota"></i></button>
-                      <button class="btn btn-icon-ghost" onclick="bukaModalKelompok('${k.id}', '${k.nama_kelompok}')"><i class="fa-solid fa-pen-to-square"></i></button>
-                      <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('kelompok','${k.id}')"><i class="fa-solid fa-trash"></i></button>
+                      <div class="d-flex justify-end gap-1">
+                          <button class="btn btn-icon-ghost" onclick="aturAnggotaKelompok('${k.id}', '${k.nama_kelompok}')"><i class="fa-solid fa-user-plus" title="Atur Anggota"></i></button>
+                          <button class="btn btn-icon-ghost" onclick="bukaModalKelompok('${k.id}', '${k.nama_kelompok}')"><i class="fa-solid fa-pen-to-square"></i></button>
+                          <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('kelompok','${k.id}')"><i class="fa-solid fa-trash"></i></button>
+                      </div>
                   </td>
               </tr>
           `,
       )
       .join("");
+    renderPagination();
+  };
+
+  window.changeKelompokPage = (page) => {
+    render(currentFilteredData, page);
+  };
+
+  if (res.success && res.data && res.data.length > 0) {
+    allData = res.data;
+    render(allData);
   } else {
     tableBody.innerHTML = `<tr><td colspan="3" class="empty-table">Belum ada kelompok.</td></tr>`;
   }
+
+  document.getElementById("search-kelompok").oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    const results = allData.filter((k) =>
+      k.nama_kelompok.toLowerCase().includes(q),
+    );
+    render(results, 1);
+  };
 }
 
 window.bukaModalKelompok = (id = null, currentNama = "") => {
@@ -4137,6 +4354,7 @@ async function renderUserManagement(area, roleFilter, title, icon) {
                               <tbody><tr><td colspan="${roleFilter === "mahasiswa" ? 5 : 4}" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
                           </table>
                       </div>
+                      <div class="pagination-container" id="pagination-${roleFilter}"></div>
                   </div>
               </div>
           </div>
@@ -4153,11 +4371,21 @@ async function renderUserManagement(area, roleFilter, title, icon) {
 
   const tableBody = document.querySelector(`#table-users-${roleFilter} tbody`);
   if (!tableBody) return;
-  window["adminUsersData_" + roleFilter] = [];
 
-  const renderUsers = (data) => {
+  let currentPage = 1;
+  const itemsPerPage = 20;
+  window["adminUsersData_" + roleFilter] = [];
+  let currentFilteredData = [];
+
+  const renderUsers = (data, page = 1) => {
+    currentPage = page;
+    currentFilteredData = data;
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const paginatedItems = data.slice(start, end);
+
     if (data.length > 0) {
-      tableBody.innerHTML = data
+      tableBody.innerHTML = paginatedItems
         .map((u, idx) => {
           let infoLahan = "-";
           if (
@@ -4180,16 +4408,58 @@ async function renderUserManagement(area, roleFilter, title, icon) {
                       <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${u.username}</span></td>
                       ${roleFilter === "mahasiswa" ? `<td><span class="badge bg-primary">${u.prodi}</span></td><td><span class="badge bg-primary-soft text-primary">${u.angkatan && u.angkatan !== "-" ? u.angkatan : "-"}</span></td>` : `<td><span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-hospital"></i> ${infoLahan}</span></td>`}
                       <td style="text-align:right">
-                          <button class="btn btn-icon-ghost" onclick="bukaModalUser('${roleFilter}', '${u.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
-                          <button class="btn btn-icon-ghost text-danger" onclick="deleteUser('${u.id}', '${roleFilter}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+                          <div class="d-flex justify-end gap-1">
+                              <button class="btn btn-icon-ghost" onclick="bukaModalUser('${roleFilter}', '${u.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                              <button class="btn btn-icon-ghost text-danger" onclick="deleteUser('${u.id}', '${roleFilter}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+                          </div>
                       </td>
                   </tr>
               `;
         })
         .join("");
+      renderPagination();
     } else {
       tableBody.innerHTML = `<tr><td colspan="${roleFilter === "mahasiswa" ? 5 : 4}" class="empty-table"><i class="fa-solid fa-users-slash fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Tidak ditemukan data matching</td></tr>`;
+      document.getElementById(`pagination-${roleFilter}`).innerHTML = "";
     }
+  };
+
+  const renderPagination = () => {
+    const totalPages = Math.ceil(currentFilteredData.length / itemsPerPage);
+    const container = document.getElementById(`pagination-${roleFilter}`);
+    if (totalPages <= 1) {
+      container.innerHTML = "";
+      return;
+    }
+
+    let buttons = `
+      <div class="pagination-info">Menampilkan ${Math.min(currentFilteredData.length, (currentPage - 1) * itemsPerPage + 1)}-${Math.min(currentFilteredData.length, currentPage * itemsPerPage)} dari ${currentFilteredData.length} data</div>
+      <div class="pagination-controls">
+        <button class="page-btn" ${currentPage === 1 ? "disabled" : ""} onclick="changeUserPage('${roleFilter}', ${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+    `;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - 2 && i <= currentPage + 2)
+      ) {
+        buttons += `<button class="page-btn ${i === currentPage ? "active" : ""}" onclick="changeUserPage('${roleFilter}', ${i})">${i}</button>`;
+      } else if (i === currentPage - 3 || i === currentPage + 3) {
+        buttons += `<span style="padding: 5px 8px; color: #cbd5e1;">...</span>`;
+      }
+    }
+
+    buttons += `
+        <button class="page-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="changeUserPage('${roleFilter}', ${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    `;
+    container.innerHTML = buttons;
+  };
+
+  window.changeUserPage = (role, page) => {
+    // Current data is already in currentFilteredData (search was applied)
+    renderUsers(currentFilteredData, page);
   };
 
   if (resUsers.success && resUsers.data && resUsers.data.length > 0) {
@@ -4207,7 +4477,7 @@ async function renderUserManagement(area, roleFilter, title, icon) {
         u.nama.toLowerCase().includes(q) ||
         u.username.toLowerCase().includes(q),
     );
-    renderUsers(results);
+    renderUsers(results, 1);
   };
 }
 
@@ -4928,7 +5198,13 @@ async function renderMasterData(
           <div class="animate-fade-up">
               <div class="card">
                   <div class="card-header d-flex justify-between align-center wrap gap-2">
-                      <h3><i class="fa-solid ${icon} text-primary"></i> Master ${title}</h3>
+                      <div class="d-flex align-center gap-3 wrap">
+                          <h3 class="m-0"><i class="fa-solid ${icon} text-primary"></i> Master ${title}</h3>
+                          <div class="input-with-icon" style="width:250px;">
+                              <i class="fa-solid fa-magnifying-glass"></i>
+                              <input type="text" id="search-master-${type}" class="form-control" placeholder="Cari..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+                          </div>
+                      </div>
                       <div class="d-flex gap-2 wrap">
                           ${
                             type === "kompetensi" || type === "tempat"
@@ -4957,6 +5233,7 @@ async function renderMasterData(
                               <tbody><tr><td colspan="${colsHeader.length + 1}" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data...</td></tr></tbody>
                           </table>
                       </div>
+                      <div class="pagination-container" id="pagination-master-${type}"></div>
                   </div>
               </div>
           </div>
@@ -4964,124 +5241,192 @@ async function renderMasterData(
 
   const res = await fetchAPI(fetchAction);
   const tableBody = document.querySelector(`#table-master-${type} tbody`);
-  if (res.success && res.data && res.data.length > 0) {
-    window["adminMasterData_" + type] = res.data;
-    let htmlRows = res.data.map((row, idx) => {
-      let tds = colsKey
-        .map((k) => {
-          if (
-            k === "nama_tempat" ||
-            k === "nama_prodi" ||
-            k === "nama_skill" ||
-            k === "nama_komponen"
-          ) {
-            let text = escapeHTML(row[k]) || "";
-            // Temukan titik pertama yang didahului angka untuk memisahkan Title dan List
-            let firstNumIdx = text.search(/[0-9]+\./);
-            let titlePart = text;
-            let listPart = "";
+  if (!tableBody) return;
 
-            if (firstNumIdx !== -1) {
-              titlePart = text.substring(0, firstNumIdx).trim();
-              listPart = text.substring(firstNumIdx);
+  let currentPage = 1;
+  const itemsPerPage = 15;
+  window["adminMasterData_" + type] = [];
+  let currentFilteredData = [];
+
+  const renderPagination = () => {
+    const totalPages = Math.ceil(currentFilteredData.length / itemsPerPage);
+    const container = document.getElementById(`pagination-master-${type}`);
+    if (!container) return;
+
+    if (totalPages <= 1) {
+      container.innerHTML = "";
+      return;
+    }
+
+    let buttons = `
+      <div class="pagination-info">Menampilkan ${Math.min(currentFilteredData.length, (currentPage - 1) * itemsPerPage + 1)}-${Math.min(currentFilteredData.length, currentPage * itemsPerPage)} dari ${currentFilteredData.length} data</div>
+      <div class="pagination-controls">
+        <button class="page-btn" ${currentPage === 1 ? "disabled" : ""} onclick="changeMasterPage('${type}', ${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+    `;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - 2 && i <= currentPage + 2)
+      ) {
+        buttons += `<button class="page-btn ${i === currentPage ? "active" : ""}" onclick="changeMasterPage('${type}', ${i})">${i}</button>`;
+      } else if (i === currentPage - 3 || i === currentPage + 3) {
+        buttons += `<span style="padding: 5px 8px; color: #cbd5e1;">...</span>`;
+      }
+    }
+
+    buttons += `
+        <button class="page-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="changeMasterPage('${type}', ${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    `;
+    container.innerHTML = buttons;
+  };
+
+  const render = (data, page = 1) => {
+    currentPage = page;
+    currentFilteredData = data;
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const paginatedItems = data.slice(start, end);
+
+    if (data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="${colsHeader.length + 1}" class="empty-table">Tidak ada data ditemukan</td></tr>`;
+      document.getElementById(`pagination-master-${type}`).innerHTML = "";
+      return;
+    }
+
+    let htmlBody = paginatedItems
+      .map((row, idx) => {
+        let tds = colsKey
+          .map((k) => {
+            if (
+              k === "nama_tempat" ||
+              k === "nama_prodi" ||
+              k === "nama_skill" ||
+              k === "nama_komponen"
+            ) {
+              let text = escapeHTML(row[k]) || "";
+              let firstNumIdx = text.search(/[0-9]+\./);
+              let titlePart = text;
+              let listPart = "";
+
+              if (firstNumIdx !== -1) {
+                titlePart = text.substring(0, firstNumIdx).trim();
+                listPart = text.substring(firstNumIdx);
+              }
+
+              let formattedList = listPart.replace(
+                /([0-9]+\.)/g,
+                '<br><span style="color:var(--primary); font-weight:700; margin-right:8px; display:inline-block; width:20px;">$1</span>',
+              );
+
+              return `<td>
+                            <div style="margin-bottom:4px;"><strong style="color:var(--primary-dark); font-size:1.05em; border-bottom:1px dashed #cbd5e1">${titlePart}</strong></div>
+                            <div style="line-height:1.7; color:var(--text-strong); padding-left:5px;">${formattedList}</div>
+                        </td>`;
             }
 
-            // Rapikan penomoran di listPart
-            let formattedList = listPart.replace(
-              /([0-9]+\.)/g,
-              '<br><span style="color:var(--primary); font-weight:700; margin-right:8px; display:inline-block; width:20px;">$1</span>',
-            );
+            if (k === "skor_maks" && type === "bimb_askep") {
+              let bobot = parseFloat(row["bobot"]) || 0;
+              let skorMaks = ((bobot * 100) / 100).toFixed(1);
+              return `<td><span class="badge bg-secondary" style="font-size:0.9em; background:#f1f5f9; color:var(--primary-dark); border:1px solid #e2e8f0">${skorMaks}</span></td>`;
+            }
 
-            return `<td>
-                          <div style="margin-bottom:4px;"><strong style="color:var(--primary-dark); font-size:1.05em; border-bottom:1px dashed #cbd5e1">${titlePart}</strong></div>
-                          <div style="line-height:1.7; color:var(--text-strong); padding-left:5px;">${formattedList}</div>
-                      </td>`;
-          }
+            let val =
+              row[k] !== undefined && row[k] !== null && row[k] !== ""
+                ? escapeHTML(row[k])
+                : "-";
+            return `<td><span class="badge bg-primary" style="font-size:0.9em; padding: 0.4rem 0.8rem;">${val}${k === "bobot" ? "%" : ""}</span></td>`;
+          })
+          .join("");
 
-          // Hitung Skor Maksimal secara otomatis untuk ASKEP (Bobot % * 100)
-          if (k === "skor_maks" && type === "bimb_askep") {
-            let bobot = parseFloat(row["bobot"]) || 0;
-            let skorMaks = ((bobot * 100) / 100).toFixed(1);
-            return `<td><span class="badge bg-secondary" style="font-size:0.9em; background:#f1f5f9; color:var(--primary-dark); border:1px solid #e2e8f0">${skorMaks}</span></td>`;
-          }
+        return `
+                <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                    ${tds}
+                    <td style="text-align:right">
+                        <div class="d-flex justify-end gap-1">
+                            <button class="btn btn-icon-ghost" onclick="bukaModalMaster('${type}', '${title}', '${row.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('${type}', '${row.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+      })
+      .join("");
 
-          // Gunakan check null/undefined agar angka 0 tetap muncul
-          let val =
-            row[k] !== undefined && row[k] !== null && row[k] !== ""
-              ? escapeHTML(row[k])
-              : "-";
-          return `<td><span class="badge bg-primary" style="font-size:0.9em; padding: 0.4rem 0.8rem;">${val}${k === "bobot" ? "%" : ""}</span></td>`;
-        })
-        .join("");
-      return `
-              <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
-                  ${tds}
-                  <td style="text-align:right">
-                      <button class="btn btn-icon-ghost" onclick="bukaModalMaster('${type}', '${title}', '${row.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
-                      <button class="btn btn-icon-ghost text-danger" onclick="deleteMaster('${type}', '${row.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
-                  </td>
-              </tr>
-          `;
-    });
-
-    // Tambahkan Total Skor jika tipe Bimbingan Praktikum
-    if (type === "bimb_praktikum") {
-      const totalSkor = res.data.reduce(
-        (acc, curr) => acc + (parseFloat(curr.nilai_maksimal) || 0),
-        0,
-      );
-      htmlRows.push(`
-                  <tr style="background:var(--bg-light); font-weight:bold; border-top:2px solid #e2e8f0">
-                      <td><strong class="text-primary">TOTAL SKOR MAKSIMAL</strong></td>
-                      <td><span class="badge bg-danger" style="font-size:1.1em; padding:0.5rem 1rem;">${totalSkor}</span></td>
-                      <td></td>
-                  </tr>
-              `);
+    // Add Totals logic if it's the last page
+    const totalPages = Math.ceil(currentFilteredData.length / itemsPerPage);
+    if (currentPage === totalPages || totalPages === 0) {
+      if (type === "bimb_praktikum") {
+        const totalSkor = currentFilteredData.reduce(
+          (acc, curr) => acc + (parseFloat(curr.nilai_maksimal) || 0),
+          0,
+        );
+        htmlBody += `
+          <tr style="background:var(--bg-main); font-weight:bold; border-top:2px solid #e2e8f0">
+            <td><strong class="text-primary uppercase" style="font-size:0.85rem">Total Skor Maksimal</strong></td>
+            <td colspan="${colsKey.length}"><span class="badge bg-danger" style="font-size:1.1em; padding:0.5rem 1rem;">${totalSkor}</span></td>
+          </tr>`;
+      }
+      if (type === "bimb_askep") {
+        const totalBobot = currentFilteredData.reduce(
+          (acc, curr) => acc + (parseFloat(curr.bobot) || 0),
+          0,
+        );
+        const totalSkorMaks = ((totalBobot * 100) / 100).toFixed(0);
+        htmlBody += `
+          <tr style="background:var(--bg-main); font-weight:bold; border-top:2px solid #e2e8f0;">
+            <td><strong class="text-primary uppercase" style="font-size:0.85rem">Total Bobot & Penilaian</strong></td>
+            <td><span class="badge ${totalBobot === 100 ? "bg-success" : "bg-warning"}" style="font-size:1.1em; padding:0.5rem 1rem;">${totalBobot}%</span></td>
+            <td colspan="${colsKey.length - 1}"><span class="badge bg-danger" style="font-size:1.1em; padding:0.5rem 1rem;">${totalSkorMaks}</span></td>
+          </tr>`;
+      }
+      if (type === "sikap_perilaku") {
+        const totalNilai = currentFilteredData.reduce(
+          (acc, curr) => acc + (parseFloat(curr.nilai_maksimal) || 0),
+          0,
+        );
+        htmlBody += `
+          <tr style="background:var(--bg-main); font-weight:bold; border-top:2px solid #e2e8f0;">
+            <td>
+                <div class="text-primary uppercase" style="font-size:0.85rem">Total Skor Maksimal</div>
+                <div class="text-muted" style="font-size:0.75rem; font-weight:normal; margin-top:4px;">
+                    <i class="fa-solid fa-calculator"></i> Nilai: (Skor &times; 100) / ${totalNilai}
+                </div>
+            </td>
+            <td colspan="${colsKey.length}"><span class="badge bg-primary" style="font-size:1.1em; padding:0.5rem 1rem;">${totalNilai}</span></td>
+          </tr>`;
+      }
     }
 
-    // Tambahkan Total Bobot jika tipe Bimbingan ASKEP
-    if (type === "bimb_askep") {
-      const totalBobot = res.data.reduce(
-        (acc, curr) => acc + (parseFloat(curr.bobot) || 0),
-        0,
-      );
-      const totalSkorMaks = ((totalBobot * 100) / 100).toFixed(0);
-      htmlRows.push(`
-                  <tr style="background:var(--bg-light); font-weight:bold; border-top:2px solid #e2e8f0; vertical-align:middle;">
-                      <td><strong class="text-primary">TOTAL PERHITUNGAN (Jika Nilai = 100)</strong></td>
-                      <td><span class="badge ${totalBobot === 100 ? "bg-success" : "bg-warning"}" style="font-size:1.1em; padding:0.5rem 1rem;">${totalBobot}%</span></td>
-                      <td><span class="badge bg-danger" style="font-size:1.1em; padding:0.5rem 1rem;">${totalSkorMaks}</span></td>
-                      <td></td>
-                  </tr>
-              `);
-    }
+    tableBody.innerHTML = htmlBody;
+    renderPagination();
+  };
 
-    // Tambahkan Total Nilai jika tipe Sikap & Perilaku
-    if (type === "sikap_perilaku") {
-      const totalNilai = res.data.reduce(
-        (acc, curr) => acc + (parseFloat(curr.nilai_maksimal) || 0),
-        0,
-      );
-      htmlRows.push(`
-                  <tr style="background:var(--bg-light); font-weight:bold; border-top:2px solid #e2e8f0; vertical-align:middle;">
-                      <td>
-                          <div class="text-primary">TOTAL SKOR MAKSIMAL</div>
-                          <div class="text-muted" style="font-size:0.8em; font-weight:normal; margin-top:4px;">
-                              <i class="fa-solid fa-calculator"></i> Nilai Akhir: (Skor Perolehan &times; 100) / ${totalNilai}
-                          </div>
-                      </td>
-                      <td>
-                          <span class="badge bg-primary" style="font-size:1.1em; padding:0.5rem 1rem;">${totalNilai}</span>
-                      </td>
-                      <td></td>
-                  </tr>
-              `);
-    }
+  window.changeMasterPage = (t, page) => {
+    // Current data is already in currentFilteredData for specific type
+    render(currentFilteredData, page);
+  };
 
-    tableBody.innerHTML = htmlRows.join("");
+  if (res.success && res.data && res.data.length > 0) {
+    window["adminMasterData_" + type] = res.data;
+    render(res.data);
   } else {
-    tableBody.innerHTML = `<tr><td colspan="${colsHeader.length + 1}" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="${colsHeader.length + 1}" class="empty-table">Belum ada data ${title}</td></tr>`;
   }
+
+  document.getElementById(`search-master-${type}`).oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    const results = window["adminMasterData_" + type].filter((row) => {
+      return colsKey.some((k) =>
+        String(row[k] || "")
+          .toLowerCase()
+          .includes(q),
+      );
+    });
+    render(results, 1);
+  };
 }
 
 window.bukaModalMaster = (type, title, id = null) => {
