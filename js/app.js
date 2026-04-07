@@ -6847,7 +6847,63 @@ document.querySelector(".close-modal").addEventListener("click", closeModal);
 document.querySelector(".modal-backdrop").addEventListener("click", closeModal);
 
 // Init
+let deferredPrompt;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+});
+
+document.body.addEventListener("click", async (e) => {
+  if (
+    e.target &&
+    (e.target.id === "btn-install-pwa" || e.target.closest("#btn-install-pwa"))
+  ) {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+        deferredPrompt = null;
+      }
+    } else {
+      alert(
+        "Silakan ketuk menu titik tiga (⋮) di browser Anda (Kanan Atas), lalu pilih 'Tambahkan ke Layar Utama' atau 'Install Aplikasi'.",
+      );
+    }
+  }
+});
+
+function checkPWAGatekeeper() {
+  const isMobile = window.innerWidth <= 768; // Force only on mobile phones
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    navigator.standalone ||
+    document.referrer.includes("android-app://");
+
+  if (isMobile && !isStandalone) {
+    const gatekeeper = document.getElementById("pwa-gatekeeper");
+    if (gatekeeper) gatekeeper.classList.remove("hidden");
+
+    // Detect if iOS to show specialized text instead of button
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    if (isIOS) {
+      const iosInst = document.getElementById("pwa-manual-instruct");
+      if (iosInst) iosInst.classList.remove("hidden");
+    } else {
+      const btn = document.getElementById("btn-install-pwa");
+      if (btn) {
+        btn.classList.remove("hidden");
+        btn.style.display = "flex";
+      }
+    }
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
+  checkPWAGatekeeper();
   checkAuth();
 });
 
