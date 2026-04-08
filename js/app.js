@@ -220,6 +220,12 @@ function initDashboard() {
         text: "Mahasiswa Bimbingan",
         view: "mahasiswaView",
       },
+      {
+        id: "nav-laporan-pre",
+        icon: "fa-file-lines",
+        text: "Laporan Bimbingan",
+        view: "laporanPreseptorView",
+      },
     ],
     preseptor_akademik: [
       {
@@ -239,6 +245,12 @@ function initDashboard() {
         icon: "fa-users",
         text: "Mahasiswa Bimbingan",
         view: "mahasiswaView",
+      },
+      {
+        id: "nav-laporan-pre",
+        icon: "fa-file-lines",
+        text: "Laporan Bimbingan",
+        view: "laporanPreseptorView",
       },
     ],
     admin: [
@@ -367,6 +379,18 @@ function initDashboard() {
         icon: "fa-chart-pie",
         text: "Rekapan Logbook",
         view: "rekapLogbookAdminView",
+      },
+      {
+        id: "nav-rekap-presensi",
+        icon: "fa-clipboard-user",
+        text: "Rekapan Daftar Hadir",
+        view: "rekapPresensiAdminView",
+      },
+      {
+        id: "nav-laporan-mgr",
+        icon: "fa-file-signature",
+        text: "Laporan Kegiatan",
+        view: "laporanKegiatanAdminView",
       },
       {
         id: "nav-settings",
@@ -2433,6 +2457,242 @@ async function mahasiswaView(area) {
   }
 }
 
+// ============ REKAPAN LAPORAN (PRESEPTOR) ============
+async function laporanPreseptorView(area) {
+  const isAkademik = currentUser.role === "preseptor_akademik";
+  const scoreField = isAkademik ? "akademik_total" : "klinik_total";
+
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center wrap gap-3">
+          <h3 class="m-0"><i class="fa-solid fa-file-invoice text-primary"></i> Laporan Bimbingan & Nilai</h3>
+          <div class="d-flex gap-2 wrap align-center">
+            <div class="input-with-icon" style="width:250px;">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="search-laporan-pre" class="form-control" placeholder="Cari nama / NIM..." oninput="applyFilterLaporanPre()">
+            </div>
+            <select id="filter-laporan-status" class="form-control" style="width:180px;" onchange="applyFilterLaporanPre()">
+              <option value="all">Semua Status</option>
+              <option value="sudah">Sudah Dinilai</option>
+              <option value="belum">Belum Dinilai</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="exportLaporanPreseptorCSV()" style="white-space:nowrap;"><i class="fa-solid fa-file-csv"></i> CSV</button>
+            <button class="btn btn-outline btn-sm" onclick="exportLaporanPreseptorPDF()" style="white-space:nowrap; border-color:#ef4444; color:#ef4444;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+          </div>
+        </div>
+
+        <div class="card-body" style="padding-bottom:0;">
+          <div class="d-flex gap-3 wrap">
+            <div class="stat-card" style="flex:1; min-width:200px;">
+              <div class="stat-info"><h5>Total Bimbingan</h5><h2 id="ls-total">-</h2></div>
+              <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
+            </div>
+            <div class="stat-card success-border" style="flex:1; min-width:200px;">
+              <div class="stat-info"><h5>Sudah Dinilai</h5><h2 id="ls-done" class="text-success">-</h2></div>
+              <div class="stat-icon success-icon"><i class="fa-solid fa-check-circle"></i></div>
+            </div>
+            <div class="stat-card" style="flex:1; min-width:200px; border-left:4px solid #f59e0b;">
+              <div class="stat-info"><h5>Belum Dinilai</h5><h2 id="ls-pending" style="color:#f59e0b;">-</h2></div>
+              <div class="stat-icon" style="color:#f59e0b;"><i class="fa-solid fa-hourglass-half"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="table-laporan-pre" style="font-size:0.88rem;">
+              <thead>
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th>Nama Mahasiswa</th>
+                  <th>NIM</th>
+                  <th>Prodi</th>
+                  <th class="text-center">Nilai Total (${isAkademik ? "Akademik" : "Klinik"})</th>
+                  <th>Status Penilaian</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="6" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data laporan...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  showLoader(true);
+  const resAssigned = await fetchAPI("getAssignedStudents", {
+    tempat_id: currentUser.tempat_id,
+    role: currentUser.role,
+  });
+
+  if (!resAssigned.success || !resAssigned.data) {
+    showLoader(false);
+    return (document.querySelector("#table-laporan-pre tbody").innerHTML =
+      `<tr><td colspan="6" class="empty-table text-danger">Gagal memuat data mahasiswa</td></tr>`);
+  }
+
+  const studentIds = resAssigned.data.map((u) => u.id);
+  const resNilai = await fetchAPI("getPenilaianAkhir", { ids: studentIds });
+  showLoader(false);
+
+  window.dtLaporanPre = resAssigned.data.map((u) => {
+    const nilai =
+      resNilai.success && resNilai.data
+        ? resNilai.data.find((n) => n.id == u.id)
+        : null;
+    const score = nilai ? nilai[scoreField] || 0 : 0;
+    return {
+      ...u,
+      score: score,
+      sudahDinilai: score > 0,
+    };
+  });
+
+  window.applyFilterLaporanPre = () => {
+    const q = (
+      document.getElementById("search-laporan-pre").value || ""
+    ).toLowerCase();
+    const status = document.getElementById("filter-laporan-status").value;
+
+    let filtered = window.dtLaporanPre;
+    if (q) {
+      filtered = filtered.filter(
+        (u) =>
+          (u.nama || "").toLowerCase().includes(q) ||
+          (u.username || "").toLowerCase().includes(q),
+      );
+    }
+    if (status === "sudah") filtered = filtered.filter((u) => u.sudahDinilai);
+    if (status === "belum") filtered = filtered.filter((u) => !u.sudahDinilai);
+
+    renderTable(filtered);
+  };
+
+  const renderTable = (data) => {
+    const tbody = document.querySelector("#table-laporan-pre tbody");
+    if (!tbody) return;
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-table">Tidak ada data ditemukan</td></tr>`;
+      return;
+    }
+
+    // Update Summary
+    document.getElementById("ls-total").textContent =
+      window.dtLaporanPre.length;
+    document.getElementById("ls-done").textContent = window.dtLaporanPre.filter(
+      (u) => u.sudahDinilai,
+    ).length;
+    document.getElementById("ls-pending").textContent =
+      window.dtLaporanPre.filter((u) => !u.sudahDinilai).length;
+
+    tbody.innerHTML = data
+      .map(
+        (u, idx) => `
+      <tr class="animate-fade-up" style="animation-delay: ${idx * 50}ms">
+        <td class="text-muted">${idx + 1}</td>
+        <td><strong>${escapeHTML(u.nama)}</strong></td>
+        <td><span class="badge" style="background:#f1f5f9; color:var(--text-strong)">${escapeHTML(u.username)}</span></td>
+        <td><small>${escapeHTML(u.prodi || "-")}</small></td>
+        <td class="text-center">
+          <div style="font-size:1.1rem; font-weight:800; color:${u.sudahDinilai ? "var(--primary)" : "#cbd5e1"}">
+            ${u.sudahDinilai ? u.score.toFixed(2) : "-"}
+          </div>
+        </td>
+        <td>
+          ${
+            u.sudahDinilai
+              ? `<span class="badge bg-success-soft text-success"><i class="fa-solid fa-check-circle"></i> Sudah Dinilai</span>`
+              : `<span class="badge bg-warning-soft text-warning" style="background:rgba(245,158,11,0.1); color:#f59e0b;"><i class="fa-solid fa-hourglass-half"></i> Belum Dinilai</span>`
+          }
+        </td>
+      </tr>
+    `,
+      )
+      .join("");
+  };
+
+  renderTable(window.dtLaporanPre);
+}
+
+window.exportLaporanPreseptorCSV = () => {
+  if (!window.dtLaporanPre || window.dtLaporanPre.length === 0)
+    return showToast("Info", "Tidak ada data untuk diekspor", "info");
+
+  const isAkademik = currentUser.role === "preseptor_akademik";
+  const headers = [
+    "Nama Mahasiswa",
+    "NIM",
+    "Prodi",
+    `Nilai Total (${isAkademik ? "Akademik" : "Klinik"})`,
+    "Status",
+  ];
+  const rows = window.dtLaporanPre.map((u) => [
+    u.nama,
+    u.username,
+    u.prodi || "-",
+    u.sudahDinilai ? u.score.toFixed(2) : "0",
+    u.sudahDinilai ? "Sudah Dinilai" : "Belum Dinilai",
+  ]);
+
+  downloadCSV(
+    headers,
+    rows,
+    `Laporan_Bimbingan_${currentUser.nama.replace(/\s+/g, "_")}.csv`,
+  );
+};
+
+window.exportLaporanPreseptorPDF = () => {
+  if (typeof window.jspdf === "undefined")
+    return showToast("Error", "Library PDF belum dimuat", "error");
+  const data = window.dtLaporanPre;
+  if (!data || data.length === 0)
+    return showToast("Info", "Tidak ada data untuk diekspor", "info");
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const isAkademik = currentUser.role === "preseptor_akademik";
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text("Laporan Rekapitulasi Nilai & Bimbingan Mahasiswa", 14, 15);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Preseptor: ${currentUser.nama}`, 14, 22);
+  doc.text(`Tanggal Cetak: ${new Date().toLocaleString("id-ID")}`, 14, 27);
+
+  const tableColumn = [
+    "#",
+    "Nama Mahasiswa",
+    "NIM",
+    "Prodi",
+    `Nilai (${isAkademik ? "Akademik" : "Klinik"})`,
+    "Status",
+  ];
+  const tableRows = data.map((u, i) => [
+    i + 1,
+    u.nama,
+    u.username,
+    u.prodi || "-",
+    u.sudahDinilai ? u.score.toFixed(2) : "-",
+    u.sudahDinilai ? "Sudah Dinilai" : "Belum Dinilai",
+  ]);
+
+  doc.autoTable({
+    startY: 35,
+    head: [tableColumn],
+    body: tableRows,
+    theme: "grid",
+    headStyles: { fillColor: [99, 102, 241] },
+    styles: { fontSize: 9 },
+  });
+
+  doc.save(`Laporan_Bimbingan_${currentUser.nama.replace(/\s+/g, "_")}.pdf`);
+};
+
 window.bukaModalInputNilai = async (mhsId, mhsNama) => {
   showLoader(true);
   const [m1, m2, m3, currentGrades] = await Promise.all([
@@ -4023,6 +4283,738 @@ window.exportRekapCSV = () => {
   downloadCSV(headers, rows, "Rekap_Logbook_Mahasiswa.csv");
 };
 
+// ============ REKAPAN DAFTAR HADIR (ADMIN) ============
+async function rekapPresensiAdminView(area) {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center wrap gap-3">
+          <h3 class="m-0"><i class="fa-solid fa-clipboard-user text-primary"></i> Rekapan Daftar Hadir</h3>
+          <div class="d-flex gap-2 wrap align-center">
+            <div class="input-with-icon" style="width:220px;">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="search-presensi-admin" class="form-control" placeholder="Cari nama / NIM..." style="padding-top:0.4rem;padding-bottom:0.4rem;">
+            </div>
+            <div class="d-flex gap-2 align-center">
+              <input type="date" id="filter-presensi-start" class="form-control" style="padding:0.35rem 0.5rem; font-size:0.85rem; width:145px;">
+              <span style="color:#94a3b8;font-size:0.85rem;">s/d</span>
+              <input type="date" id="filter-presensi-end" class="form-control" style="padding:0.35rem 0.5rem; font-size:0.85rem; width:145px;">
+              <button class="btn btn-primary btn-sm" onclick="applyFilterPresensiAdmin()" style="white-space:nowrap;"><i class="fa-solid fa-filter"></i> Filter</button>
+              <button class="btn btn-outline btn-sm" onclick="resetFilterPresensiAdmin()" style="white-space:nowrap;"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="exportRekapPresensiCSV()" style="white-space:nowrap;"><i class="fa-solid fa-file-csv"></i> CSV</button>
+            <button class="btn btn-outline btn-sm" onclick="exportRekapPresensiPDF()" style="white-space:nowrap; border-color:#ef4444; color:#ef4444;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div id="presensi-summary-cards" class="card-body" style="padding-bottom:0;">
+          <div class="d-flex gap-3 wrap" id="presensi-stat-cards">
+            <div class="stat-card" style="flex:1;min-width:160px;">
+              <div class="stat-info"><h5>Total Kehadiran</h5><h2 id="ps-total">-</h2></div>
+              <div class="stat-icon"><i class="fa-solid fa-calendar-check"></i></div>
+            </div>
+            <div class="stat-card success-border" style="flex:1;min-width:160px;">
+              <div class="stat-info"><h5>Rata-rata Durasi</h5><h2 id="ps-avg-dur">- <span style="font-size:0.5em;color:var(--text-muted)">Jam</span></h2></div>
+              <div class="stat-icon success-icon"><i class="fa-solid fa-clock"></i></div>
+            </div>
+            <div class="stat-card" style="flex:1;min-width:160px;border-left:4px solid #f59e0b;">
+              <div class="stat-info"><h5>Belum Check-Out</h5><h2 id="ps-no-co">-</h2></div>
+              <div class="stat-icon" style="color:#f59e0b;"><i class="fa-solid fa-right-from-bracket"></i></div>
+            </div>
+            <div class="stat-card" style="flex:1;min-width:160px;border-left:4px solid #ef4444;">
+              <div class="stat-info"><h5>Durasi < 6 Jam</h5><h2 id="ps-kurang">-</h2></div>
+              <div class="stat-icon" style="color:#ef4444;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="table-presensi-admin" style="font-size:0.88rem;">
+              <thead>
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th>Mahasiswa</th>
+                  <th>NIM</th>
+                  <th>Tanggal</th>
+                  <th>Masuk</th>
+                  <th>Keluar</th>
+                  <th>Lahan</th>
+                  <th>Durasi</th>
+                  <th>Status</th>
+                  <th style="text-align:right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="9" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data presensi...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-container" id="pagination-presensi-admin"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  showLoader(true);
+  const [resPresensi, resTempat] = await Promise.all([
+    fetchAPI("getAllPresensi"),
+    fetchCachedAPI("getTempat"),
+  ]);
+  showLoader(false);
+
+  const tableBody = document.querySelector("#table-presensi-admin tbody");
+  if (!tableBody) return;
+
+  // Build tempat lookup
+  const tempatMap = {};
+  if (resTempat.success && resTempat.data) {
+    resTempat.data.forEach((t) => {
+      tempatMap[t.id] = t.nama_tempat;
+    });
+  }
+
+  let currentPage = 1;
+  const itemsPerPage = 20;
+  window.dtPresensiAdmin = [];
+  let currentFilteredData = [];
+
+  const updateSummary = (data) => {
+    const total = data.length;
+    const withDurasi = data.filter((p) => p.durasi && parseFloat(p.durasi) > 0);
+    const avgDur =
+      withDurasi.length > 0
+        ? withDurasi.reduce((a, b) => a + parseFloat(b.durasi), 0) /
+          withDurasi.length
+        : 0;
+    const noCO = data.filter((p) => !p.jam_keluar).length;
+    const kurang = withDurasi.filter((p) => parseFloat(p.durasi) < 6).length;
+
+    const el = (id) => document.getElementById(id);
+    if (el("ps-total")) el("ps-total").textContent = total;
+    if (el("ps-avg-dur"))
+      el("ps-avg-dur").innerHTML =
+        `${avgDur.toFixed(1)} <span style="font-size:0.5em;color:var(--text-muted)">Jam</span>`;
+    if (el("ps-no-co")) el("ps-no-co").textContent = noCO;
+    if (el("ps-kurang")) el("ps-kurang").textContent = kurang;
+  };
+
+  const renderPagination = () => {
+    const totalPages = Math.ceil(currentFilteredData.length / itemsPerPage);
+    const container = document.getElementById("pagination-presensi-admin");
+    if (!container) return;
+    if (totalPages <= 1) {
+      container.innerHTML = "";
+      return;
+    }
+
+    let buttons = `
+      <div class="pagination-info">Menampilkan ${Math.min(currentFilteredData.length, (currentPage - 1) * itemsPerPage + 1)}-${Math.min(currentFilteredData.length, currentPage * itemsPerPage)} dari ${currentFilteredData.length} data</div>
+      <div class="pagination-controls">
+        <button class="page-btn" ${currentPage === 1 ? "disabled" : ""} onclick="changePresensiAdminPage(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+    `;
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - 2 && i <= currentPage + 2)
+      ) {
+        buttons += `<button class="page-btn ${i === currentPage ? "active" : ""}" onclick="changePresensiAdminPage(${i})">${i}</button>`;
+      } else if (i === currentPage - 3 || i === currentPage + 3) {
+        buttons += `<span style="padding:5px 8px;color:#cbd5e1;">...</span>`;
+      }
+    }
+    buttons += `
+        <button class="page-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="changePresensiAdminPage(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    `;
+    container.innerHTML = buttons;
+  };
+
+  const render = (data, page = 1) => {
+    currentPage = page;
+    currentFilteredData = data;
+    updateSummary(data);
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const paginatedItems = data.slice(start, end);
+
+    if (data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="9" class="empty-table"><i class="fa-solid fa-folder-open fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Tidak ada data presensi ditemukan</td></tr>`;
+      document.getElementById("pagination-presensi-admin").innerHTML = "";
+      return;
+    }
+
+    tableBody.innerHTML = paginatedItems
+      .map((p, idx) => {
+        const dur = p.durasi ? parseFloat(p.durasi) : 0;
+        const globalIdx = start + idx + 1;
+        const lahanNama = tempatMap[p.lahan] || p.lahan || "-";
+
+        let durHtml = "-";
+        if (p.jam_keluar && dur > 0) {
+          durHtml = `<span class="badge ${dur >= 6 ? "bg-success" : "bg-danger"}" style="font-size:0.8rem">${dur.toFixed(1)} Jam</span>`;
+        } else if (!p.jam_keluar) {
+          durHtml = `<span class="badge bg-warning" style="font-size:0.8rem">Aktif</span>`;
+        }
+
+        let statusHtml;
+        if (!p.jam_keluar) {
+          statusHtml = `<span class="badge bg-warning" style="font-size:0.78rem"><i class="fa-solid fa-clock"></i> Belum CO</span>`;
+        } else if (dur >= 6) {
+          statusHtml = `<span class="badge bg-success" style="font-size:0.78rem"><i class="fa-solid fa-circle-check"></i> Lengkap</span>`;
+        } else {
+          statusHtml = `<span class="badge bg-danger" style="font-size:0.78rem"><i class="fa-solid fa-triangle-exclamation"></i> Kurang</span>`;
+        }
+
+        return `
+        <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+          <td style="color:#94a3b8;font-size:0.8rem;">${globalIdx}</td>
+          <td><strong>${escapeHTML(p.nama || "-")}</strong><br><small class="text-muted">${escapeHTML(p.prodi || "-")}</small></td>
+          <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong);font-size:0.8rem">${escapeHTML(p.user_id || "-")}</span></td>
+          <td style="white-space:nowrap;">${formatDateIndo(p.tanggal)}</td>
+          <td><span class="badge bg-primary-soft text-primary" style="font-size:0.8rem">${p.jam_masuk || "-"}</span></td>
+          <td>${p.jam_keluar ? `<span class="badge bg-primary-soft text-primary" style="font-size:0.8rem">${p.jam_keluar}</span>` : '<span class="text-muted">-</span>'}</td>
+          <td style="max-width:150px;">${escapeHTML(lahanNama)}</td>
+          <td>${durHtml}</td>
+          <td>${statusHtml}</td>
+          <td style="text-align:right">
+            <button class="btn btn-icon-ghost text-danger" onclick="hapusPresensiAdmin('${p.id}')" title="Hapus Presensi"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `;
+      })
+      .join("");
+    renderPagination();
+  };
+
+  window.changePresensiAdminPage = (page) => {
+    render(currentFilteredData, page);
+  };
+
+  window.hapusPresensiAdmin = async (id) => {
+    if (!confirm("Yakin ingin menghapus data presensi ini?")) return;
+
+    showLoader(true);
+    const res = await postAPI("deleteMaster", { type: "presensi", id: id });
+    showLoader(false);
+
+    if (res.success) {
+      showToast("Berhasil", "Data presensi berhasil dihapus", "success");
+      rekapPresensiAdminView(area); // Reload view to reflect changes
+    } else {
+      showToast("Gagal", res.message || "Gagal menghapus data", "error");
+    }
+  };
+
+  // Filter logic
+  const applyFilters = () => {
+    const q = (
+      document.getElementById("search-presensi-admin").value || ""
+    ).toLowerCase();
+    const startDate = document.getElementById("filter-presensi-start").value;
+    const endDate = document.getElementById("filter-presensi-end").value;
+
+    let results = window.dtPresensiAdmin;
+
+    if (q) {
+      results = results.filter(
+        (p) =>
+          (p.nama || "").toLowerCase().includes(q) ||
+          (p.user_id || "").toLowerCase().includes(q) ||
+          (p.prodi || "").toLowerCase().includes(q),
+      );
+    }
+    if (startDate) {
+      results = results.filter((p) => p.tanggal >= startDate);
+    }
+    if (endDate) {
+      results = results.filter((p) => p.tanggal <= endDate);
+    }
+
+    render(results, 1);
+  };
+
+  window.applyFilterPresensiAdmin = applyFilters;
+  window.resetFilterPresensiAdmin = () => {
+    document.getElementById("search-presensi-admin").value = "";
+    document.getElementById("filter-presensi-start").value = "";
+    document.getElementById("filter-presensi-end").value = "";
+    render(window.dtPresensiAdmin, 1);
+  };
+
+  if (resPresensi.success && resPresensi.data) {
+    // Sort by tanggal desc, then by nama asc
+    const sorted = resPresensi.data.sort((a, b) => {
+      if (a.tanggal > b.tanggal) return -1;
+      if (a.tanggal < b.tanggal) return 1;
+      return (a.nama || "").localeCompare(b.nama || "");
+    });
+    window.dtPresensiAdmin = sorted;
+    render(sorted);
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="9" class="empty-table">Belum ada data presensi</td></tr>`;
+  }
+
+  // Live search on type
+  document.getElementById("search-presensi-admin").oninput = () =>
+    applyFilters();
+}
+
+window.exportRekapPresensiCSV = () => {
+  if (!window.dtPresensiAdmin || window.dtPresensiAdmin.length === 0) {
+    return showToast("Info", "Tidak ada data untuk diekspor", "info");
+  }
+  const headers = [
+    "Nama",
+    "NIM",
+    "Prodi",
+    "Tanggal",
+    "Jam Masuk",
+    "Jam Keluar",
+    "Lahan",
+    "Durasi (Jam)",
+    "Status",
+  ];
+  const rows = window.dtPresensiAdmin.map((p) => {
+    const dur = p.durasi ? parseFloat(p.durasi) : 0;
+    let status = "";
+    if (!p.jam_keluar) status = "Belum CO";
+    else if (dur >= 6) status = "Lengkap";
+    else status = "Kurang";
+    return [
+      p.nama,
+      p.user_id,
+      p.prodi,
+      p.tanggal,
+      p.jam_masuk || "",
+      p.jam_keluar || "",
+      p.lahan || "",
+      dur.toFixed(1),
+      status,
+    ];
+  });
+  downloadCSV(headers, rows, "Rekapan_Daftar_Hadir.csv");
+};
+
+window.exportRekapPresensiPDF = () => {
+  if (typeof window.jspdf === "undefined")
+    return showToast("Error", "Library PDF belum dimuat", "error");
+  const data = window.dtPresensiAdmin;
+  if (!data || data.length === 0)
+    return showToast("Info", "Tidak ada data untuk diekspor", "info");
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Rekapan Daftar Hadir Mahasiswa", 14, 15);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Dicetak pada: ${new Date().toLocaleString("id-ID")}`, 14, 22);
+
+  const tableColumn = [
+    "#",
+    "Nama Mahasiswa",
+    "NIM",
+    "Prodi",
+    "Tanggal",
+    "Masuk",
+    "Keluar",
+    "Lahan",
+    "Durasi",
+    "Status",
+  ];
+  const tableRows = data.map((p, i) => {
+    const dur = p.durasi ? parseFloat(p.durasi) : 0;
+    let status = "";
+    if (!p.jam_keluar) status = "Belum CO";
+    else if (dur >= 6) status = "Lengkap";
+    else status = "Kurang";
+    return [
+      i + 1,
+      p.nama,
+      p.user_id,
+      p.prodi,
+      p.tanggal,
+      p.jam_masuk || "-",
+      p.jam_keluar || "-",
+      p.lahan || "-",
+      dur.toFixed(1) + " jam",
+      status,
+    ];
+  });
+
+  doc.autoTable({
+    startY: 28,
+    head: [tableColumn],
+    body: tableRows,
+    theme: "grid",
+    headStyles: { fillColor: [99, 102, 241] },
+    styles: { fontSize: 8 },
+  });
+
+  doc.save(`Rekap_Daftar_Hadir_${new Date().getTime()}.pdf`);
+};
+
+window.exportLaporanKegiatanPDF = async (data) => {
+  if (!data) {
+    showLoader(true);
+    const [resU, resG, resT, resK, resJ] = await Promise.all([
+      fetchAPI("getUsers"),
+      fetchAPI("getKelompok"),
+      fetchAPI("getTempat"),
+      fetchAPI("getKompetensi"),
+      fetchAPI("getJadwal"),
+    ]);
+    showLoader(false);
+    let dr = { start: "...", end: "..." };
+    if (resJ.success && resJ.data && resJ.data.length > 0) {
+      const dates = resJ.data.map((d) => new Date(d.tanggal));
+      dr = {
+        start: formatDateIndo(
+          new Date(Math.min(...dates)).toISOString().split("T")[0],
+        ),
+        end: formatDateIndo(
+          new Date(Math.max(...dates)).toISOString().split("T")[0],
+        ),
+      };
+    }
+    data = {
+      users: resU.data || [],
+      groups: resG.data || [],
+      sites: resT.data || [],
+      comps: resK.data || [],
+      dateRange: dr,
+    };
+  }
+
+  if (typeof window.jspdf === "undefined")
+    return showToast("Error", "Library PDF belum dimuat", "error");
+
+  const { users, groups, sites, comps, dateRange } = data;
+  const mhs = users.filter((u) => u.role === "mahasiswa");
+  const preKlinik = users.filter((u) => u.role === "preseptor");
+  const preAkd = users.filter((u) => u.role === "preseptor_akademik");
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // COVER LETTER STYLE
+  doc.setFont("times", "bold");
+  doc.setFontSize(14);
+  doc.text("LAPORAN RESMI KEGIATAN PRAKTIK KLINIK", 105, 20, {
+    align: "center",
+  });
+  doc.setFontSize(12);
+  doc.text("UNIVERSITAS / INSTANSI KESEHATAN", 105, 27, { align: "center" });
+  doc.setLineWidth(0.5);
+  doc.line(14, 32, 196, 32);
+  doc.line(14, 33, 196, 33);
+
+  doc.setFont("times", "normal");
+  doc.setFontSize(10);
+  doc.text(
+    `Tanggal: ${formatDateIndo(new Date().toISOString().split("T")[0])}`,
+    196,
+    42,
+    { align: "right" },
+  );
+
+  doc.setFont("times", "bold");
+  doc.text("Lampiran: Lengkap (Lampiran 1 s/d 5)", 14, 52);
+
+  doc.setFont("times", "normal");
+  doc.text(
+    "Dengan hormat, melalui laporan ini kami sampaikan ringkasan data operasional",
+    14,
+    62,
+  );
+  doc.text(
+    `kegiatan praktik klinik yang berlangsung dari ${dateRange.start || "-"} s/d ${dateRange.end || "-"} sebagai berikut:`,
+    14,
+    67,
+  );
+
+  // SUMMARY TABLE
+  doc.setFillColor(248, 250, 252);
+  doc.rect(14, 75, 182, 55, "F");
+  doc.setDrawColor(226, 232, 240);
+  doc.rect(14, 75, 182, 55, "S");
+
+  doc.setFont("times", "bold");
+  let y = 85;
+  const metrics = [
+    ["1. Jumlah Mahasiswa Aktif", mhs.length + " Orang"],
+    ["2. Jumlah Kelompok Praktik", groups.length + " Kelompok"],
+    ["3. Jumlah Preseptor Klinik", preKlinik.length + " Orang"],
+    ["4. Jumlah Preseptor Akademik", preAkd.length + " Orang"],
+    ["5. Jumlah Lahan Praktik", sites.length + " Lokasi"],
+    ["6. Jumlah Target Kompetensi", comps.length + " Kompetensi"],
+  ];
+  metrics.forEach((m) => {
+    doc.setFont("times", "normal");
+    doc.text(m[0], 20, y);
+    doc.setFont("times", "bold");
+    doc.text(": " + m[1], 80, y);
+    y += 8;
+  });
+
+  doc.setFont("times", "normal");
+  doc.text(
+    "Demikian laporan ringkasan kegiatan ini kami sampaikan sebagai bahan evaluasi dan",
+    14,
+    142,
+  );
+  doc.text(
+    "monitoring pelaksanaan praktik klinik. Detail data pendukung terlampir pada dokumen ini.",
+    14,
+    147,
+  );
+
+  doc.text("Dicetak oleh Admin,", 150, 170);
+  doc.setFont("times", "bold");
+  doc.text(currentUser.nama, 150, 200);
+  doc.line(150, 201, 190, 201);
+  doc.setFont("times", "normal");
+  doc.setFontSize(8);
+  doc.text("Sistem E-Klinik Digital", 150, 205);
+
+  const addAppendixHeader = (title) => {
+    doc.addPage();
+    doc.setFont("times", "bold");
+    doc.setFontSize(12);
+    doc.text(title, 105, 20, { align: "center" });
+    doc.setLineWidth(0.2);
+    doc.line(14, 23, 196, 23);
+  };
+
+  // Lampiran 1: Mahasiswa
+  addAppendixHeader("LAMPIRAN 1: DAFTAR MAHASISWA");
+  doc.autoTable({
+    startY: 28,
+    head: [["#", "NIM", "Nama", "Prodi"]],
+    body: mhs.map((u, i) => [i + 1, u.username, u.nama, u.prodi || "-"]),
+    theme: "grid",
+    styles: { font: "times", fontSize: 8 },
+    headStyles: { fillColor: [71, 85, 105] },
+  });
+
+  // Lampiran 2: Preseptor Klinik
+  addAppendixHeader("LAMPIRAN 2: DAFTAR PRESEPTOR KLINIK");
+  doc.autoTable({
+    startY: 28,
+    head: [["#", "Username", "Nama", "Lokasi Tugas"]],
+    body: preKlinik.map((u, i) => {
+      const lahans = (u.tempat_id || "")
+        .split(",")
+        .map((id) => {
+          const s = sites.find((st) => st.id === id.trim());
+          return s ? s.nama_tempat : id;
+        })
+        .join(", ");
+      return [i + 1, u.username, u.nama, lahans || "-"];
+    }),
+    theme: "grid",
+    styles: { font: "times", fontSize: 8 },
+    headStyles: { fillColor: [71, 85, 105] },
+  });
+
+  // Lampiran 3: Preseptor Akademik
+  addAppendixHeader("LAMPIRAN 3: DAFTAR PRESEPTOR AKADEMIK");
+  doc.autoTable({
+    startY: 28,
+    head: [["#", "Username", "Nama"]],
+    body: preAkd.map((u, i) => [i + 1, u.username, u.nama]),
+    theme: "grid",
+    styles: { font: "times", fontSize: 8 },
+    headStyles: { fillColor: [71, 85, 105] },
+  });
+
+  // Lampiran 4: Lahan Praktik
+  addAppendixHeader("LAMPIRAN 4: DAFTAR LAHAN PRAKTIK");
+  doc.autoTable({
+    startY: 28,
+    head: [["#", "Nama Lahan / Rumah Sakit", "Alamat"]],
+    body: sites.map((s, i) => [i + 1, s.nama_tempat, s.alamat || "-"]),
+    theme: "grid",
+    styles: { font: "times", fontSize: 8 },
+    headStyles: { fillColor: [71, 85, 105] },
+  });
+
+  // Lampiran 5: Kompetensi
+  addAppendixHeader("LAMPIRAN 5: DAFTAR KOMPETENSI");
+  doc.autoTable({
+    startY: 28,
+    head: [["#", "Target Kompetensi", "Kategori"]],
+    body: comps.map((c, i) => [i + 1, c.nama_skill || "-", c.kategori || "-"]),
+    theme: "grid",
+    styles: { font: "times", fontSize: 8 },
+    headStyles: { fillColor: [71, 85, 105] },
+  });
+
+  doc.save(`Laporan_Kegiatan_Lengkap_${new Date().getTime()}.pdf`);
+};
+
+function renderLaporanKegiatan(area, data) {
+  window._dtReportCache = data;
+  const { users, groups, sites, comps, dateRange } = data;
+  const mhs = users.filter((u) => u.role === "mahasiswa");
+  const preKlinik = users.filter((u) => u.role === "preseptor");
+  const preAkd = users.filter((u) => u.role === "preseptor_akademik");
+
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card" id="report-page" style="max-width:900px; margin:0 auto; font-family:'Times New Roman', serif; color:#000; box-shadow:0 0 40px rgba(0,0,0,0.1); border-radius:4px; border:none; padding:40px;">
+        <div style="text-align:center; border-bottom:3px double #000; padding-bottom:15px; margin-bottom:25px;">
+          <h2 style="margin:0; font-size:1.4rem; text-transform:uppercase;">Laporan Resmi Kegiatan Praktik Klinik</h2>
+          <h3 style="margin:5px 0; font-size:1.1rem; text-transform:uppercase;">Universitas / Instansi Kesehatan</h3>
+          <p style="margin:0; font-size:0.85rem; font-style:italic;">Dicetak secara otomatis melalui Sistem Informasi E-Klinik</p>
+        </div>
+
+        <div style="text-align:right; margin-bottom:20px;">
+          <p style="margin:0;">Tanggal Cetak: ${formatDateIndo(new Date().toISOString().split("T")[0])}</p>
+        </div>
+
+        <div style="line-height:1.6; font-size:1rem;">
+          <p style="margin-bottom:15px; font-weight:700;">Lampiran: Lengkap (Lampiran 1 s/d 5)</p>
+          <p style="margin-bottom:15px;">Dengan hormat, melalui laporan ini kami sampaikan ringkasan data operasional kegiatan praktik klinik yang dilaksanakan pada periode <strong>${dateRange.start || "-"}</strong> hingga <strong>${dateRange.end || "-"}</strong>:</p>
+
+          <div style="margin:20px 0; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px;">
+            <table style="width:100%; border-collapse:collapse;">
+              <tr><td style="width:40%; padding:8px 0;">1. Jumlah Mahasiswa Aktif</td><td>: <strong>${mhs.length}</strong> Orang</td></tr>
+              <tr><td style="padding:8px 0;">2. Jumlah Kelompok Praktik</td><td>: <strong>${groups.length}</strong> Kelompok</td></tr>
+              <tr><td style="padding:8px 0;">3. Jumlah Preseptor Klinik</td><td>: <strong>${preKlinik.length}</strong> Orang</td></tr>
+              <tr><td style="padding:8px 0;">4. Jumlah Preseptor Akademik</td><td>: <strong>${preAkd.length}</strong> Orang</td></tr>
+              <tr><td style="padding:8px 0;">5. Jumlah Lahan Praktik/Rumah Sakit</td><td>: <strong>${sites.length}</strong> Lokasi</td></tr>
+              <tr><td style="padding:8px 0;">6. Jumlah Target Kompetensi</td><td>: <strong>${comps.length}</strong> Kompetensi</td></tr>
+            </table>
+          </div>
+
+          <p style="margin-bottom:25px; text-align:justify;">
+            Demikian laporan ringkasan kegiatan ini kami sampaikan sebagai bahan evaluasi dan monitoring pelaksanaan praktik klinik. Detail data pendukung sebagaimana terlampir pada dokumen ini.
+          </p>
+
+          <div style="display:flex; justify-content:flex-end; margin-top:50px;">
+            <div style="text-align:center;">
+              <p style="margin-bottom:70px;">Dicetak oleh Admin,</p>
+              <p style="font-weight:700; border-bottom:1px solid #000;">${currentUser.nama}</p>
+              <p style="font-size:0.8rem;">Sistem E-Klinik Digital</p>
+            </div>
+          </div>
+        </div>
+
+        <hr style="border:1px dashed #cbd5e1; margin:60px 0;">
+
+        <div style="page-break-before:always;">
+          <h4 style="text-align:center; text-decoration:underline; font-size:1.1rem; margin-bottom:25px;">LAMPIRAN DATA KEGIATAN</h4>
+          
+          <div class="report-appendix mb-5">
+            <p style="font-weight:700; margin-bottom:8px;">Lampiran 1: Daftar Mahasiswa</p>
+            <table class="report-table" style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:0.85rem;">
+              <thead>
+                <tr style="background:#f1f5f9;">
+                  <th style="border:1px solid #000; padding:8px;">#</th>
+                  <th style="border:1px solid #000; padding:8px;">NIM</th>
+                  <th style="border:1px solid #000; padding:8px;">Nama</th>
+                  <th style="border:1px solid #000; padding:8px;">Prodi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${mhs.map((u, i) => `<tr><td style="border:1px solid #000; padding:6px; text-align:center;">${i + 1}</td><td style="border:1px solid #000; padding:6px;">${u.username}</td><td style="border:1px solid #000; padding:6px;">${u.nama}</td><td style="border:1px solid #000; padding:6px;">${u.prodi || "-"}</td></tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="report-appendix mb-5">
+            <p style="font-weight:700; margin-bottom:8px;">Lampiran 2: Daftar Preseptor Klinik</p>
+            <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:0.85rem;">
+              <tr style="background:#f1f5f9;"><th style="border:1px solid #000; padding:8px;">#</th><th style="border:1px solid #000; padding:8px;">Username</th><th style="border:1px solid #000; padding:8px;">Nama Preseptor</th><th style="border:1px solid #000; padding:8px;">Lahan</th></tr>
+              ${preKlinik
+                .map((u, i) => {
+                  const lahans = (u.tempat_id || "")
+                    .split(",")
+                    .map((id) => {
+                      const s = sites.find((st) => st.id === id.trim());
+                      return s ? s.nama_tempat : id;
+                    })
+                    .join(", ");
+                  return `<tr><td style="border:1px solid #000; padding:6px; text-align:center;">${i + 1}</td><td style="border:1px solid #000; padding:6px;">${escapeHTML(u.username)}</td><td style="border:1px solid #000; padding:6px;">${escapeHTML(u.nama)}</td><td style="border:1px solid #000; padding:6px;">${escapeHTML(lahans || "-")}</td></tr>`;
+                })
+                .join("")}
+            </table>
+          </div>
+
+          <div class="report-appendix mb-5">
+            <p style="font-weight:700; margin-bottom:8px;">Lampiran 3: Daftar Preseptor Akademik</p>
+            <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:0.85rem;">
+              <tr style="background:#f1f5f9;"><th style="border:1px solid #000; padding:8px;">#</th><th style="border:1px solid #000; padding:8px;">Username</th><th style="border:1px solid #000; padding:8px;">Nama Preseptor</th></tr>
+              ${preAkd.map((u, i) => `<tr><td style="border:1px solid #000; padding:6px; text-align:center;">${i + 1}</td><td style="border:1px solid #000; padding:6px;">${u.username}</td><td style="border:1px solid #000; padding:6px;">${u.nama}</td></tr>`).join("")}
+            </table>
+          </div>
+
+          <div class="report-appendix mb-5">
+            <p style="font-weight:700; margin-bottom:8px;">Lampiran 4: Daftar Lahan Praktik</p>
+            <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:0.85rem;">
+              <tr style="background:#f1f5f9;"><th style="border:1px solid #000; padding:8px;">#</th><th style="border:1px solid #000; padding:8px;">Nama Lahan / Rumah Sakit</th><th style="border:1px solid #000; padding:8px;">Alamat</th></tr>
+              ${sites.map((s, i) => `<tr><td style="border:1px solid #000; padding:6px; text-align:center;">${i + 1}</td><td style="border:1px solid #000; padding:6px;">${s.nama_tempat}</td><td style="border:1px solid #000; padding:6px;">${s.alamat || "-"}</td></tr>`).join("")}
+            </table>
+          </div>
+
+          <div class="report-appendix mb-5">
+            <p style="font-weight:700; margin-bottom:8px;">Lampiran 5: Daftar Kompetensi</p>
+            <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:0.85rem;">
+              <tr style="background:#f1f5f9;"><th style="border:1px solid #000; padding:8px;">#</th><th style="border:1px solid #000; padding:8px;">Target Kompetensi</th><th style="border:1px solid #000; padding:8px;">Kategori</th></tr>
+              ${comps.map((c, i) => `<tr><td style="border:1px solid #000; padding:6px; text-align:center;">${i + 1}</td><td style="border:1px solid #000; padding:6px;">${escapeHTML(c.nama_skill || "-")}</td><td style="border:1px solid #000; padding:6px;">${escapeHTML(c.kategori || "-")}</td></tr>`).join("")}
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div style="position:fixed; bottom:30px; right:30px; display:flex; flex-direction:column; gap:10px;">
+        <button class="btn btn-primary" style="height:54px; width:54px; border-radius:50%; box-shadow:0 4px 15px rgba(99, 102, 241, 0.4);" onclick="exportLaporanKegiatanPDF(window._dtReportCache)" title="Unduh PDF Resmi">
+          <i class="fa-solid fa-file-pdf" style="font-size:1.4rem"></i>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function laporanKegiatanAdminView(area) {
+  showLoader(true);
+  const [resU, resG, resT, resK, resJ] = await Promise.all([
+    fetchAPI("getUsers"),
+    fetchAPI("getKelompok"),
+    fetchAPI("getTempat"),
+    fetchAPI("getKompetensi"),
+    fetchAPI("getJadwal"), // To get date range
+  ]);
+  showLoader(false);
+
+  let dateRange = { start: "...", end: "..." };
+  if (resJ.success && resJ.data && resJ.data.length > 0) {
+    const dates = resJ.data.map((d) => new Date(d.tanggal));
+    const minDate = new Date(Math.min(...dates));
+    const maxDate = new Date(Math.max(...dates));
+    dateRange = {
+      start: formatDateIndo(minDate.toISOString().split("T")[0]),
+      end: formatDateIndo(maxDate.toISOString().split("T")[0]),
+    };
+  }
+
+  const data = {
+    users: resU.data || [],
+    groups: resG.data || [],
+    sites: resT.data || [],
+    comps: resK.data || [],
+    dateRange: dateRange,
+  };
+
+  renderLaporanKegiatan(area, data);
+}
+
 window.mahasiswaAdminView = (area) =>
   renderUserManagement(area, "mahasiswa", "Mahasiswa", "fa-user-graduate");
 window.preseptorAdminView = (area) =>
@@ -4513,6 +5505,7 @@ window.eksekusiSwapAnggota = async () => {
   if (res.success) {
     clearCache("getKelompok");
     clearCache("getUsers");
+    clearCache("getJadwal");
     showToast("Berhasil", res.message || "Tukar anggota berhasil!", "success");
     loadView("kelompokAdminView");
   } else {

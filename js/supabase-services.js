@@ -1098,27 +1098,19 @@ window.supabasePostAPI = async (action, payload) => {
         const idsB = (jadwalB || []).map((j) => j.id);
         const totalSwapped = idsA.length + idsB.length;
 
-        //    Step B: Move A's jadwal to a temp placeholder
-        const TEMP_ID = "__swap_temp__";
+        //    Step B: Move all schedules originally belonging to A into B
         if (idsA.length > 0) {
           await supabaseClient
             .from("jadwal")
-            .update({ user_id: TEMP_ID })
+            .update({ user_id: user_b_id })
             .in("id", idsA);
         }
-        //    Step C: Move B's jadwal to A
+        //    Step C: Move all schedules originally belonging to B into A
         if (idsB.length > 0) {
           await supabaseClient
             .from("jadwal")
             .update({ user_id: user_a_id })
             .in("id", idsB);
-        }
-        //    Step D: Move temp (A's old jadwal) to B
-        if (idsA.length > 0) {
-          await supabaseClient
-            .from("jadwal")
-            .update({ user_id: user_b_id })
-            .eq("user_id", TEMP_ID);
         }
 
         // 5. Log the swap
