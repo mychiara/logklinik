@@ -200,6 +200,12 @@ function initDashboard() {
         text: "Informasi Praktik",
         view: "informasiPraktikView",
       },
+      {
+        id: "nav-aplikasi-pendukung",
+        icon: "fa-rocket",
+        text: "Aplikasi Pendukung",
+        view: "aplikasiPendukungView",
+      },
     ],
     preseptor: [
       {
@@ -226,6 +232,12 @@ function initDashboard() {
         text: "Laporan Bimbingan",
         view: "laporanPreseptorView",
       },
+      {
+        id: "nav-aplikasi-pendukung",
+        icon: "fa-rocket",
+        text: "Aplikasi Pendukung",
+        view: "aplikasiPendukungView",
+      },
     ],
     preseptor_akademik: [
       {
@@ -251,6 +263,12 @@ function initDashboard() {
         icon: "fa-file-lines",
         text: "Laporan Bimbingan",
         view: "laporanPreseptorView",
+      },
+      {
+        id: "nav-aplikasi-pendukung",
+        icon: "fa-rocket",
+        text: "Aplikasi Pendukung",
+        view: "aplikasiPendukungView",
       },
     ],
     admin: [
@@ -8793,4 +8811,137 @@ window.eksekusiBroadcast = async () => {
     document.getElementById("bc-message").value = "";
     loadView("dashboardView");
   }
+};
+// STUDENT: SUPPORTING APPLICATIONS VIEW
+window.aplikasiPendukungView = (area) => {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <!-- Header Section -->
+      <div style="background: linear-gradient(135deg, var(--primary) 0%, #4338ca 100%); padding: 40px; border-radius: 24px; color: white; margin-bottom: 40px; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(79, 70, 229, 0.2);">
+        <div style="position: absolute; top: -20px; right: -20px; font-size: 15rem; color: rgba(255,255,255,0.05); transform: rotate(15deg);">
+            <i class="fa-solid fa-rocket"></i>
+        </div>
+        <div style="position: relative; z-index: 1;">
+            <h2 style="font-size: 2rem; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 15px;">
+                <span style="background: rgba(255,255,255,0.2); width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:12px; backdrop-filter: blur(10px);">
+                    <i class="fa-solid fa-rocket"></i>
+                </span>
+                Aplikasi Pendukung
+            </h2>
+            <p style="margin-top: 15px; font-size: 1.1rem; opacity: 0.9; max-width: 600px; line-height: 1.6;">
+                Ekosistem digital untuk mempercepat penguasaan kompetensi klinis dan persiapan karir profesional Anda di dunia kesehatan.
+            </p>
+        </div>
+      </div>
+
+      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap:30px;">
+        
+        <!-- App 1: SDKI Pro -->
+        <a href="https://sdkipro.com" target="_blank" class="glass-app-card" style="text-decoration:none; display: block;">
+            <div class="app-card-inner">
+                <div class="app-icon-wrapper" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);">
+                    <i class="fa-solid fa-notes-medical"></i>
+                </div>
+                <div style="padding: 30px;">
+                    <h3 style="margin: 0; font-size: 1.4rem; color: var(--text-strong); font-weight: 800;">SDKI PRO Official</h3>
+                    <div style="margin: 10px 0; display: flex; gap: 8px;">
+                        <span class="badge" style="background:#fee2e2; color:#ef4444; font-size:0.7rem;">Sistem Digital</span>
+                        <span class="badge" style="background:#fee2e2; color:#ef4444; font-size:0.7rem;">Panduan Askep</span>
+                        <span class="badge" style="background:#fee2e2; color:#ef4444; font-size:0.7rem;">Android/iOS</span>
+                    </div>
+                    <p style="font-size: 0.95rem; color: var(--text-light); line-height: 1.7; margin: 20px 0;">
+                        <strong>Sistem Keperawatan Digital & Panduan Diagnosa Asuhan Keperawatan Indonesia.</strong> Dirancang sebagai panduan SDKI lengkap pendorong mahasiswa keperawatan dan perawat profesional, memuat materi SDKI, SLKI, SIKI secara online yang mudah diakses.
+                    </p>
+                    <div style="font-size: 0.8rem; color: var(--text-light); border-top: 1px solid #f1f5f9; padding-top: 15px; margin-bottom: 20px;">
+                        <div style="font-weight: 700; color: #ef4444; margin-bottom: 8px;">Manfaat & Keunggulan:</div>
+                        <ul style="padding-left: 15px; margin: 0;">
+                            <li>Akses cepat via Android & iOS</li>
+                            <li>Sesuai Standar PPNI Terbaru</li>
+                            <li>Interface User-Friendly & Ringan</li>
+                        </ul>
+                    </div>
+                    <div class="app-action-link" style="color:#ef4444;">
+                        Buka Panduan Lengkap <i class="fa-solid fa-arrow-right-long" style="margin-left: 10px;"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+
+        <!-- App 2: Bimbel MasanDigital -->
+        <a href="https://bimbel.masandigital.com" target="_blank" class="glass-app-card" style="text-decoration:none; display: block;">
+            <div class="app-card-inner">
+                <div class="app-icon-wrapper" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div style="padding: 30px;">
+                    <h3 style="margin: 0; font-size: 1.4rem; color: var(--text-strong); font-weight: 800;">Bimbel MasanDigital</h3>
+                    <div style="margin: 10px 0; display: flex; gap: 8px;">
+                        <span class="badge" style="background:#dbeafe; color:#3b82f6; font-size:0.7rem;">UKOM Profesi</span>
+                        <span class="badge" style="background:#dbeafe; color:#3b82f6; font-size:0.7rem;">Try Out SKD</span>
+                        <span class="badge" style="background:#dbeafe; color:#3b82f6; font-size:0.7rem;">Video Pembelajaran</span>
+                    </div>
+                    <p style="font-size: 0.95rem; color: var(--text-light); line-height: 1.7; margin: 20px 0;">
+                        <strong>Platform Digital Learning untuk Tenaga Kesehatan.</strong> Fokus pada persiapan Uji Kompetensi (UKOM), SKD CPNS, dan PPPK Kesehatan. Menyediakan ribuan bank soal dan video pembahasan materi terupdate.
+                    </p>
+                    <div style="font-size: 0.8rem; color: var(--text-light); border-top: 1px solid #f1f5f9; padding-top: 15px; margin-bottom: 20px;">
+                        <div style="font-weight: 700; color: #3b82f6; margin-bottom: 8px;">Manfaat & Keunggulan:</div>
+                        <ul style="padding-left: 15px; margin: 0;">
+                            <li>Try Out Simulasi UKOM Real-time</li>
+                            <li>Modul Materi Berbasis Kurikulum Nasional</li>
+                            <li>Diskusi Soal & Dukungan Mentor</li>
+                        </ul>
+                    </div>
+                    <div class="app-action-link" style="color:#3b82f6;">
+                        Mulai Belajar Sekarang <i class="fa-solid fa-arrow-right-long" style="margin-left: 10px;"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+
+      </div>
+
+      <style>
+        .glass-app-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            z-index: 1;
+            border: 1px solid #f1f5f9;
+        }
+        .glass-app-card:hover {
+            transform: translateY(-12px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.1);
+            border-color: var(--primary-soft);
+        }
+        .app-card-inner {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .app-icon-wrapper {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.2rem;
+            margin: 30px 30px 0 30px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        .app-action-link {
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            transition: gap 0.3s ease;
+        }
+        .glass-app-card:hover .app-action-link {
+            gap: 5px;
+        }
+      </style>
+    </div>
+  `;
 };
