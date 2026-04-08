@@ -686,6 +686,36 @@ window.supabaseFetchAPI = async (action, payload) => {
         };
       }
 
+      case "getPreviewSwap": {
+        const [{ data: jadwalA }, { data: jadwalB }] = await Promise.all([
+          supabaseClient
+            .from("jadwal")
+            .select("id")
+            .eq("user_id", payload.user_a_id),
+          supabaseClient
+            .from("jadwal")
+            .select("id")
+            .eq("user_id", payload.user_b_id),
+        ]);
+        return {
+          success: true,
+          data: {
+            jadwal_a_count: (jadwalA || []).length,
+            jadwal_b_count: (jadwalB || []).length,
+          },
+        };
+      }
+
+      case "getSwapLog": {
+        const { data, error } = await supabaseClient
+          .from("swap_log")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(50);
+        if (error) throw error;
+        return { success: true, data: data || [] };
+      }
+
       case "backupData": {
         const tables = [
           "users",
@@ -702,6 +732,7 @@ window.supabaseFetchAPI = async (action, payload) => {
           "bimb_praktikum",
           "bimb_askep",
           "sikap_perilaku",
+          "swap_log",
         ];
         const backup = {};
         await Promise.all(
@@ -1009,6 +1040,107 @@ window.supabasePostAPI = async (action, payload) => {
           .in("id", payload.member_ids);
         if (error) throw error;
         return { success: true };
+      }
+
+      case "swapKelompokMember": {
+        const { user_a_id, user_b_id, kelompok_a_id, kelompok_b_id, admin_id } =
+          payload;
+
+        // 1. Get user names for logging
+        const [{ data: userA }, { data: userB }] = await Promise.all([
+          supabaseClient
+            .from("users")
+            .select("id, nama, kelompok_id")
+            .eq("id", user_a_id)
+            .single(),
+          supabaseClient
+            .from("users")
+            .select("id, nama, kelompok_id")
+            .eq("id", user_b_id)
+            .single(),
+        ]);
+        if (!userA || !userB) throw new Error("Data mahasiswa tidak ditemukan");
+
+        // 2. Get kelompok names for logging
+        const [{ data: kelA }, { data: kelB }] = await Promise.all([
+          supabaseClient
+            .from("kelompok")
+            .select("nama_kelompok")
+            .eq("id", kelompok_a_id)
+            .single(),
+          supabaseClient
+            .from("kelompok")
+            .select("nama_kelompok")
+            .eq("id", kelompok_b_id)
+            .single(),
+        ]);
+
+        // 3. Swap kelompok_id on users
+        await Promise.all([
+          supabaseClient
+            .from("users")
+            .update({ kelompok_id: kelompok_b_id })
+            .eq("id", user_a_id),
+          supabaseClient
+            .from("users")
+            .update({ kelompok_id: kelompok_a_id })
+            .eq("id", user_b_id),
+        ]);
+
+        // 4. Swap jadwal: use a temporary placeholder to avoid conflicts
+        //    Step A: Get all jadwal IDs for both users
+        const [{ data: jadwalA }, { data: jadwalB }] = await Promise.all([
+          supabaseClient.from("jadwal").select("id").eq("user_id", user_a_id),
+          supabaseClient.from("jadwal").select("id").eq("user_id", user_b_id),
+        ]);
+
+        const idsA = (jadwalA || []).map((j) => j.id);
+        const idsB = (jadwalB || []).map((j) => j.id);
+        const totalSwapped = idsA.length + idsB.length;
+
+        //    Step B: Move A's jadwal to a temp placeholder
+        const TEMP_ID = "__swap_temp__";
+        if (idsA.length > 0) {
+          await supabaseClient
+            .from("jadwal")
+            .update({ user_id: TEMP_ID })
+            .in("id", idsA);
+        }
+        //    Step C: Move B's jadwal to A
+        if (idsB.length > 0) {
+          await supabaseClient
+            .from("jadwal")
+            .update({ user_id: user_a_id })
+            .in("id", idsB);
+        }
+        //    Step D: Move temp (A's old jadwal) to B
+        if (idsA.length > 0) {
+          await supabaseClient
+            .from("jadwal")
+            .update({ user_id: user_b_id })
+            .eq("user_id", TEMP_ID);
+        }
+
+        // 5. Log the swap
+        await supabaseClient.from("swap_log").insert([
+          {
+            user_a_id,
+            user_b_id,
+            nama_a: userA.nama,
+            nama_b: userB.nama,
+            kelompok_a_id,
+            kelompok_b_id,
+            kelompok_a_nama: kelA ? kelA.nama_kelompok : "",
+            kelompok_b_nama: kelB ? kelB.nama_kelompok : "",
+            jadwal_swapped: totalSwapped,
+            admin_id: admin_id || "system",
+          },
+        ]);
+
+        return {
+          success: true,
+          message: `Berhasil menukar ${userA.nama} ↔ ${userB.nama} (${totalSwapped} jadwal ditukar)`,
+        };
       }
 
       case "addMaster":

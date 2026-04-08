@@ -4054,6 +4054,8 @@ async function kelompokAdminView(area) {
                               <i class="fa-solid fa-upload"></i> Import
                               <input type="file" accept=".csv" class="hidden" onchange="importKelompokCSV(event)">
                           </label>
+                          <button class="btn btn-sm" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;" onclick="bukaModalTukarAnggota()"><i class="fa-solid fa-arrow-right-arrow-left"></i> Tukar Anggota</button>
+                          <button class="btn btn-sm" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8);color:#fff;" onclick="lihatHistoryTukar()"><i class="fa-solid fa-clock-rotate-left"></i> History Tukar</button>
                           <button class="btn btn-danger-soft btn-sm" onclick="clearMasterData('kelompok', 'Kelompok')"><i class="fa-solid fa-trash-can"></i> Hapus Semua</button>
                           <button class="btn btn-primary btn-sm" onclick="bukaModalKelompok()"><i class="fa-solid fa-plus"></i> Tambah Kelompok</button>
                       </div>
@@ -4277,6 +4279,309 @@ window.simpanAnggotaKelompok = async (kelompokId) => {
     showToast("Berhasil", res.message, "success");
   }
   loadView("kelompokAdminView");
+};
+
+// ============ TUKAR ANGGOTA KELOMPOK ============
+window.bukaModalTukarAnggota = async () => {
+  showLoader(true);
+  const [resKelompok, resUsers] = await Promise.all([
+    fetchAPI("getKelompok"),
+    fetchAPI("getUsers"),
+  ]);
+  showLoader(false);
+  if (!resKelompok.success || !resUsers.success) {
+    return showToast("Error", "Gagal memuat data", "error");
+  }
+
+  const kelompokList = resKelompok.data || [];
+  const mahasiswa = (resUsers.data || []).filter((u) => u.role === "mahasiswa");
+  window._swapKelompokList = kelompokList;
+  window._swapMahasiswa = mahasiswa;
+
+  const kelompokOptions = kelompokList
+    .map((k) => `<option value="${k.id}">${k.nama_kelompok}</option>`)
+    .join("");
+
+  openModal(
+    `<i class="fa-solid fa-arrow-right-arrow-left" style="color:var(--primary)"></i> Tukar Anggota Kelompok`,
+    `
+    <div class="animate-fade-in">
+      <div style="background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.08)); border:1px solid rgba(99,102,241,0.2); border-radius:12px; padding:14px; margin-bottom:16px;">
+        <div style="font-size:0.85rem; color:var(--text-strong)">
+          <i class="fa-solid fa-circle-info text-primary"></i>
+          Pilih <strong>2 mahasiswa dari 2 kelompok berbeda</strong> untuk ditukar. Jadwal akan otomatis mengikuti pertukaran.
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:start;">
+        <!-- Kolom Kiri: Mahasiswa A -->
+        <div style="background:var(--bg-main); border-radius:12px; padding:16px; border:1px solid #e2e8f0;">
+          <div style="font-weight:700; font-size:0.9rem; margin-bottom:10px; color:var(--primary-dark);"><i class="fa-solid fa-user"></i> Mahasiswa A</div>
+          <div class="form-group mb-2">
+            <label style="font-size:0.8rem">Kelompok Asal</label>
+            <select id="swap-kelompok-a" class="form-control" onchange="updateSwapMahasiswaList('a')">
+              <option value="">-- Pilih Kelompok --</option>
+              ${kelompokOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="font-size:0.8rem">Mahasiswa</label>
+            <select id="swap-mhs-a" class="form-control">
+              <option value="">-- Pilih Kelompok dulu --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Ikon Tukar -->
+        <div style="display:flex; align-items:center; justify-content:center; padding-top:60px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem;box-shadow:0 4px 15px rgba(99,102,241,0.4);">
+            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+          </div>
+        </div>
+
+        <!-- Kolom Kanan: Mahasiswa B -->
+        <div style="background:var(--bg-main); border-radius:12px; padding:16px; border:1px solid #e2e8f0;">
+          <div style="font-weight:700; font-size:0.9rem; margin-bottom:10px; color:var(--primary-dark);"><i class="fa-solid fa-user"></i> Mahasiswa B</div>
+          <div class="form-group mb-2">
+            <label style="font-size:0.8rem">Kelompok Asal</label>
+            <select id="swap-kelompok-b" class="form-control" onchange="updateSwapMahasiswaList('b')">
+              <option value="">-- Pilih Kelompok --</option>
+              ${kelompokOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="font-size:0.8rem">Mahasiswa</label>
+            <select id="swap-mhs-b" class="form-control">
+              <option value="">-- Pilih Kelompok dulu --</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview Area -->
+      <div id="swap-preview" class="hidden" style="margin-top:16px; background:var(--bg-main); border-radius:12px; padding:16px; border:1px solid #e2e8f0;"></div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-outline" style="flex:1" onclick="previewSwapAnggota()">
+          <i class="fa-solid fa-eye"></i> Preview Perubahan
+        </button>
+        <button class="btn" style="flex:1;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;" onclick="eksekusiSwapAnggota()">
+          <i class="fa-solid fa-arrow-right-arrow-left"></i> Eksekusi Tukar
+        </button>
+      </div>
+    </div>
+    `,
+  );
+};
+
+window.updateSwapMahasiswaList = (side) => {
+  const kelompokId = document.getElementById(`swap-kelompok-${side}`).value;
+  const selectMhs = document.getElementById(`swap-mhs-${side}`);
+  if (!kelompokId) {
+    selectMhs.innerHTML = '<option value="">-- Pilih Kelompok dulu --</option>';
+    return;
+  }
+  const members = (window._swapMahasiswa || []).filter(
+    (m) => m.kelompok_id === kelompokId,
+  );
+  selectMhs.innerHTML =
+    '<option value="">-- Pilih Mahasiswa --</option>' +
+    members
+      .map((m) => `<option value="${m.id}">${m.nama} (${m.username})</option>`)
+      .join("");
+};
+
+window.previewSwapAnggota = async () => {
+  const kelA = document.getElementById("swap-kelompok-a").value;
+  const kelB = document.getElementById("swap-kelompok-b").value;
+  const mhsA = document.getElementById("swap-mhs-a").value;
+  const mhsB = document.getElementById("swap-mhs-b").value;
+
+  if (!kelA || !kelB || !mhsA || !mhsB) {
+    return showToast(
+      "Peringatan",
+      "Pilih kelompok dan mahasiswa terlebih dahulu",
+      "error",
+    );
+  }
+  if (kelA === kelB) {
+    return showToast("Peringatan", "Kelompok asal harus berbeda!", "error");
+  }
+  if (mhsA === mhsB) {
+    return showToast(
+      "Peringatan",
+      "Mahasiswa yang ditukar harus berbeda!",
+      "error",
+    );
+  }
+
+  const namaA = document.getElementById("swap-mhs-a").selectedOptions[0].text;
+  const namaB = document.getElementById("swap-mhs-b").selectedOptions[0].text;
+  const kelNamaA =
+    document.getElementById("swap-kelompok-a").selectedOptions[0].text;
+  const kelNamaB =
+    document.getElementById("swap-kelompok-b").selectedOptions[0].text;
+
+  // Fetch jadwal count for both
+  showLoader(true);
+  const res = await fetchAPI("getPreviewSwap", {
+    user_a_id: mhsA,
+    user_b_id: mhsB,
+  });
+  showLoader(false);
+
+  const jadwalA = res.success ? res.data.jadwal_a_count || 0 : 0;
+  const jadwalB = res.success ? res.data.jadwal_b_count || 0 : 0;
+
+  const previewEl = document.getElementById("swap-preview");
+  previewEl.classList.remove("hidden");
+  previewEl.innerHTML = `
+    <div style="font-weight:700; font-size:0.9rem; margin-bottom:12px; color:var(--primary-dark);">
+      <i class="fa-solid fa-magnifying-glass-chart"></i> Preview Perubahan
+    </div>
+    <div style="display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; text-align:center;">
+      <div style="padding:12px; border-radius:10px; background:rgba(239,68,68,0.06); border:1px dashed rgba(239,68,68,0.3);">
+        <div style="font-weight:700; font-size:0.85rem; color:#ef4444;">${escapeHTML(namaA)}</div>
+        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaA)} → <strong style="color:#22c55e;">${escapeHTML(kelNamaB)}</strong></div>
+        <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem">${jadwalA} jadwal akan pindah</span>
+      </div>
+      <div style="font-size:1.5rem; color:var(--primary);"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+      <div style="padding:12px; border-radius:10px; background:rgba(34,197,94,0.06); border:1px dashed rgba(34,197,94,0.3);">
+        <div style="font-weight:700; font-size:0.85rem; color:#22c55e;">${escapeHTML(namaB)}</div>
+        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaB)} → <strong style="color:#ef4444;">${escapeHTML(kelNamaA)}</strong></div>
+        <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem">${jadwalB} jadwal akan pindah</span>
+      </div>
+    </div>
+    <div style="margin-top:10px; font-size:0.8rem; color:#64748b; text-align:center;">
+      <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b"></i>
+      Total <strong>${jadwalA + jadwalB}</strong> jadwal akan ditukar antara kedua mahasiswa.
+    </div>
+  `;
+};
+
+window.eksekusiSwapAnggota = async () => {
+  const kelA = document.getElementById("swap-kelompok-a").value;
+  const kelB = document.getElementById("swap-kelompok-b").value;
+  const mhsA = document.getElementById("swap-mhs-a").value;
+  const mhsB = document.getElementById("swap-mhs-b").value;
+
+  if (!kelA || !kelB || !mhsA || !mhsB) {
+    return showToast(
+      "Peringatan",
+      "Pilih kelompok dan mahasiswa terlebih dahulu",
+      "error",
+    );
+  }
+  if (kelA === kelB) {
+    return showToast("Peringatan", "Kelompok asal harus berbeda!", "error");
+  }
+  if (mhsA === mhsB) {
+    return showToast(
+      "Peringatan",
+      "Mahasiswa yang ditukar harus berbeda!",
+      "error",
+    );
+  }
+
+  const namaA = document.getElementById("swap-mhs-a").selectedOptions[0].text;
+  const namaB = document.getElementById("swap-mhs-b").selectedOptions[0].text;
+  const kelNamaA =
+    document.getElementById("swap-kelompok-a").selectedOptions[0].text;
+  const kelNamaB =
+    document.getElementById("swap-kelompok-b").selectedOptions[0].text;
+
+  if (
+    !confirm(
+      `Yakin ingin menukar:\n\n${namaA} (${kelNamaA})\n⇅\n${namaB} (${kelNamaB})\n\nJadwal kedua mahasiswa juga akan ditukar?`,
+    )
+  )
+    return;
+
+  closeModal();
+  showLoader(true);
+  showToast("Memproses", "Menukar anggota dan jadwal...", "info");
+
+  const res = await postAPI("swapKelompokMember", {
+    user_a_id: mhsA,
+    user_b_id: mhsB,
+    kelompok_a_id: kelA,
+    kelompok_b_id: kelB,
+    admin_id: currentUser.id,
+  });
+
+  showLoader(false);
+  if (res.success) {
+    clearCache("getKelompok");
+    clearCache("getUsers");
+    showToast("Berhasil", res.message || "Tukar anggota berhasil!", "success");
+    loadView("kelompokAdminView");
+  } else {
+    showToast("Gagal", res.message || "Gagal menukar anggota", "error");
+  }
+};
+
+window.lihatHistoryTukar = async () => {
+  showLoader(true);
+  const res = await fetchAPI("getSwapLog");
+  showLoader(false);
+
+  const logs = res.success ? res.data || [] : [];
+
+  let tableRows = "";
+  if (logs.length === 0) {
+    tableRows = `<tr><td colspan="5" class="empty-table"><i class="fa-solid fa-inbox" style="font-size:2rem;color:#cbd5e1;display:block;margin-bottom:8px"></i>Belum ada history pertukaran</td></tr>`;
+  } else {
+    tableRows = logs
+      .map((log, idx) => {
+        const tgl = new Date(log.created_at).toLocaleString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        return `
+        <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+          <td style="font-size:0.85rem; white-space:nowrap;">${tgl}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span class="badge bg-danger" style="font-size:0.78rem">${escapeHTML(log.nama_a || log.user_a_id)}</span>
+              <span style="font-size:0.75rem; color:#64748b">${escapeHTML(log.kelompok_a_nama || "")}</span>
+            </div>
+          </td>
+          <td style="text-align:center; font-size:1.1rem; color:var(--primary);"><i class="fa-solid fa-arrow-right-arrow-left"></i></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span class="badge bg-success" style="font-size:0.78rem">${escapeHTML(log.nama_b || log.user_b_id)}</span>
+              <span style="font-size:0.75rem; color:#64748b">${escapeHTML(log.kelompok_b_nama || "")}</span>
+            </div>
+          </td>
+          <td><span class="badge bg-primary-soft text-primary" style="font-size:0.75rem">${log.jadwal_swapped || 0} jadwal</span></td>
+        </tr>
+      `;
+      })
+      .join("");
+  }
+
+  openModal(
+    `<i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i> History Tukar Anggota`,
+    `
+    <div class="table-responsive" style="max-height:450px; overflow-y:auto;">
+      <table style="font-size:0.88rem; width:100%;">
+        <thead>
+          <tr>
+            <th style="white-space:nowrap">Tanggal</th>
+            <th>Mahasiswa A</th>
+            <th style="text-align:center; width:40px;"></th>
+            <th>Mahasiswa B</th>
+            <th>Jadwal</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    `,
+  );
 };
 
 window.downloadKelompokTemplate = async () => {
