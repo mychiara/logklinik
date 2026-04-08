@@ -546,9 +546,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         while (!finished) {
           let query = supabaseClient
             .from("jadwal")
-            .select(
-              "*, users!inner(nama, kelompok_id), tempat_praktik!inner(nama_tempat)",
-            );
+            .select("*, users(nama, kelompok_id), tempat_praktik(nama_tempat)");
 
           if (payload.user_id) {
             if (Array.isArray(payload.user_id)) {
@@ -578,9 +576,9 @@ window.supabaseFetchAPI = async (action, payload) => {
           success: true,
           data: allData.map((j) => ({
             ...j,
-            nama: j.users.nama,
-            kelompok_id: j.users.kelompok_id,
-            nama_tempat: j.tempat_praktik.nama_tempat,
+            nama: j.users?.nama || "-",
+            kelompok_id: j.users?.kelompok_id || null,
+            nama_tempat: j.tempat_praktik?.nama_tempat || "-",
           })),
         };
       }

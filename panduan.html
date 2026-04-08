@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Panduan Instalasi E-Klinik Premium Edition</title>
+    <title>E-Klinik Professional Manual - Full Detail V3.0</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap"
       rel="stylesheet"
@@ -14,413 +14,414 @@
     />
     <style>
       :root {
-        --primary: #8b5cf6;
-        --primary-dark: #6d28d9;
-        --primary-soft: #f3e8ff;
+        --primary: #4f46e5;
+        --secondary: #ec4899;
+        --accent: #8b5cf6;
         --success: #10b981;
         --warning: #f59e0b;
         --danger: #ef4444;
+        --sidebar-bg: #111827;
         --bg: #f8fafc;
         --card-bg: #ffffff;
-        --text: #0f172a;
+        --text: #1e293b;
         --text-light: #64748b;
+        --border: #e2e8f0;
+        --indigo-soft: #eef2ff;
+        --rose-soft: #fff1f2;
       }
 
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         font-family: "Outfit", sans-serif;
         background: var(--bg);
         color: var(--text);
-        line-height: 1.6;
-        padding: 40px 20px;
+        line-height: 1.8;
+        scroll-behavior: smooth;
       }
 
-      .container {
-        max-width: 1000px;
-        margin: 0 auto;
-      }
+      .container { max-width: 1400px; margin: 0 auto; padding: 0 40px; }
 
-      header {
+      /* Top Masthead */
+      .masthead {
+        background: linear-gradient(135deg, var(--sidebar-bg), #1e293b);
+        color: white;
+        padding: 60px 0;
         text-align: center;
-        margin-bottom: 50px;
-        background: linear-gradient(
-          135deg,
-          var(--primary),
-          var(--primary-dark)
-        );
-        padding: 80px 20px;
-        border-radius: 32px;
-        color: white;
-        box-shadow: 0 25px 50px -12px rgba(139, 92, 246, 0.4);
-        position: relative;
-        overflow: hidden;
+        border-bottom: 4px solid var(--primary);
       }
 
-      header::before {
-        content: "";
-        position: absolute;
-        top: -50px;
-        right: -50px;
-        width: 200px;
-        height: 200px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 50%;
+      .masthead h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -2px; }
+      .masthead p { font-size: 1.2rem; opacity: 0.8; font-weight: 300; }
+
+      /* Section Jumpers */
+      .jumpers {
+         display: flex;
+         justify-content: center;
+         gap: 25px;
+         margin-top: -35px;
+         margin-bottom: 80px;
       }
 
-      h1 {
-        font-size: 2.8rem;
-        margin-bottom: 15px;
-        font-weight: 800;
-        letter-spacing: -1px;
-      }
-      .subtitle {
-        font-size: 1.2rem;
-        opacity: 0.9;
-        font-weight: 300;
-      }
-
-      .step-card {
-        background: var(--card-bg);
-        border-radius: 24px;
-        padding: 40px;
-        margin-bottom: 35px;
-        box-shadow:
-          0 4px 6px -1px rgba(0, 0, 0, 0.05),
-          0 2px 4px -2px rgba(0, 0, 0, 0.05);
-        border: 1px solid #f1f5f9;
-        position: relative;
-        transition: all 0.3s ease;
+      .jumper-btn {
+         background: white;
+         padding: 20px 45px;
+         border-radius: 24px;
+         text-decoration: none;
+         color: var(--text);
+         font-weight: 800;
+         display: flex;
+         align-items: center;
+         gap: 15px;
+         box-shadow: 0 15px 35px -10px rgba(0,0,0,0.15);
+         transition: all 0.3s ease;
+         border: 2px solid transparent;
       }
 
-      .step-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      .jumper-btn:hover { transform: translateY(-8px); box-shadow: 0 25px 45px -15px rgba(0,0,0,0.2); }
+      .jumper-btn.mhs-jumper:hover { border-color: var(--primary); color: var(--primary); }
+      .jumper-btn.pre-jumper:hover { border-color: var(--secondary); color: var(--secondary); }
+      .jumper-btn i { font-size: 1.8rem; }
+
+      /* Layout */
+      .role-section {
+         background: white;
+         border-radius: 40px;
+         padding: 80px;
+         margin-bottom: 100px;
+         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+         border: 1px solid var(--border);
+         position: relative;
       }
 
-      .step-number {
-        position: absolute;
-        top: -20px;
-        left: 40px;
-        background: var(--primary);
-        color: white;
-        width: 48px;
-        height: 48px;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 800;
-        font-size: 1.2rem;
-        box-shadow: 0 10px 15px -3px rgba(139, 92, 246, 0.5);
-        transform: rotate(-5deg);
+      .role-indicator {
+         position: absolute;
+         top: 30px; left: 80px;
+         text-transform: uppercase;
+         font-weight: 900;
+         padding: 6px 20px;
+         border-radius: 50px;
+         letter-spacing: 1px;
+         font-size: 0.8rem;
       }
 
-      h2 {
-        margin-bottom: 25px;
-        font-size: 1.6rem;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        font-weight: 700;
-        color: var(--primary-dark);
-      }
-      h2 i {
-        color: var(--primary);
+      .mhs-indicator { background: var(--indigo-soft); color: var(--primary); }
+      .pre-indicator { background: var(--rose-soft); color: var(--secondary); }
+
+      /* Detailed Menu Box */
+      .menu-explorer {
+         display: grid;
+         grid-template-columns: 320px 1fr;
+         gap: 60px;
+         margin-top: 40px;
       }
 
-      h3 {
-        margin: 25px 0 12px;
-        font-size: 1.1rem;
-        color: var(--text);
-        font-weight: 700;
-        border-left: 4px solid var(--primary);
-        padding-left: 12px;
+      .menu-nav-mock {
+         background: var(--sidebar-bg);
+         border-radius: 25px;
+         padding: 30px 15px;
+         height: fit-content;
+         position: sticky;
+         top: 30px;
       }
 
-      p,
-      ul {
-        margin-bottom: 20px;
-        color: var(--text-light);
-        font-size: 1.05rem;
-      }
-      ul {
-        padding-left: 25px;
-      }
-      li {
-        margin-bottom: 10px;
-      }
-
-      code {
-        background: #f1f5f9;
-        padding: 4px 10px;
-        border-radius: 8px;
-        font-family: "Fira Code", "Courier New", monospace;
-        color: var(--danger);
-        font-weight: 600;
-        font-size: 0.9em;
+      .nav-item-mock {
+         display: flex;
+         align-items: center;
+         gap: 15px;
+         padding: 15px 20px;
+         color: #9ca3af;
+         border-radius: 12px;
+         margin-bottom: 8px;
+         font-weight: 700;
+         font-size: 0.95rem;
       }
 
-      .code-block {
-        background: #0f172a;
-        color: #f8fafc;
-        padding: 25px;
-        border-radius: 16px;
-        font-family: "Fira Code", "Courier New", monospace;
-        font-size: 0.9rem;
-        overflow-x: auto;
-        margin: 20px 0;
-        position: relative;
-        border: 1px solid #334155;
-        line-height: 1.7;
+      .mhs-explorer .nav-item-mock i.fa-chart-pie { color: #a855f7; }
+      .mhs-explorer .nav-item-mock i.fa-clock { color: #3b82f6; }
+      .mhs-explorer .nav-item-mock i.fa-calendar-alt { color: #10b981; }
+      .mhs-explorer .nav-item-mock i.fa-book-open { color: #f59e0b; }
+      .mhs-indicator + h2 { font-size: 2.8rem; font-weight: 800; margin-bottom: 10px; }
+
+      /* Manual Cards */
+      .manual-card { margin-bottom: 60px; scroll-margin-top: 50px; }
+      .manual-card h3 { 
+         font-size: 1.8rem; 
+         font-weight: 800; 
+         margin-bottom: 20px; 
+         display: flex; 
+         align-items: center; 
+         gap: 15px;
       }
 
-      .alert {
-        padding: 20px 25px;
-        border-radius: 16px;
-        margin: 25px 0;
-        display: flex;
-        gap: 20px;
-        align-items: flex-start;
-        font-size: 0.95rem;
+      .instruction-step {
+         background: #f8fafc;
+         border-radius: 25px;
+         padding: 40px;
+         margin-bottom: 25px;
+         border-left: 8px solid var(--primary);
+         position: relative;
       }
 
-      .alert-info {
-        background: #f5f3ff;
-        color: #5b21b6;
-        border: 1px solid #ddd6fe;
+      .pre-theme .instruction-step { border-left-color: var(--secondary); }
+
+      .step-badge {
+         background: var(--text);
+         color: white;
+         padding: 4px 12px;
+         border-radius: 8px;
+         font-size: 0.75rem;
+         font-weight: 900;
+         margin-bottom: 15px;
+         display: inline-block;
       }
-      .alert-warning {
-        background: #fffcf0;
-        color: #92400e;
-        border: 1px solid #fef3c7;
+
+      .step-detail-list { list-style: none; margin-top: 20px; }
+      .step-detail-list li {
+         position: relative;
+         padding-left: 35px;
+         margin-bottom: 15px;
+         font-weight: 500;
+      }
+
+      .step-detail-list li::before {
+         content: "\f058";
+         font-family: "Font Awesome 6 Free";
+         font-weight: 900;
+         position: absolute;
+         left: 0; color: var(--success);
+         font-size: 1.2rem;
+      }
+
+      .pro-tip {
+         background: #fff9db;
+         border: 1px solid #f9e79f;
+         padding: 25px;
+         border-radius: 20px;
+         margin-top: 25px;
+         color: #856404;
+      }
+
+      .pro-tip b { display: block; font-size: 1.1rem; margin-bottom: 5px; }
+
+      .ui-ref {
+         background: #0f172a;
+         color: #f8fafc;
+         padding: 2px 10px;
+         border-radius: 6px;
+         font-weight: 700;
+         font-family: monospace;
       }
 
       footer {
-        text-align: center;
-        margin-top: 60px;
-        padding: 40px 0;
-        color: var(--text-light);
-        font-size: 0.95rem;
-        border-top: 1px solid #e2e8f0;
+         background: var(--sidebar-bg);
+         color: white;
+         padding: 80px 0;
+         text-align: center;
       }
 
-      .demo-badge {
-        display: inline-block;
-        background: var(--primary-soft);
-        color: var(--primary-dark);
-        padding: 4px 12px;
-        border-radius: 8px;
-        font-weight: 700;
-        font-family: monospace;
-      }
+      .footer-logo { font-size: 2.2rem; font-weight: 900; margin-bottom: 10px; }
+      .footer-logo span { color: var(--primary); }
 
-      /* Mobile Adjustments */
-      @media (max-width: 600px) {
-        header {
-          padding: 50px 20px;
-          border-radius: 0;
-          margin: -40px -20px 40px;
-        }
-        h1 {
-          font-size: 2rem;
-        }
-        .step-card {
-          padding: 30px 20px;
-        }
-        .step-number {
-          left: 20px;
-        }
+      @media (max-width: 1100px) {
+         .menu-explorer { grid-template-columns: 1fr; }
+         .menu-nav-mock { position: static; margin-bottom: 40px; }
+         .role-section { padding: 40px 20px; }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <header>
-        <h1>Sistem E-Klinik Premium</h1>
-        <p class="subtitle">
-          Panduan Instalasi & Konfigurasi Database Supabase (Production Ready)
-        </p>
-      </header>
-
-      <!-- STEP 1 -->
-      <div class="step-card">
-        <div class="step-number">1</div>
-        <h2>
-          <i class="fa-solid fa-cloud-bolt"></i> Menyiapkan Project Supabase
-        </h2>
-        <p>Langkah awal untuk membangun backend yang stabil dan cepat.</p>
-        <ul>
-          <li>
-            Buat akun di
-            <a
-              href="https://supabase.com"
-              target="_blank"
-              style="font-weight: 700"
-              >supabase.com</a
-            >.
-          </li>
-          <li>
-            Buat <b>New Project</b>. Simpan <b>Database Password</b> Anda
-            baik-baik.
-          </li>
-          <li>Tungu hingga status project menjadi <b>Active</b>.</li>
-        </ul>
-        <div class="alert alert-info">
-          <i class="fa-solid fa-location-dot fa-2x"></i>
-          <div>
-            Pilih Region <b>Singapore</b> untuk performa terbaik jika Anda
-            berada di Indonesia.
-          </div>
-        </div>
-      </div>
-
-      <!-- STEP 2 -->
-      <div class="step-card">
-        <div class="step-number">2</div>
-        <h2><i class="fa-solid fa-database"></i> Membangun Skema Database</h2>
-        <p>
-          Eksekusi perintah SQL untuk membuat tabel-tabel utama termasuk sistem
-          Penilaian Akhir yang baru.
-        </p>
-        <ul>
-          <li>Masuk ke menu <b>SQL Editor</b> di Sidebar kiri Supabase.</li>
-          <li>Klik <b>New Query</b>.</li>
-          <li>
-            Copy seluruh isi file <code>supabase-schema.sql</code> dari folder
-            project ini.
-          </li>
-          <li>Tempelkan ke dalam editor dan klik <b>Run</b>.</li>
-        </ul>
-        <div class="alert alert-warning">
-          <i class="fa-solid fa-triangle-exclamation fa-2x"></i>
-          <div>
-            Pastikan semua tabel berhasil dibuat (centang hijau). Jika ada tabel
-            yang gagal, jalankan ulang kueri tersebut secara spesifik.
-          </div>
-        </div>
-      </div>
-
-      <!-- STEP 3 -->
-      <div class="step-card">
-        <div class="step-number">3</div>
-        <h2><i class="fa-solid fa-shield-halved"></i> Keamanan (RLS Policy)</h2>
-        <p>
-          <b>PENTING:</b> Jangan mematikan RLS di server produksi. Gunakan
-          kebijakan akses agar data tetap aman.
-        </p>
-        <h3>Jalankan kueri ini di SQL Editor untuk memberi izin akses:</h3>
-        <div class="code-block">
-          -- Memberi izin Baca/Tulis untuk Aplikasi ALTER TABLE users ENABLE ROW
-          LEVEL SECURITY; CREATE POLICY "Public Read" ON users FOR SELECT TO
-          anon USING (true); CREATE POLICY "Public Write" ON users FOR INSERT TO
-          anon WITH CHECK (true); -- Lakukan hal yang sama untuk tabel lain
-          (presensi, logbook, laporan) -- Atau jalankan script RLS lengkap dari
-          file audit_results.md
-        </div>
-        <p>
-          Kebijakan ini memungkinkan aplikasi web Anda berkomunikasi dengan
-          database menggunakan <code>anon key</code> secara aman.
-        </p>
-      </div>
-
-      <!-- STEP 4 -->
-      <div class="step-card">
-        <div class="step-number">4</div>
-        <h2><i class="fa-solid fa-plug"></i> Menghubungkan API</h2>
-        <p>
-          Konfigurasi koneksi antara frontend (browser) dan backend (Supabase).
-        </p>
-        <ul>
-          <li>Buka <b>Project Settings</b> (gir bawah) > <b>API</b>.</li>
-          <li>Salin <b>Project URL</b> dan <b>anon keys</b>.</li>
-          <li>
-            Buka file <code>js/supabase-config.js</code> di komputer Anda.
-          </li>
-          <li>Update variabel berikut:</li>
-        </ul>
-        <div class="code-block">
-          const SUPABASE_URL = "https://proyek-anda.supabase.co"; const
-          SUPABASE_ANON_KEY = "eyJhbGc...pasted-from-dashboard";
-        </div>
-      </div>
-
-      <!-- FINISH -->
-      <div
-        class="step-card"
-        style="border: 3px solid var(--success); background: #f0fdfa"
-      >
-        <div
-          class="step-number"
-          style="background: var(--success); transform: rotate(0)"
-        >
-          <i class="fa-solid fa-trophy"></i>
-        </div>
-        <h2 style="color: var(--success)">Berhasil Diinstal!</h2>
-        <p>Gunakan akun demo berikut untuk mencoba seluruh fitur baru:</p>
-
-        <div
-          style="
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 10px;
-          "
-        >
-          <div
-            style="
-              background: white;
-              padding: 15px;
-              border-radius: 12px;
-              border: 1px solid #d1fae5;
-            "
-          >
-            <p style="margin: 0; font-weight: 700; color: var(--primary)">
-              👤 SUPER ADMIN
-            </p>
-            <code class="demo-badge">hironimus</code> /
-            <code class="demo-badge">admin123</code>
-          </div>
-          <div
-            style="
-              background: white;
-              padding: 15px;
-              border-radius: 12px;
-              border: 1px solid #d1fae5;
-            "
-          >
-            <p style="margin: 0; font-weight: 700; color: var(--primary)">
-              🎓 MAHASISWA
-            </p>
-            <code class="demo-badge">mhs</code> /
-            <code class="demo-badge">123</code>
-          </div>
-          <div
-            style="
-              background: white;
-              padding: 15px;
-              border-radius: 12px;
-              border: 1px solid #d1fae5;
-            "
-          >
-            <p style="margin: 0; font-weight: 700; color: var(--primary)">
-              🏥 PRESEPTOR
-            </p>
-            <code class="demo-badge">pre</code> /
-            <code class="demo-badge">123</code>
-          </div>
-        </div>
-      </div>
-
-      <footer>
-        <p>&copy; 2026 E-Klinik Management System | Pro-Grade PWA Edition</p>
-        <p style="font-size: 0.8rem; margin-top: 10px; opacity: 0.7">
-          Optimized for High Performance & Secure Database Interactions
-        </p>
-      </footer>
+    
+    <div class="masthead">
+       <div class="container">
+          <h1>E-KLINIK MANUAL</h1>
+          <p>Manual Panduan Operasional Terpusat Versi 3.0 (Full Detailed Access)</p>
+       </div>
     </div>
+
+    <div class="jumpers">
+       <a href="#mahasiswa-guide" class="jumper-btn mhs-jumper">
+          <i class="fas fa-user-graduate"></i> PANDUAN MAHASISWA
+       </a>
+       <a href="#preseptor-guide" class="jumper-btn pre-jumper">
+          <i class="fas fa-user-md"></i> PANDUAN PRESEPTOR
+       </a>
+    </div>
+
+    <main class="container">
+
+      <!-- SECTION MAHASISWA -->
+      <section id="mahasiswa-guide" class="role-section mhs-theme">
+         <div class="role-indicator mhs-indicator">MAHASISWA EDITION</div>
+         <h2>Manajemen Kegiatan Klinik</h2>
+         <p style="color: var(--text-light); margin-bottom: 40px;">Panduan operasional mendalam untuk seluruh fitur Mahasiswa berdasarkan navigasi menu utama.</p>
+
+         <div class="menu-explorer mhs-explorer">
+            <aside class="menu-nav-mock">
+               <div class="nav-item-mock"><i class="fas fa-chart-pie"></i> Dashboard</div>
+               <div class="nav-item-mock"><i class="fas fa-clock"></i> Presensi Harian</div>
+               <div class="nav-item-mock"><i class="fas fa-calendar-alt"></i> Jadwal Saya</div>
+               <div class="nav-item-mock"><i class="fas fa-book-open"></i> Logbook Tindakan</div>
+               <div class="nav-item-mock"><i class="fas fa-graduation-cap"></i> Nilai Saya</div>
+               <div class="nav-item-mock"><i class="fas fa-info-circle"></i> Informasi Praktik</div>
+               <div class="nav-item-mock"><i class="fas fa-exclamation-triangle"></i> Laporan Kejadian</div>
+               <div class="nav-item-mock"><i class="fas fa-key"></i> Ubah Password</div>
+            </aside>
+
+            <div class="manual-content">
+               
+               <!-- Dashboard -->
+               <div class="manual-card" id="mhs-dashboard">
+                  <h3>Dashboard Utama</h3>
+                  <div class="instruction-step">
+                     <span class="step-badge">Navigasi Dasar</span>
+                     <p>Saat Anda login, Dashboard adalah pusat informasi pertama. Berikut cara membacanya:</p>
+                     <ul class="step-detail-list">
+                        <li><b>Logbook Diisi:</b> Menunjukkan total seluruh logbook yang pernah Anda buat (baik yang sedang menunggu maupun sudah disetujui).</li>
+                        <li><b>Jumlah Hadir:</b> Menghitung berapa hari Anda melakukan "Clock In" yang sah.</li>
+                        <li><b>Jumlah Absen:</b> Dihitung otomatis jika hari ini ada jadwal namun Anda belum melakukan presensi melewati batas jam masuk.</li>
+                        <li><b>Aktivitas Terbaru:</b> Melihat feedback komentar terbaru dari preseptor terkait logbook Anda.</li>
+                     </ul>
+                  </div>
+               </div>
+
+               <!-- Presensi -->
+               <div class="manual-card" id="mhs-presensi">
+                  <h3>Presensi Harian</h3>
+                  <div class="instruction-step">
+                     <span class="step-badge">Prosedur Kehadiran</span>
+                     <p>Wajib dilakukan setiap kali Anda berada di lahan praktik (RS/Puskesmas).</p>
+                     <ul class="step-detail-list">
+                        <li><b>Check-In:</b> Klik tombol <span class="ui-ref">Presensi</span> -> Izinkan Akses Kamera & GPS -> Klik <span class="ui-ref">Ambil Foto</span> (Pastikan memakai seragam lengkap & ID Card) -> Klik <span class="ui-ref">Simpan Presensi Masuk</span>.</li>
+                        <li><b>Deteksi Lokasi:</b> Jika sistem menolak, pastikan Anda berada di area lahan praktik yang terdaftar sesuai jadwal.</li>
+                        <li><b>Check-Out:</b> Di akhir shift, klik kembali menu ini dan pilih <span class="ui-ref">Clock Out</span>. Jika lupa, total durasi jam praktik tidak akan terhitung.</li>
+                     </ul>
+                     <div class="pro-tip">
+                        <b>PRO-TIP:</b> Jika sinyal GPS lemah, keluarlah sejenak dari gedung menuju area terbuka untuk mendapatkan koordinat yang akurat.
+                     </div>
+                  </div>
+               </div>
+
+               <!-- Jadwal -->
+               <div class="manual-card" id="mhs-jadwal">
+                  <h3>Jadwal Saya</h3>
+                  <div class="instruction-step">
+                     <span class="step-badge">Manajemen Rotasi</span>
+                     <p>Cek ketersediaan jadwal Anda agar tidak terjadi kesalahan shift.</p>
+                     <ul class="step-detail-list">
+                        <li><b>Kalender Aktivitas:</b> Lihat baris jadwal yang berisi: Tanggal, Nama Lahan, dan Nama Ruangan.</li>
+                        <li><b>Shift Detail:</b> Perhatikan Jam Mulai & Jam Selesai. Datanglah 15 menit sebelum shift dimulai.</li>
+                        <li><b>Kelompok:</b> Lihat rekan satu tim Anda di lahan tersebut untuk koordinasi bimbingan kelompok.</li>
+                     </ul>
+                  </div>
+               </div>
+
+               <!-- Logbook -->
+               <div class="manual-card" id="mhs-logbook">
+                  <h3>Logbook Tindakan</h3>
+                  <div class="instruction-step">
+                     <span class="step-badge">Pencatatan Kompetensi</span>
+                     <p>Catatan harian tindakan klinis sebagai bukti kelulusan stase.</p>
+                     <ul class="step-detail-list">
+                        <li><b>Input Data:</b> Klik <span class="ui-ref">+ Tambah Tindakan</span>.</li>
+                        <li><b>Kompetensi:</b> Pilih skill spesifik. Jika skill tidak ada di daftar, pilih "Lainnya" dan tulis di deskripsi.</li>
+                        <li><b>Level Partisipasi:</b>
+                           <ul>
+                              <li><i>Observasi (Level 1):</i> Hanya menonton Tindakan.</li>
+                              <li><i>Dibantu (Level 2-3):</i> Melakukan dengan bimbingan CI.</li>
+                              <li><i>Mandiri (Level 4):</i> Melakukan sendiri secara profesional.</li>
+                           </ul>
+                        </li>
+                        <li><b>Deskripsi:</b> Tulis narasi ringkas (Inisial Pasien, Kondisi, Tindakan, Respons).</li>
+                     </ul>
+                  </div>
+               </div>
+
+            </div>
+         </div>
+      </section>
+
+      <!-- SECTION PRESEPTOR -->
+      <section id="preseptor-guide" class="role-section pre-theme">
+         <div class="role-indicator pre-indicator">PRESEPTOR EDITION</div>
+         <h2>Verifikasi & Penilaian Klinik</h2>
+         <p style="color: var(--text-light); margin-bottom: 40px;">Panduan operasional mendalam untuk Preseptor dalam mengawal kualitas bimbingan klinis.</p>
+
+         <div class="menu-explorer pre-explorer">
+            <aside class="menu-nav-mock">
+               <div class="nav-item-mock"><i class="fas fa-chart-pie" style="color: #a855f7;"></i> Dashboard</div>
+               <div class="nav-item-mock"><i class="fas fa-check-double" style="color: #3b82f6;"></i> Validasi Logbook</div>
+               <div class="nav-item-mock"><i class="fas fa-users" style="color: #10b981;"></i> Mahasiswa Bimbingan</div>
+               <div class="nav-item-mock"><i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> Laporan Kejadian</div>
+               <div class="nav-item-mock"><i class="fas fa-key" style="color: #fb7185;"></i> Ubah Password</div>
+            </aside>
+
+            <div class="manual-content">
+
+               <!-- Dashboard -->
+               <div class="manual-card">
+                  <h3>Dashboard Pengawasan</h3>
+                  <div class="instruction-step">
+                     <span class="step-badge">Insight & Control</span>
+                     <p>Pusat kontrol cepat untuk memantau beban bimbingan ruangan Anda.</p>
+                     <ul class="step-detail-list">
+                        <li><b>Antrean Validasi:</b> Angka kumulatif logbook yang belum disentuh. Admin mewajibkan validasi maksimal 1x24 jam.</li>
+                        <li><b>Statistik Ruangan:</b> Pantau perbandingan capaian kompetensi antar kelompok mahasiswa di unit Anda.</li>
+                        <li><b>Notifikasi Logbook:</b> Muncul secara real-time setiap kali mahasiswa selesai mengisi logbook tindakan.</li>
+                     </ul>
+                  </div>
+               </div>
+
+               <!-- Validasi -->
+               <div class="manual-card">
+                  <h3>Validasi Logbook</h3>
+                  <div class="instruction-step">
+                     <span class="step-badge">Verifikasi Tindakan</span>
+                     <p>Tahap krusial untuk memastikan mahasiswa benar-benar melakukan tindakan dengan benar.</p>
+                     <ul class="step-detail-list">
+                        <li><b>Menu Validasi:</b> Klik menu ini untuk melihat daftar kiriman mahasiswa.</li>
+                        <li><b>Pemeriksaan Detail:</b> Klik tombol <span class="ui-ref">Detail</span>. Cek apakah level (Mandiri/Observasi) sudah sesuai dengan supervisi Anda.</li>
+                        <li><b>Eksekusi:</b> 
+                           <ul>
+                              <li>Klik Hijau <span class="ui-ref">Setujui</span> jika deskripsi valid.</li>
+                              <li>Klik Merah <span class="ui-ref">Tolak</span> jika data mencurigakan atau deskripsi tidak jelas. Tuliskan alasan di kolom komentar agar mahasiswa paham.</li>
+                           </ul>
+                        </li>
+                     </ul>
+                  </div>
+               </div>
+
+               <!-- Mahasiswa Bimbingan -->
+               <div class="manual-card">
+                  <h3>Mahasiswa Bimbingan & Nilai</h3>
+                  <div class="instruction-step">
+                     <span class="step-badge">Penilaian Akhir</span>
+                     <p>Pemberian skor resmi yang akan menjadi bukti kelulusan akademik mahasiswa.</p>
+                     <ul class="step-detail-list">
+                        <li><b>Daftar Mahasiswa:</b> Menampilkan foto, nama, dan NIM mahasiswa yang bertugas saat ini.</li>
+                        <li><b>Input Skor:</b> Klik tombol <span class="ui-ref">Beri Nilai</span>.</li>
+                        <li><b>Komponen Standar:</b>
+                           <ul>
+                              <li><b>Klinik Praktikum:</b> Skor keteknisan (40%).</li>
+                              <li><b>Klinik Askep:</b> Skor dokumentasi asuhan (40%).</li>
+                              <li><b>Klinik Sikap:</b> Skor etika & disiplin (20%).</li>
+                           </ul>
+                        </li>
+                        <li><b>Simpan:</b> Data akan langsung terhitung menjadi <b>Nilai Akhir</b> dan masuk ke portal nilai kampus.</li>
+                     </ul>
+                  </div>
+               </div>
+
+            </div>
+         </div>
+      </section>
+
+    </main>
+
+    <footer>
+       <div class="footer-logo">E-<span>KLINIK</span> SYSTEM</div>
+       <p>Optimized for Pro-Grade Medical Education Operations</p>
+       <p style="margin-top: 20px; opacity: 0.5;">Manual Documentation Version 3.0 Build 2026.04</p>
+    </footer>
+
   </body>
 </html>

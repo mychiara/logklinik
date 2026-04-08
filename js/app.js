@@ -1700,6 +1700,15 @@ async function logbookView(area) {
       btn.innerHTML =
         '<i class="fa-solid fa-spinner fa-spin"></i> Menghubungkan...';
 
+      const payload = {
+        user_id: currentUser.id,
+        tanggal: document.getElementById("log-tanggal").value,
+        lahan: document.getElementById("log-lahan").value,
+        kompetensi: document.getElementById("log-kompetensi").value,
+        level: document.getElementById("log-level").value,
+        deskripsi: document.getElementById("log-deskripsi").value,
+      };
+
       showLoader(true);
       try {
         const res = await postAPI("addLogbook", payload);
