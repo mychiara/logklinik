@@ -3605,9 +3605,23 @@ async function adminLaporanView(area) {
                           <h3 class="m-0"><i class="fa-solid fa-triangle-exclamation text-danger"></i> Daftar Laporan Kejadian</h3>
                           <p class="text-muted mt-1" style="font-size:0.85rem;">Gunakan halaman ini untuk memantau laporan dari mahasiswa dan preseptor klinik.</p>
                       </div>
-                      <div class="input-with-icon" style="width:250px;">
-                          <i class="fa-solid fa-magnifying-glass"></i>
-                          <input type="text" id="search-laporan" class="form-control" placeholder="Cari laporan..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+                      <div class="d-flex gap-2 align-center wrap">
+                          ${
+                            currentUser.role === "admin"
+                              ? `
+                          <button class="btn btn-outline btn-sm" id="btn-proses-semua-laporan" style="white-space:nowrap;">
+                              <i class="fa-solid fa-check-double"></i> Proses Semua
+                          </button>
+                          <button class="btn btn-danger-soft btn-sm" id="btn-hapus-semua-laporan" style="white-space:nowrap;">
+                              <i class="fa-solid fa-trash-can"></i> Hapus Semua
+                          </button>
+                          `
+                              : ""
+                          }
+                          <div class="input-with-icon" style="width:250px;">
+                              <i class="fa-solid fa-magnifying-glass"></i>
+                              <input type="text" id="search-laporan" class="form-control" placeholder="Cari laporan..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+                          </div>
                       </div>
                   </div>
                   <div class="card-body">
@@ -3791,6 +3805,74 @@ async function adminLaporanView(area) {
       showToast("Gagal", res.message || "Gagal menghapus laporan.", "error");
     }
   };
+
+  // Bulk: Proses Semua
+  const btnProsesSemua = document.getElementById("btn-proses-semua-laporan");
+  if (btnProsesSemua) {
+    btnProsesSemua.onclick = async () => {
+      const baruList = allData.filter((l) => l.status === "Baru");
+      if (baruList.length === 0) {
+        return showToast(
+          "Info",
+          'Tidak ada laporan berstatus "Baru" untuk diproses.',
+          "warning",
+        );
+      }
+      if (
+        !confirm(
+          `Anda akan memproses ${baruList.length} laporan berstatus "Baru" menjadi "Ditindak Lanjuti". Lanjutkan?`,
+        )
+      )
+        return;
+      showLoader(true);
+      const ids = baruList.map((l) => l.id);
+      const res = await postAPI("bulkUpdateLaporanStatus", {
+        ids,
+        status: "Ditindak Lanjuti",
+      });
+      showLoader(false);
+      if (res.success) {
+        showToast(
+          "Sukses",
+          `${ids.length} laporan berhasil diproses.`,
+          "success",
+        );
+        adminLaporanView(area);
+      } else {
+        showToast("Gagal", res.message || "Gagal memproses laporan.", "error");
+      }
+    };
+  }
+
+  // Bulk: Hapus Semua
+  const btnHapusSemua = document.getElementById("btn-hapus-semua-laporan");
+  if (btnHapusSemua) {
+    btnHapusSemua.onclick = async () => {
+      if (allData.length === 0) {
+        return showToast("Info", "Tidak ada laporan untuk dihapus.", "warning");
+      }
+      if (
+        !confirm(
+          `⚠️ PERINGATAN: Anda akan menghapus SEMUA ${allData.length} laporan secara permanen. Tindakan ini tidak dapat dibatalkan!\n\nLanjutkan?`,
+        )
+      )
+        return;
+      showLoader(true);
+      const ids = allData.map((l) => l.id);
+      const res = await postAPI("bulkDeleteLaporan", { ids });
+      showLoader(false);
+      if (res.success) {
+        showToast(
+          "Sukses",
+          `${ids.length} laporan berhasil dihapus.`,
+          "success",
+        );
+        adminLaporanView(area);
+      } else {
+        showToast("Gagal", res.message || "Gagal menghapus laporan.", "error");
+      }
+    };
+  }
 }
 
 // ============ GENERATE JADWAL VIEW ============
