@@ -5053,9 +5053,9 @@ async function kelompokAdminView(area) {
                   <div class="card-header d-flex justify-between align-center wrap gap-2">
                       <div class="d-flex align-center gap-3 wrap">
                           <h3 class="m-0"><i class="fa-solid fa-users-rectangle text-primary"></i> Kelompok Mahasiswa</h3>
-                          <div class="input-with-icon" style="width:250px;">
+                          <div class="input-with-icon" style="width:300px;">
                               <i class="fa-solid fa-magnifying-glass"></i>
-                              <input type="text" id="search-kelompok" class="form-control" placeholder="Cari kelompok..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+                              <input type="text" id="search-kelompok" class="form-control" placeholder="Cari kelompok atau nama mahasiswa..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
                           </div>
                       </div>
                       <div class="d-flex gap-2 wrap">
@@ -5089,9 +5089,15 @@ async function kelompokAdminView(area) {
           </div>
       `;
 
-  const res = await fetchAPI("getKelompok");
+  const [resG, resU] = await Promise.all([
+    fetchAPI("getKelompok"),
+    fetchAPI("getUsers"),
+  ]);
+
   const tableBody = document.querySelector("#table-kelompok tbody");
   if (!tableBody) return;
+
+  const mahasiswa = (resU.data || []).filter((u) => u.role === "mahasiswa");
 
   let currentPage = 1;
   const itemsPerPage = 15;
@@ -5142,15 +5148,43 @@ async function kelompokAdminView(area) {
 
     if (data.length === 0) {
       tableBody.innerHTML = `<tr><td colspan="3" class="empty-table">Tidak ada kelompok ditemukan</td></tr>`;
-      document.getElementById("pagination-kelompok").innerHTML = "";
+      const pGroup = document.getElementById("pagination-kelompok");
+      if (pGroup) pGroup.innerHTML = "";
       return;
     }
 
+    const q =
+      document.getElementById("search-kelompok")?.value.toLowerCase() || "";
+
     tableBody.innerHTML = paginatedItems
-      .map(
-        (k, idx) => `
+      .map((k, idx) => {
+        let matchHint = "";
+        if (q) {
+          const matchedMhs = mahasiswa.filter(
+            (m) =>
+              (m.kelompok == k.id || m.kelompok_id == k.id) &&
+              (m.nama.toLowerCase().includes(q) ||
+                m.username.toLowerCase().includes(q)),
+          );
+          if (matchedMhs.length > 0) {
+            matchHint = `<div class="animate-fade-in" style="font-size:0.8rem; color:var(--primary); margin-top:4px; font-weight:500;">
+                                <i class="fa-solid fa-id-card-clip"></i> Ditemukan: 
+                                ${matchedMhs
+                                  .map(
+                                    (m) =>
+                                      `<span class="badge bg-primary-soft text-primary" style="font-size:0.75rem">${m.nama}</span>`,
+                                  )
+                                  .join(" ")}
+                             </div>`;
+          }
+        }
+
+        return `
               <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
-                  <td><strong><i class="fa-solid fa-users-rectangle" style="color:var(--primary)"></i> ${k.nama_kelompok}</strong></td>
+                  <td>
+                    <strong><i class="fa-solid fa-users-rectangle" style="color:var(--primary)"></i> ${k.nama_kelompok}</strong>
+                    ${matchHint}
+                  </td>
                   <td><span class="badge bg-primary" style="font-size:0.95em">${k.jumlah_anggota || 0} mahasiswa</span></td>
                   <td style="text-align:right">
                       <div class="d-flex justify-end gap-1">
@@ -5160,8 +5194,8 @@ async function kelompokAdminView(area) {
                       </div>
                   </td>
               </tr>
-          `,
-      )
+          `;
+      })
       .join("");
     renderPagination();
   };
@@ -5170,8 +5204,19 @@ async function kelompokAdminView(area) {
     render(currentFilteredData, page);
   };
 
-  if (res.success && res.data && res.data.length > 0) {
-    allData = res.data;
+  if (resG.success && resG.data) {
+    allData = resG.data.map((k) => {
+      const listMhs = mahasiswa.filter(
+        (m) => m.kelompok == k.id || m.kelompok_id == k.id,
+      );
+      return {
+        ...k,
+        search_names: listMhs.map((m) => m.nama.toLowerCase()).join("|"),
+        search_usernames: listMhs
+          .map((m) => m.username.toLowerCase())
+          .join("|"),
+      };
+    });
     render(allData);
   } else {
     tableBody.innerHTML = `<tr><td colspan="3" class="empty-table">Belum ada kelompok.</td></tr>`;
@@ -5179,8 +5224,11 @@ async function kelompokAdminView(area) {
 
   document.getElementById("search-kelompok").oninput = (e) => {
     const q = e.target.value.toLowerCase();
-    const results = allData.filter((k) =>
-      k.nama_kelompok.toLowerCase().includes(q),
+    const results = allData.filter(
+      (k) =>
+        k.nama_kelompok.toLowerCase().includes(q) ||
+        k.search_names.includes(q) ||
+        k.search_usernames.includes(q),
     );
     render(results, 1);
   };
@@ -5224,18 +5272,27 @@ window.bukaModalKelompok = (id = null, currentNama = "") => {
 
 window.aturAnggotaKelompok = async (kelompokId, namaKelompok) => {
   showLoader(true);
-  const resUsers = await fetchAPI("getUsers");
+  const [resUsers, resKelompok] = await Promise.all([
+    fetchAPI("getUsers"),
+    fetchAPI("getKelompok"),
+  ]);
   showLoader(false);
   if (!resUsers.success) return;
+
+  const kelompokMap = {};
+  if (resKelompok.success && resKelompok.data) {
+    resKelompok.data.forEach((k) => (kelompokMap[k.id] = k.nama_kelompok));
+  }
 
   const mahasiswa = resUsers.data.filter((u) => u.role === "mahasiswa");
 
   const checkboxes = mahasiswa
     .map((m) => {
       const checked = m.kelompok == kelompokId ? "checked" : "";
+      const otherGroupName = kelompokMap[m.kelompok] || "KELOMPOK LAIN";
       const otherGroup =
         m.kelompok && m.kelompok !== "-" && m.kelompok !== kelompokId
-          ? `<span class="badge bg-warning" style="font-size:0.7em; margin-left:6px">di kelompok lain</span>`
+          ? `<span class="badge bg-warning" style="font-size:0.7em; margin-left:6px; text-transform:uppercase;">DI ${otherGroupName}</span>`
           : "";
       return `
               <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:var(--bg-main); cursor:pointer; margin-bottom:4px;">
@@ -5669,12 +5726,14 @@ window.importKelompokCSV = async (event) => {
 };
 
 async function renderUserManagement(area, roleFilter, title, icon) {
+  const isMhs = roleFilter === "mahasiswa";
   area.innerHTML = `
           <div class="animate-fade-up">
               <div class="card">
                   <div class="card-header d-flex align-center justify-between wrap gap-3">
                       <div class="d-flex align-center gap-3 wrap">
                           <h3 class="m-0"><i class="fa-solid ${icon} text-primary"></i> Manajemen ${title}</h3>
+                          ${isMhs ? `<select id="filter-angkatan" class="form-control" style="width:150px; padding:0.4rem; border-color:var(--primary); font-weight:600;"><option value="">Semua Angkatan</option></select>` : ""}
                           <div class="input-with-icon" style="width:250px;">
                               <i class="fa-solid fa-magnifying-glass"></i>
                               <input type="text" id="search-users" class="form-control" placeholder="Cari nama atau ID..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
@@ -5721,6 +5780,20 @@ async function renderUserManagement(area, roleFilter, title, icon) {
 
   const tableBody = document.querySelector(`#table-users-${roleFilter} tbody`);
   if (!tableBody) return;
+
+  const applyFilters = () => {
+    const q = document.getElementById("search-users").value.toLowerCase();
+    const angkatan = document.getElementById("filter-angkatan")?.value || "";
+
+    const results = window["adminUsersData_" + roleFilter].filter((u) => {
+      const matchSearch =
+        u.nama.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q);
+      const matchAngkatan = angkatan === "" || u.angkatan == angkatan;
+      return matchSearch && matchAngkatan;
+    });
+    renderUsers(results, 1);
+  };
 
   let currentPage = 1;
   const itemsPerPage = 20;
@@ -5808,27 +5881,37 @@ async function renderUserManagement(area, roleFilter, title, icon) {
   };
 
   window.changeUserPage = (role, page) => {
-    // Current data is already in currentFilteredData (search was applied)
     renderUsers(currentFilteredData, page);
   };
 
   if (resUsers.success && resUsers.data && resUsers.data.length > 0) {
     const filteredByRole = resUsers.data.filter((u) => u.role === roleFilter);
     window["adminUsersData_" + roleFilter] = filteredByRole;
+
+    if (isMhs) {
+      const angkatans = [
+        ...new Set(
+          filteredByRole.map((u) => u.angkatan).filter((a) => a && a !== "-"),
+        ),
+      ]
+        .sort()
+        .reverse();
+      const select = document.getElementById("filter-angkatan");
+      angkatans.forEach((a) => {
+        const opt = document.createElement("option");
+        opt.value = a;
+        opt.textContent = "Angkatan " + a;
+        select.appendChild(opt);
+      });
+      select.onchange = applyFilters;
+    }
+
     renderUsers(filteredByRole);
   } else {
     tableBody.innerHTML = `<tr><td colspan="${roleFilter === "mahasiswa" ? 5 : 4}" class="empty-table"><i class="fa-solid fa-users-slash fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Belum ada data ${title}</td></tr>`;
   }
 
-  document.getElementById("search-users").oninput = (e) => {
-    const q = e.target.value.toLowerCase();
-    const results = window["adminUsersData_" + roleFilter].filter(
-      (u) =>
-        u.nama.toLowerCase().includes(q) ||
-        u.username.toLowerCase().includes(q),
-    );
-    renderUsers(results, 1);
-  };
+  document.getElementById("search-users").oninput = applyFilters;
 }
 
 window.bukaModalUser = async (roleFilter, id = null) => {
