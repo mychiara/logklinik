@@ -854,6 +854,18 @@ window.supabasePostAPI = async (action, payload) => {
 
   try {
     switch (action) {
+      case "updateBroadcast": {
+        const { message } = payload;
+        const { error } = await supabaseClient
+          .from("settings")
+          .upsert(
+            { key: "broadcast_message", value: message },
+            { onConflict: "key" },
+          );
+        if (error) throw error;
+        return { success: true };
+      }
+
       case "checkIn": {
         const row = {
           user_id: payload.user_id,

@@ -763,13 +763,13 @@ async function dashboardView(area) {
   if (bMsg) {
     urgentContainer.innerHTML =
       `
-          <div class="alert bg-primary text-white animate-fade-in mb-4 d-flex align-center gap-3" style="border-radius:12px; border:none; box-shadow:0 10px 15px -3px rgba(37,99,235,0.2);">
-              <div style="background:rgba(255,255,255,0.2); width:35px; height:35px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                  <i class="fa-solid fa-bullhorn fa-sm"></i>
+          <div class="alert animate-fade-in mb-4 d-flex align-center gap-4" style="background:rgba(139,92,246,0.08); color:var(--primary-dark); padding:20px 25px; border-radius:16px; border:1px solid rgba(139,92,246,0.15); width:100%; box-shadow:0 4px 15px rgba(0,0,0,0.02);">
+              <div style="background:var(--primary); color:white; width:45px; height:45px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 8px 15px -5px rgba(139,92,246,0.5);">
+                  <i class="fa-solid fa-bullhorn fa-lg"></i>
               </div>
-              <div style="flex:1; font-size:0.9rem; font-weight:500;">
-                  <span style="opacity:0.8; font-size:0.75rem; display:block; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Pengumuman Sistem</span>
-                  ${escapeHTML(bMsg)}
+              <div style="flex:1;">
+                  <span style="opacity:0.75; font-size:0.75rem; display:block; text-transform:uppercase; font-weight:800; letter-spacing:0.8px; margin-bottom:4px;">Pengumuman Sistem</span>
+                  <div style="font-weight:600; font-size:1.05rem; line-height:1.5;">${escapeHTML(bMsg)}</div>
               </div>
           </div>
         ` + urgentContainer.innerHTML;
@@ -783,15 +783,15 @@ async function dashboardView(area) {
   // Handle Urgent Notifications
   if (resMendesak.success && resMendesak.data.length > 0) {
     urgentContainer.innerHTML = `
-              <div class="alert bg-danger-soft animate-bounce-subtle" style="border-radius:12px; border:1px solid #fee2e2; margin-bottom:1.5rem; display:flex; align-items:center; gap:12px;">
-                  <div style="background:#ef4444; color:white; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <div class="alert bg-danger-soft animate-bounce-subtle" style="border-radius:16px; border:1px solid #fee2e2; margin-bottom:1.5rem; display:flex; align-items:center; gap:20px; padding: 20px 25px; width: 100%;">
+                  <div style="background:#ef4444; color:white; width:45px; height:45px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
                       <i class="fa-solid fa-bell-exclamation fa-lg"></i>
                   </div>
                   <div style="flex:1">
-                      <strong style="color:#991b1b">Peringatan Validasi!</strong>
-                      <div style="font-size:0.85rem; color:#b91c1c">Terdapat <strong>${resMendesak.data.length} logbook</strong> yang telah menunggu lebih dari 24 jam. Mohon segera divalidasi.</div>
+                      <strong style="color:#991b1b; font-size:1.05rem;">Peringatan Validasi!</strong>
+                      <div style="font-size:0.9rem; color:#b91c1c; margin-top:4px;">Terdapat <strong>${resMendesak.data.length} logbook</strong> yang telah menunggu lebih dari 24 jam. Mohon segera divalidasi.</div>
                   </div>
-                  <button class="btn btn-danger btn-sm" onclick="loadView('validasiView')">Lihat Antrean</button>
+                  <button class="btn btn-danger btn-sm" onclick="loadView('validasiView')" style="border-radius:10px; padding: 10px 18px;">Lihat Antrean</button>
               </div>
           `;
   }
@@ -8799,7 +8799,7 @@ window.eksekusiBroadcast = async () => {
     );
 
   showLoader(true);
-  const res = await fetchAPI("updateBroadcast", { message: msg });
+  const res = await postAPI("updateBroadcast", { message: msg });
   showLoader(false);
 
   if (res.success) {
