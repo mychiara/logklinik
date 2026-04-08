@@ -1259,6 +1259,15 @@ async function dashboardView(area) {
   container.innerHTML = html;
 }
 
+// Helper: get local date string in YYYY-MM-DD format (timezone-safe)
+const getLocalToday = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 const formatDateIndo = (dateStr, includeTime = false) => {
   if (!dateStr) return "-";
 
@@ -1430,7 +1439,7 @@ async function presensiView(area) {
   if (!document.getElementById("table-presensi")) return;
 
   // Render Today's Schedule Banner
-  const today = new Date().toISOString().split("T")[0];
+  const today = getLocalToday();
   const mySchedule =
     resJadwal.success && resJadwal.data
       ? resJadwal.data.find(
@@ -1507,7 +1516,7 @@ async function presensiView(area) {
 
           // VALIDASI JADWAL UNTUK CHECK-IN
           if (type === "in") {
-            const today = new Date().toISOString().split("T")[0];
+            const today = getLocalToday();
             const scRes = await fetchAPI("getJadwal", {
               user_id: currentUser.id,
             });
@@ -1672,7 +1681,7 @@ async function logbookView(area) {
         .join("");
     }
 
-    const todayDate = new Date().toISOString().split("T")[0];
+    const todayDate = getLocalToday();
     const userSchedules = resJadw && resJadw.data ? resJadw.data : [];
 
     openModal(

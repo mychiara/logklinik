@@ -1,3 +1,20 @@
+// Helper: get local date string in YYYY-MM-DD format (timezone-safe)
+const getLocalTodayService = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+// Helper: get local time string in HH:mm format (PostgreSQL-safe, uses colon)
+const getLocalTimeService = () => {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, "0");
+  const m = String(now.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+};
+
 window.supabaseFetchAPI = async (action, payload) => {
   if (!supabaseClient) {
     await new Promise((r) => setTimeout(r, 600));
@@ -84,7 +101,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         }
 
         if (payload.role === "mahasiswa") {
-          const today = new Date().toISOString().split("T")[0];
+          const today = getLocalTodayService();
           const [logs, pres, sched] = await Promise.all([
             supabaseClient
               .from("logbook")
@@ -194,7 +211,7 @@ window.supabaseFetchAPI = async (action, payload) => {
       }
 
       case "getLiveAttendance": {
-        const today = new Date().toISOString().split("T")[0];
+        const today = getLocalTodayService();
         const tIds = payload.tempat_id ? payload.tempat_id.split(",") : [];
 
         let query = supabaseClient
@@ -320,7 +337,7 @@ window.supabaseFetchAPI = async (action, payload) => {
       }
 
       case "getAdminAnalytics": {
-        const today = new Date().toISOString().split("T")[0];
+        const today = getLocalTodayService();
         const [mhs, logs, pres, scores, prodis] = await Promise.all([
           supabaseClient
             .from("users")
@@ -869,12 +886,8 @@ window.supabasePostAPI = async (action, payload) => {
       case "checkIn": {
         const row = {
           user_id: payload.user_id,
-          tanggal: new Date().toISOString().split("T")[0],
-          jam_masuk: new Date().toLocaleTimeString("id-id", {
-            hour12: false,
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          tanggal: getLocalTodayService(),
+          jam_masuk: getLocalTimeService(),
           lahan: payload.lahan,
           foto: payload.foto || null,
         };
@@ -884,12 +897,8 @@ window.supabasePostAPI = async (action, payload) => {
       }
 
       case "checkOut": {
-        const today = new Date().toISOString().split("T")[0];
-        const now = new Date().toLocaleTimeString("id-id", {
-          hour12: false,
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+        const today = getLocalTodayService();
+        const now = getLocalTimeService();
         const { data, error: errF } = await supabaseClient
           .from("presensi")
           .select("*")
