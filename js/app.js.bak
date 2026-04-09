@@ -4220,9 +4220,10 @@ async function rekapLogbookAdminView(area) {
                                   <tr>
                                       <th>Mahasiswa & Prodi</th>
                                       <th>Status Kompetensi (Detail)</th>
+                                      <th class="text-center">Nilai Akhir Logbook</th>
                                   </tr>
                               </thead>
-                              <tbody><tr><td colspan="2" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menganalisis logbook...</td></tr></tbody>
+                              <tbody><tr><td colspan="3" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menganalisis logbook...</td></tr></tbody>
                           </table>
                       </div>
                       <div class="pagination-container" id="pagination-rekap-log"></div>
@@ -4283,7 +4284,7 @@ async function rekapLogbookAdminView(area) {
     const paginatedItems = data.slice(start, end);
 
     if (data.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="2" class="empty-table">Tidak ada data ditemukan</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="3" class="empty-table">Tidak ada data ditemukan</td></tr>`;
       document.getElementById("pagination-rekap-log").innerHTML = "";
       return;
     }
@@ -4309,8 +4310,21 @@ async function rekapLogbookAdminView(area) {
                             <i class="fa-solid fa-eye"></i> Lihat Detail
                         </button>
                     </td>
-                    <td>
+                    <td style="vertical-align:top">
                         <div id="rekap-detail-${m.user_id}" class="hidden">
+                             ${""}
+                        </div>
+                        <div id="rekap-summary-${m.user_id}" class="text-muted" style="font-size:0.85rem">
+                           <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
+                        </div>
+                    </td>
+                    <td class="text-center" style="vertical-align:middle; width:150px;">
+                        <div style="font-size:1.5rem; font-weight:800; color:var(--primary)">${m.nilai_akhir || "0.00"}</div>
+                        <small class="text-muted">Rata-rata Logbook</small>
+                    </td>
+                </tr>
+        `;
+      })
                             ${(() => {
                               // Group rekap by kategori
                               const gRekap = {};

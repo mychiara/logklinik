@@ -611,18 +611,112 @@ window.supabaseFetchAPI = async (action, payload) => {
         return { success: true, data: data || [] };
       }
 
+      case "getAntrianLogbook": {
+        let allLogs = [];
+        let from = 0;
+        const step = 2000;
+        let finished = false;
+
+        while (!finished) {
+          const { data, error } = await supabaseClient
+            .from("logbook")
+            .select("*")
+            .order("tanggal", { ascending: false })
+            .range(from, from + step - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) allLogs = allLogs.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
+        }
+
+        // Fetch user metadata to join in JS (avoids relationship cache issues)
+        const userIds = [
+          ...new Set([
+            ...allLogs.map((l) => l.user_id),
+            ...allLogs.map((l) => l.preseptor_klinik_id).filter(Boolean),
+            ...allLogs.map((l) => l.preseptor_akademik_id).filter(Boolean),
+            ...allLogs.map((l) => l.preseptor_id).filter(Boolean),
+          ]),
+        ];
+
+        const { data: usersData } = await supabaseClient
+          .from("users")
+          .select("id, nama, prodi, role")
+          .in("id", userIds);
+
+        const userMap = {};
+        (usersData || []).forEach((u) => {
+          userMap[u.id] = u;
+        });
+
+        return {
+          success: true,
+          data: (allLogs || []).map((l) => ({
+            ...l,
+            nama_mahasiswa: userMap[l.user_id]?.nama || "-",
+            prodi_mahasiswa: userMap[l.user_id]?.prodi || "-",
+            nama_preseptor_klinik: userMap[l.preseptor_klinik_id]?.nama || "-",
+            nama_preseptor_akademik:
+              userMap[l.preseptor_akademik_id]?.nama || "-",
+            nama_preseptor: userMap[l.preseptor_id]?.nama || "-",
+            role_preseptor: userMap[l.preseptor_id]?.role || "-",
+          })),
+        };
+      }
+
       case "getLogbook": {
-        let query = supabaseClient.from("logbook").select("*");
+        let query = supabaseClient
+          .from("logbook")
+          .select("*, nilai_klinik, nilai_akademik");
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
         const { data, error } = await query
           .order("tanggal", { ascending: false })
-          .range(0, 49999);
+          .range(0, 4999);
         if (error) throw error;
-        return { success: true, data: data || [] };
+
+        // Fetch preceptor metadata
+        const preseptorIds = [
+          ...new Set((data || []).map((l) => l.preseptor_id).filter(Boolean)),
+        ];
+        let pMap = {};
+        if (preseptorIds.length > 0) {
+          const { data: pData } = await supabaseClient
+            .from("users")
+            .select("id, nama, role")
+            .in("id", preseptorIds);
+          (pData || []).forEach((u) => (pMap[u.id] = u));
+        }
+
+        const mapped = (data || []).map((l) => ({
+          ...l,
+          nama_preseptor: pMap[l.preseptor_id]?.nama || "-",
+          role_preseptor: pMap[l.preseptor_id]?.role || "-",
+        }));
+
+        return { success: true, data: mapped };
       }
 
       case "getPendingLogs": {
-        const { tempat_id } = payload;
+        const { tempat_id, user_id } = payload;
+
+        // Fetch Settings & Current User Role
+        const [{ data: sMode }, { data: pUser }] = await Promise.all([
+          supabaseClient
+            .from("settings")
+            .select("value")
+            .eq("key", "logbook_validation_mode")
+            .single(),
+          supabaseClient
+            .from("users")
+            .select("role")
+            .eq("id", user_id || currentUser.id)
+            .single(),
+        ]);
+
+        const mode = sMode?.value || "1";
+        const pRole = pUser?.role || "preseptor";
+
         let allLogs = [];
         let from = 0;
         const step = 2000;
@@ -631,8 +725,19 @@ window.supabaseFetchAPI = async (action, payload) => {
         while (!finished) {
           let query = supabaseClient
             .from("logbook")
-            .select("*, users!inner(nama)")
-            .eq("status", "Menunggu Validasi");
+            .select("*, users!inner(nama)");
+
+          if (mode === "2") {
+            const allowedStatuses = ["Menunggu Validasi"];
+            if (pRole === "preseptor_akademik") {
+              allowedStatuses.push("Disetujui (Klinik)");
+            } else {
+              allowedStatuses.push("Disetujui (Akademik)");
+            }
+            query = query.in("status", allowedStatuses);
+          } else {
+            query = query.eq("status", "Menunggu Validasi");
+          }
 
           const { data, error } = await query
             .order("tanggal", { ascending: true })
@@ -937,29 +1042,191 @@ window.supabasePostAPI = async (action, payload) => {
       }
 
       case "validasiLog": {
+        const { log_id, status, nilai, feedback, preseptor_id } = payload;
+
+        // Fetch Settings & Current Log Status & Values
+        const [{ data: sMode }, { data: currLog }, { data: pUser }] =
+          await Promise.all([
+            supabaseClient
+              .from("settings")
+              .select("value")
+              .eq("key", "logbook_validation_mode")
+              .single(),
+            supabaseClient
+              .from("logbook")
+              .select("status, nilai_klinik, nilai_akademik")
+              .eq("id", log_id || payload.id)
+              .single(),
+            supabaseClient
+              .from("users")
+              .select("role")
+              .eq("id", preseptor_id)
+              .single(),
+          ]);
+
+        const mode = sMode?.value || "1";
+        const currentStatus = currLog?.status || "Menunggu Validasi";
+        const pRole = pUser?.role || "preseptor";
+
+        let finalStatus = status;
+        let updateData = {
+          preseptor_id: preseptor_id,
+          feedback: feedback || payload.catatan,
+        };
+
+        if (mode === "2" && status === "Disetujui") {
+          let nk = currLog?.nilai_klinik;
+          let na = currLog?.nilai_akademik;
+
+          if (pRole === "preseptor_akademik") {
+            na = nilai;
+            updateData.nilai_akademik = na;
+            updateData.preseptor_akademik_id = preseptor_id;
+          } else {
+            nk = nilai;
+            updateData.nilai_klinik = nk;
+            updateData.preseptor_klinik_id = preseptor_id;
+          }
+
+          // Determine Status
+          if (currentStatus === "Menunggu Validasi") {
+            finalStatus =
+              pRole === "preseptor_akademik"
+                ? "Disetujui (Akademik)"
+                : "Disetujui (Klinik)";
+          } else if (
+            (currentStatus === "Disetujui (Klinik)" &&
+              pRole === "preseptor_akademik") ||
+            (currentStatus === "Disetujui (Akademik)" && pRole === "preseptor")
+          ) {
+            finalStatus = "Disetujui";
+          } else {
+            finalStatus = currentStatus;
+          }
+
+          // Combined score logic
+          if (
+            nk !== undefined &&
+            nk !== null &&
+            na !== undefined &&
+            na !== null
+          ) {
+            updateData.nilai = (parseFloat(nk) + parseFloat(na)) / 2;
+          } else {
+            updateData.nilai = nilai; // temporary single score
+          }
+        } else {
+          // Mode 1 or Rejection
+          updateData.nilai = nilai;
+          if (pRole === "preseptor_akademik") {
+            updateData.nilai_akademik = nilai;
+            updateData.preseptor_akademik_id = preseptor_id;
+          } else {
+            updateData.nilai_klinik = nilai;
+            updateData.preseptor_klinik_id = preseptor_id;
+          }
+        }
+
+        updateData.status = finalStatus;
+
         const { error } = await supabaseClient
           .from("logbook")
-          .update({
-            status: payload.status,
-            nilai: payload.nilai,
-            feedback: payload.catatan || payload.feedback,
-          })
-          .eq("id", payload.log_id || payload.id);
+          .update(updateData)
+          .eq("id", log_id || payload.id);
         if (error) throw error;
         return { success: true };
       }
 
       case "validasiLogBulk": {
-        const { ids, status, nilai, feedback } = payload;
-        const { error } = await supabaseClient
-          .from("logbook")
-          .update({
+        const { ids, status, nilai, feedback, preseptor_id } = payload;
+
+        // Fetch Settings & Current User Role
+        const [{ data: sMode }, { data: pUser }, { data: currentLogs }] =
+          await Promise.all([
+            supabaseClient
+              .from("settings")
+              .select("value")
+              .eq("key", "logbook_validation_mode")
+              .single(),
+            supabaseClient
+              .from("users")
+              .select("role")
+              .eq("id", preseptor_id)
+              .single(),
+            supabaseClient
+              .from("logbook")
+              .select(
+                "id, status, nilai_klinik, nilai_akademik, preseptor_klinik_id, preseptor_akademik_id",
+              )
+              .in("id", ids),
+          ]);
+
+        const mode = sMode?.value || "1";
+        const pRole = pUser?.role || "preseptor";
+
+        if (mode === "1" || status !== "Disetujui") {
+          // Simple update for all
+          let updateData = {
             status: status,
             nilai: nilai || 100,
             feedback: feedback || "Validasi Massal",
-          })
-          .in("id", ids);
-        if (error) throw error;
+            preseptor_id: preseptor_id,
+          };
+          if (pRole === "preseptor_akademik")
+            updateData.nilai_akademik = nilai || 100;
+          else updateData.nilai_klinik = nilai || 100;
+
+          const { error } = await supabaseClient
+            .from("logbook")
+            .update(updateData)
+            .in("id", ids);
+          if (error) throw error;
+        } else {
+          // 2-Stage Bulk: update individually based on current status
+          const updates = currentLogs.map((l) => {
+            let finalStatus = status;
+            let nk = l.nilai_klinik;
+            let na = l.nilai_akademik;
+
+            if (pRole === "preseptor_akademik") {
+              na = nilai || 100;
+            } else {
+              nk = nilai || 100;
+            }
+
+            if (l.status === "Menunggu Validasi") {
+              finalStatus =
+                pRole === "preseptor_akademik"
+                  ? "Disetujui (Akademik)"
+                  : "Disetujui (Klinik)";
+            } else if (
+              (l.status === "Disetujui (Klinik)" &&
+                pRole === "preseptor_akademik") ||
+              (l.status === "Disetujui (Akademik)" && pRole === "preseptor")
+            ) {
+              finalStatus = "Disetujui";
+            } else {
+              finalStatus = l.status;
+            }
+
+            let finalNilai = nilai || 100;
+            if (nk && na) finalNilai = (parseFloat(nk) + parseFloat(na)) / 2;
+
+            return supabaseClient
+              .from("logbook")
+              .update({
+                status: finalStatus,
+                nilai: finalNilai,
+                nilai_klinik: nk,
+                nilai_akademik: na,
+                feedback: feedback || "Validasi Massal",
+                preseptor_id: preseptor_id,
+              })
+              .eq("id", l.id);
+          });
+          await Promise.all(updates);
+        }
+
         return {
           success: true,
           message: `Berhasil memvalidasi ${ids.length} data`,
