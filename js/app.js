@@ -806,55 +806,89 @@ async function dashboardView(area) {
   if (currentUser.role.includes("preseptor")) {
     let gapHtml = "";
     if (resGap.success && resGap.data) {
+      const renderKompList = (list, title, subtitle, color, barColor) => {
+        let content = "";
+        if (!list || list.length === 0) {
+          content = `<div class="p-4 text-center text-muted" style="background:var(--bg-main); border-radius:12px; font-size:0.85rem;"><i class="fa-solid fa-database mb-2" style="display:block; font-size:1.2rem; opacity:0.3"></i> Belum ada aktivitas data di lahan ini.</div>`;
+        } else {
+          content = list
+            .map((g, idx) => {
+              let text = g.nama || "";
+              let firstNumIdx = text.search(/[0-9]+\./);
+              let formattedText = text;
+
+              if (firstNumIdx !== -1) {
+                let titlePart = text.substring(0, firstNumIdx).trim();
+                let listPart = text.substring(firstNumIdx);
+                formattedText =
+                  titlePart +
+                  "<div style='margin-top:4px; padding-left:5px; color:var(--text-strong); font-size:0.85em;'>" +
+                  listPart.replace(
+                    /([0-9]+\.)/g,
+                    `<br><span style="color:${color}; font-weight:700; margin-right:5px; display:inline-block;">$1</span>`,
+                  ) +
+                  "</div>";
+              }
+
+              return `
+                <div class="d-flex gap-2 mb-3" style="align-items:flex-start;">
+                    <div style="width:24px; height:24px; background:var(--bg-main); color:${color}; border:1px solid #e2e8f0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.7rem; flex-shrink:0; margin-top:2px;">
+                        ${idx + 1}
+                    </div>
+                    <div style="flex:1; overflow:hidden;">
+                        <div class="d-flex justify-between text-xs mb-2">
+                            <div style="line-height:1.6; padding-right:15px; font-weight:500;">${formattedText}</div>
+                            <span class="font-bold whitespace-nowrap" style="color:var(--text-strong)">${g.count}x</span>
+                        </div>
+                        <div style="height:5px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
+                            <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:${barColor}; border-radius:10px;"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            })
+            .join("");
+        }
+
+        return `
+          <div class="card shadow-sm border-0 mb-3" style="border-radius:16px;">
+              <div class="card-header bg-white" style="border-bottom: 1px solid #f1f5f9;">
+                  <h4 class="mb-0 font-bold"><i class="fa-solid fa-chart-line" style="color:${color}"></i> ${title}</h4>
+                  <p class="text-xs text-muted mb-0">${subtitle}</p>
+              </div>
+              <div class="card-body" style="padding:1rem;">
+                  ${content}
+              </div>
+          </div>
+        `;
+      };
+
+      // Ensure we are reading from the new object structure { rare, frequent }
+      const gapsData =
+        resGap.data.rare || (Array.isArray(resGap.data) ? resGap.data : []);
+      const mostData = resGap.data.frequent || [];
+
+      const rareHtml = renderKompList(
+        gapsData,
+        "Gap Analysis Kompetensi",
+        "Kompetensi yang paling jarang dilakukan di lahan ini",
+        "var(--primary)",
+        "var(--primary)",
+      );
+      const freqHtml = renderKompList(
+        mostData,
+        "Kompetensi Sering Dilakukan",
+        "Kompetensi yang paling sering dilakukan di lahan ini",
+        "#10b981",
+        "#10b981",
+      );
+
       gapHtml = `
-                  <div class="card shadow-sm border-0" style="border-radius:16px;">
-                      <div class="card-header bg-white">
-                          <h4 class="mb-0 font-bold"><i class="fa-solid fa-chart-line text-primary"></i> Gap Analysis Kompetensi</h4>
-                          <p class="text-xs text-muted mb-0">Kompetensi yang paling jarang dilakukan di lahan ini</p>
-                      </div>
-                      <div class="card-body" style="padding:1rem;">
-                          ${resGap.data
-                            .map((g, idx) => {
-                              let text = g.nama || "";
-                              let firstNumIdx = text.search(/[0-9]+\./);
-                              let formattedText = text;
-
-                              if (firstNumIdx !== -1) {
-                                let titlePart = text
-                                  .substring(0, firstNumIdx)
-                                  .trim();
-                                let listPart = text.substring(firstNumIdx);
-                                formattedText =
-                                  titlePart +
-                                  "<div style='margin-top:4px; padding-left:5px; color:var(--text-strong);'>" +
-                                  listPart.replace(
-                                    /([0-9]+\.)/g,
-                                    '<br><span style="color:var(--primary); font-weight:700; margin-right:5px; display:inline-block;">$1</span>',
-                                  ) +
-                                  "</div>";
-                              }
-
-                              return `
-                                <div class="d-flex gap-2 mb-3" style="align-items:flex-start;">
-                                    <div style="width:24px; height:24px; background:var(--primary-light); color:var(--primary); border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.7rem; flex-shrink:0; margin-top:2px;">
-                                        ${idx + 1}
-                                    </div>
-                                    <div style="flex:1; overflow:hidden;">
-                                        <div class="d-flex justify-between text-xs mb-2">
-                                            <div style="line-height:1.6; padding-right:15px;">${formattedText}</div>
-                                            <span class="font-bold whitespace-nowrap" style="color:var(--primary-dark)">${g.count}x</span>
-                                        </div>
-                                        <div style="height:5px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
-                                            <div style="width:${Math.min(100, g.count * 10)}%; height:100%; background:var(--primary); opacity:0.7; border-radius:10px;"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                            })
-                            .join("")}
-                      </div>
-                  </div>
-              `;
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          ${freqHtml}
+          ${rareHtml}
+        </div>
+      `;
     }
 
     let boardHtml = "";
