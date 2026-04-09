@@ -1218,8 +1218,8 @@ async function dashboardView(area) {
                                   </div>
                               </div>
                               <div style="flex:1">
-                                  <h4 class="mb-1 font-bold"><i class="fa-solid fa-bullseye text-primary"></i> Target Kompetensi</h4>
-                                  <p class="text-sm text-muted mb-0">Anda telah mencapai <strong>${completed} dari ${total}</strong> target keterampilan di stase ini.</p>
+                                  <h4 class="mb-1 font-bold"><i class="fa-solid fa-bullseye text-primary"></i> Target Kompetensi (Kategori)</h4>
+                                  <p class="text-sm text-muted mb-0">Anda telah mencapai <strong>${completed} dari ${total}</strong> kategori kompetensi di stase ini.</p>
                               </div>
                               <div class="d-flex align-center gap-3">
                                   <button class="btn btn-outline btn-sm" onclick="bukaModalMyQR()"><i class="fa-solid fa-address-card"></i> QR Saya</button>
@@ -4302,7 +4302,7 @@ async function rekapLogbookAdminView(area) {
                         <small class="text-muted">${m.prodi}</small>
                         <div class="mt-2">
                             <span class="badge ${totalTercapai === totalTarget ? "bg-success" : "bg-warning"}" style="font-size:0.75rem">
-                                ${totalTercapai} / ${totalTarget} Kompetensi
+                                ${totalTercapai} / ${totalTarget} Kategori
                             </span>
                         </div>
                         <button class="btn btn-primary-soft btn-sm mt-3" onclick="toggleRekapDetail('${m.user_id}')" id="btn-toggle-${m.user_id}">
@@ -4311,33 +4311,30 @@ async function rekapLogbookAdminView(area) {
                     </td>
                     <td>
                         <div id="rekap-detail-${m.user_id}" class="hidden">
-                            ${(() => {
-                              // Group rekap by kategori
-                              const gRekap = {};
-                              m.rekap.forEach((r) => {
-                                const kat =
-                                  r.kategori && r.kategori !== "-"
-                                    ? r.kategori
-                                    : "Umum";
-                                if (!gRekap[kat]) gRekap[kat] = [];
-                                gRekap[kat].push(r);
-                              });
-                              return Object.keys(gRekap)
-                                .map(
-                                  (kat) => `
-                                    <div style="margin-bottom:1rem;">
-                                        <div style="font-weight:700; font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
-                                            <i class="fa-solid fa-folder-open text-primary" style="margin-right:6px;"></i>${kat}
+                            ${m.rekap
+                              .map(
+                                (kat) => `
+                                    <div style="margin-bottom:1.5rem; background:rgba(248,250,252,0.5); padding:15px; border-radius:12px; border:1px solid #e2e8f0;">
+                                        <div class="d-flex justify-between align-center mb-3" style="border-bottom:2px solid #e2e8f0; padding-bottom:8px;">
+                                            <div style="font-weight:800; font-size:0.95rem; color:var(--primary-dark);">
+                                                <i class="fa-solid fa-folder-open text-primary" style="margin-right:8px;"></i>${kat.kategori}
+                                            </div>
+                                            <div class="d-flex align-center gap-2">
+                                                <span class="badge ${kat.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.8rem; padding: 0.4rem 0.8rem;">
+                                                    <i class="fa-solid ${kat.status === "Tercapai" ? "fa-circle-check" : "fa-circle-xmark"}"></i> 
+                                                    Total: ${kat.capaian} / ${kat.target} 
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div class="grid-skills-rekap" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
-                                            ${gRekap[kat]
+                                        <div class="grid-skills-rekap" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:12px;">
+                                            ${kat.skills
                                               .map(
-                                                (r) => `
-                                                <div class="skill-rekap-card" style="padding:10px; border-radius:8px; background:var(--bg-main); border-left: 4px solid ${r.status === "Tercapai" ? "#22c55e" : "#ef4444"};">
-                                                    <div style="font-weight:600; font-size:0.8rem; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${r.nama_skill}</div>
-                                                    <div class="d-flex justify-between align-center mt-2">
-                                                        <span class="badge ${r.status === "Tercapai" ? "bg-success" : "bg-danger"}" style="font-size:0.75rem">${r.capaian} / ${r.target}</span>
-                                                        <small style="color:${r.status === "Tercapai" ? "#22c55e" : "#ef4444"}; font-weight:700; font-size:0.75rem">${r.status.toUpperCase()}</small>
+                                                (s) => `
+                                                <div class="skill-rekap-card" style="padding:12px; border-radius:10px; background:#fff; border:1px solid #f1f5f9; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                                                    <div style="font-weight:600; font-size:0.8rem; color:#475569; height:2.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.2;">${s.nama_skill}</div>
+                                                    <div class="d-flex justify-between align-center mt-2 pt-2" style="border-top:1px solid #f8fafc;">
+                                                        <span class="text-xs font-bold" style="color:var(--primary);">${s.capaian} Tindakan</span>
+                                                        <small class="text-muted" style="font-size:0.7rem;">Target Indv: ${s.target}</small>
                                                     </div>
                                                 </div>
                                             `,
@@ -4346,9 +4343,8 @@ async function rekapLogbookAdminView(area) {
                                         </div>
                                     </div>
                                 `,
-                                )
-                                .join("");
-                            })()}
+                              )
+                              .join("")}
                         </div>
                         <div id="rekap-summary-text-${m.user_id}" class="text-muted" style="font-size:0.85rem">
                             <i class="fa-solid fa-circle-info"></i> Klik tombol detail untuk melihat rincian setiap kompetensi.
@@ -4617,15 +4613,26 @@ window.exportRekapCSV = () => {
   const headers = [
     "Nama Mahasiswa",
     "Prodi",
+    "Kategori",
     "Kompetensi",
     "Capaian",
-    "Target",
-    "Status",
+    "Target Individu",
+    "Status Kategori",
   ];
   const rows = [];
   window.dtRekapLog.forEach((m) => {
-    m.rekap.forEach((r) => {
-      rows.push([m.nama, m.prodi, r.nama_skill, r.capaian, r.target, r.status]);
+    m.rekap.forEach((kat) => {
+      kat.skills.forEach((s) => {
+        rows.push([
+          m.nama,
+          m.prodi,
+          kat.kategori,
+          s.nama_skill,
+          s.capaian,
+          s.target,
+          kat.status,
+        ]);
+      });
     });
   });
 
