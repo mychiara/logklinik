@@ -66,25 +66,71 @@
           <i class="fa-solid fa-arrow-down install-arrow"></i>
         </div>
         <h2>Aplikasi Khusus Mobile!</h2>
-        <p>E-Klinik dirancang sebagai aplikasi <strong>fullscreen</strong> untuk kenyamanan Anda. Agar sinkronisasi offline bekerja optimal, Anda <strong>wajib menginstal</strong> web ini ke layar HP (Home Screen).</p>
-        
+        <p>
+          E-Klinik dirancang sebagai aplikasi <strong>fullscreen</strong> untuk
+          kenyamanan Anda. Agar sinkronisasi offline bekerja optimal, Anda
+          <strong>wajib menginstal</strong> web ini ke layar HP (Home Screen).
+        </p>
+
         <div id="pwa-install-actions">
-           <!-- Android / Chrome -->
-           <button id="btn-install-pwa" class="btn btn-primary hidden" style="width: 100%; border-radius: 50px; font-weight: 700; height: 50px; font-size: 1.05rem; box-shadow: 0 10px 20px -5px rgba(139, 92, 246, 0.4); justify-content:center;">
-             <i class="fa-solid fa-download mr-2"></i> Install App Sekarang
-           </button>
-           
-           <!-- Manual Instructions (iOS / Fallback) -->
-           <div id="pwa-manual-instruct" class="hidden">
-             <div style="background: rgba(139, 92, 246, 0.08); padding: 15px; border-radius: 12px; margin-top: 10px; text-align: left; border: 1px dashed rgba(139, 92, 246, 0.3);">
-               <div style="font-weight: 700; margin-bottom: 8px; color: var(--primary-dark);"><i class="fa-brands fa-apple"></i> Pengguna iPhone/iPad:</div>
-               <ol style="margin: 0; padding-left: 20px; font-size: 0.85rem; line-height: 1.5; color: var(--text-strong);">
-                 <li>Ketuk icon <strong>Share</strong> (kotak panah atas) di bar penelusuran.</li>
-                 <li>Gulir bawah lalu pilih <strong>"Add to Home Screen"</strong>.</li>
-                 <li>Buka aplikasi lewat icon E-Klinik di HP.</li>
-               </ol>
-             </div>
-           </div>
+          <!-- Android / Chrome -->
+          <button
+            id="btn-install-pwa"
+            class="btn btn-primary hidden"
+            style="
+              width: 100%;
+              border-radius: 50px;
+              font-weight: 700;
+              height: 50px;
+              font-size: 1.05rem;
+              box-shadow: 0 10px 20px -5px rgba(139, 92, 246, 0.4);
+              justify-content: center;
+            "
+          >
+            <i class="fa-solid fa-download mr-2"></i> Install App Sekarang
+          </button>
+
+          <!-- Manual Instructions (iOS / Fallback) -->
+          <div id="pwa-manual-instruct" class="hidden">
+            <div
+              style="
+                background: rgba(139, 92, 246, 0.08);
+                padding: 15px;
+                border-radius: 12px;
+                margin-top: 10px;
+                text-align: left;
+                border: 1px dashed rgba(139, 92, 246, 0.3);
+              "
+            >
+              <div
+                style="
+                  font-weight: 700;
+                  margin-bottom: 8px;
+                  color: var(--primary-dark);
+                "
+              >
+                <i class="fa-brands fa-apple"></i> Pengguna iPhone/iPad:
+              </div>
+              <ol
+                style="
+                  margin: 0;
+                  padding-left: 20px;
+                  font-size: 0.85rem;
+                  line-height: 1.5;
+                  color: var(--text-strong);
+                "
+              >
+                <li>
+                  Ketuk icon <strong>Share</strong> (kotak panah atas) di bar
+                  penelusuran.
+                </li>
+                <li>
+                  Gulir bawah lalu pilih <strong>"Add to Home Screen"</strong>.
+                </li>
+                <li>Buka aplikasi lewat icon E-Klinik di HP.</li>
+              </ol>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -212,24 +258,93 @@
             <button id="toggle-sidebar" class="mobile-only btn-icon-ghost">
               <i class="fa-solid fa-bars-staggered"></i>
             </button>
-            <div class="topbar-breadcrumb" style="display: flex; flex-direction: column; justify-content: center; line-height: 1.1;">
+            <div
+              class="topbar-breadcrumb"
+              style="
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                line-height: 1.1;
+              "
+            >
               <div>
-                <span class="text-muted"><i class="fa-solid fa-house fa-sm"></i> /</span>
+                <span class="text-muted"
+                  ><i class="fa-solid fa-house fa-sm"></i> /</span
+                >
                 <strong id="topbar-title-text" class="ml-1">Dashboard</strong>
               </div>
               <!-- Mobile only credit under title -->
-              <div class="mobile-only" style="margin-top: 2px;">
-                 <span class="responsive-credit" style="font-weight: 800; background: linear-gradient(to right, #fff, #fbbf24, #f472b6, #60a5fa, #fbbf24, #fff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: shine 4s linear infinite; display: inline-block;">
-                    by Mas Andy - masandigital.com
-                 </span>
+              <div class="mobile-only" style="margin-top: 2px">
+                <span
+                  class="responsive-credit"
+                  style="
+                    font-weight: 800;
+                    background: linear-gradient(
+                      to right,
+                      #fff,
+                      #fbbf24,
+                      #f472b6,
+                      #60a5fa,
+                      #fbbf24,
+                      #fff
+                    );
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-size: 200% auto;
+                    animation: shine 4s linear infinite;
+                    display: inline-block;
+                  "
+                >
+                  by Mas Andy - masandigital.com
+                </span>
               </div>
             </div>
           </div>
-          
-          <div class="topbar-center desktop-only" style="flex: 1; text-align: center; overflow: hidden; white-space: nowrap;">
-             <span class="responsive-credit" style="font-weight: 800; background: linear-gradient(to right, #fff, #fbbf24, #f472b6, #60a5fa, #fbbf24, #fff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: shine 4s linear infinite; text-shadow: 0 0 10px rgba(255,255,255,0.1); display: inline-block;">
-                by Mas Andy - <a href="https://masandigital.com" target="_blank" style="color: inherit; text-decoration: none; -webkit-text-fill-color: transparent;">masandigital.com</a>
-             </span>
+
+          <div
+            class="topbar-center desktop-only"
+            style="
+              flex: 1;
+              text-align: center;
+              overflow: hidden;
+              white-space: nowrap;
+            "
+          >
+            <span
+              class="responsive-credit"
+              style="
+                font-weight: 800;
+                background: linear-gradient(
+                  to right,
+                  #fff,
+                  #fbbf24,
+                  #f472b6,
+                  #60a5fa,
+                  #fbbf24,
+                  #fff
+                );
+                -webkit-background-clip: text;
+                background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-size: 200% auto;
+                animation: shine 4s linear infinite;
+                text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+                display: inline-block;
+              "
+            >
+              by Mas Andy -
+              <a
+                href="https://masandigital.com"
+                target="_blank"
+                style="
+                  color: inherit;
+                  text-decoration: none;
+                  -webkit-text-fill-color: transparent;
+                "
+                >masandigital.com</a
+              >
+            </span>
           </div>
 
           <div class="topbar-right">
@@ -310,7 +425,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabase-config.js"></script>
     <script src="js/supabase-services.js"></script>
-    <script src="js/app.js?v=1.6"></script>
+    <script src="js/app.js?v=1.7"></script>
     <script>
       // Register Service Worker for PWA
       if ("serviceWorker" in navigator) {
