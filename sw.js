@@ -1,4 +1,4 @@
-const CACHE_NAME = "e-klinik-v5";
+const CACHE_NAME = "e-klinik-v6";
 const ASSETS = [
   "./",
   "./index.html",
