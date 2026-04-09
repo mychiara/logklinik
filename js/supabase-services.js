@@ -1064,8 +1064,9 @@ window.supabasePostAPI = async (action, payload) => {
 
         if (existing && existing.length > 0) {
           return {
-            success: true,
-            message: "Anda sudah melakukan Check-In hari ini.",
+            success: false,
+            message:
+              "Anda sudah melakukan presensi hari ini. Tidak dapat mengulang Check-In.",
           };
         }
 
@@ -1084,16 +1085,22 @@ window.supabasePostAPI = async (action, payload) => {
       case "checkOut": {
         const today = getLocalTodayService();
         const now = getLocalTimeService();
-        const { data, error: errF } = await supabaseClient
+        const { data: existing } = await supabaseClient
           .from("presensi")
           .select("*")
           .eq("user_id", payload.user_id)
           .eq("tanggal", today)
-          .is("jam_keluar", null)
           .order("id", { ascending: false })
-          .limit(1)
-          .single();
-        if (errF || !data) throw new Error("Tidak menemukan presensi aktif");
+          .limit(1);
+
+        if (!existing || existing.length === 0) {
+          throw new Error("Anda belum melakukan Check-In hari ini.");
+        }
+
+        const data = existing[0];
+        if (data.jam_keluar) {
+          throw new Error("Anda sudah melakukan Check-Out hari ini.");
+        }
         const t1 = new Date(`${today}T${data.jam_masuk}`);
         const t2 = new Date(`${today}T${now}`);
         const durasi = Math.abs(t2 - t1) / 36e5;
