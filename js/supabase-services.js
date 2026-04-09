@@ -1412,6 +1412,45 @@ window.supabasePostAPI = async (action, payload) => {
         return { success: true };
       }
 
+      case "editPresensi": {
+        const { id, jam_masuk, jam_keluar } = payload;
+
+        // Fetch existing record to get tanggal (to recalculate durasi)
+        const { data: record, error: errF } = await supabaseClient
+          .from("presensi")
+          .select("tanggal")
+          .eq("id", id)
+          .single();
+        if (errF) throw errF;
+
+        let durasi = null;
+        if (jam_masuk && jam_keluar) {
+          const t1 = new Date(`${record.tanggal}T${jam_masuk}`);
+          const t2 = new Date(`${record.tanggal}T${jam_keluar}`);
+          durasi = Math.abs(t2 - t1) / 36e5;
+        }
+
+        const { error } = await supabaseClient
+          .from("presensi")
+          .update({
+            jam_masuk,
+            jam_keluar: jam_keluar || null,
+            durasi,
+          })
+          .eq("id", id);
+        if (error) throw error;
+        return { success: true };
+      }
+
+      case "deletePresensi": {
+        const { error } = await supabaseClient
+          .from("presensi")
+          .delete()
+          .eq("id", payload.id);
+        if (error) throw error;
+        return { success: true };
+      }
+
       case "clearUsersByRole": {
         const { error } = await supabaseClient
           .from("users")
