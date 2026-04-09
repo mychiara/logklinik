@@ -3413,7 +3413,7 @@ async function adminView(area) {
                                       <th>Waktu Masuk</th>
                                       <th>Waktu Keluar</th>
                                                                           <th>Durasi</th>
-
+                                      <th style="text-align:right">Aksi</th>
                                   </tr>
                               </thead>
                                                           <tbody><tr><td colspan="6" class="empty-table">
@@ -3475,6 +3475,9 @@ async function adminView(area) {
                   <td><span class="badge bg-primary">${formatDateIndo(p.jam_masuk)}</span></td>
                   <td>${p.jam_keluar ? `<span class="badge bg-primary">${formatDateIndo(p.jam_keluar)}</span>` : "-"}</td>
                   <td>${dur}</td>
+                  <td style="text-align:right">
+                      <button class="btn btn-icon-ghost text-warning" onclick="bukaModalEditPresensi('${p.id}', '${p.jam_masuk}', '${p.jam_keluar || ""}')" title="Edit Jam"><i class="fa-solid fa-edit"></i></button>
+                  </td>
               </tr>
           `;
       })
@@ -4899,7 +4902,10 @@ async function rekapPresensiAdminView(area) {
           <td>${durHtml}</td>
           <td>${statusHtml}</td>
           <td style="text-align:right">
-            <button class="btn btn-icon-ghost text-danger" onclick="hapusPresensiAdmin('${p.id}')" title="Hapus Presensi"><i class="fa-solid fa-trash"></i></button>
+            <div class="d-flex justify-end gap-1">
+              <button class="btn btn-icon-ghost text-warning" onclick="bukaModalEditPresensi('${p.id}', '${p.jam_masuk}', '${p.jam_keluar || ""}')" title="Edit Jam"><i class="fa-solid fa-edit"></i></button>
+              <button class="btn btn-icon-ghost text-danger" onclick="hapusPresensiAdmin('${p.id}')" title="Hapus Presensi"><i class="fa-solid fa-trash"></i></button>
+            </div>
           </td>
         </tr>
       `;
@@ -4913,18 +4919,71 @@ async function rekapPresensiAdminView(area) {
   };
 
   window.hapusPresensiAdmin = async (id) => {
-    if (!confirm("Yakin ingin menghapus data presensi ini?")) return;
-
+    if (!confirm("Hapus data presensi ini? Tindakan ini permanen.")) return;
     showLoader(true);
-    const res = await postAPI("deleteMaster", { type: "presensi", id: id });
+    const res = await postAPI("deletePresensi", { id });
     showLoader(false);
-
     if (res.success) {
-      showToast("Berhasil", "Data presensi berhasil dihapus", "success");
-      rekapPresensiAdminView(area); // Reload view to reflect changes
+      showToast("Berhasil", "Data presensi dihapus", "success");
+      // Cek area aktif untuk refresh
+      const content = document.getElementById("content-area");
+      if (document.getElementById("table-presensi-admin")) {
+        rekapPresensiAdminView(content);
+      } else if (document.getElementById("table-admin")) {
+        adminView(content);
+      }
     } else {
-      showToast("Gagal", res.message || "Gagal menghapus data", "error");
+      showToast("Gagal", res.message, "error");
     }
+  };
+
+  window.bukaModalEditPresensi = (id, currentIn, currentOut) => {
+    openModal(
+      "Edit Jam Presensi",
+      `
+        <form id="form-edit-presensi">
+          <input type="hidden" id="edit-pres-id" value="${id}">
+          <div class="form-group">
+            <label>Jam Masuk</label>
+            <input type="time" id="edit-jam-masuk" class="form-control" value="${currentIn.substring(0, 5)}" required>
+          </div>
+          <div class="form-group">
+            <label>Jam Keluar</label>
+            <input type="time" id="edit-jam-keluar" class="form-control" value="${currentOut ? currentOut.substring(0, 5) : ""}">
+            <small class="text-muted">Kosongkan jika belum Checkout (masih Aktif)</small>
+          </div>
+          <div class="d-flex justify-end gap-2 mt-4">
+            <button type="button" class="btn btn-outline btn-sm close-modal">Batal</button>
+            <button type="submit" class="btn btn-primary btn-sm">Simpan Perubahan</button>
+          </div>
+        </form>
+      `,
+    );
+
+    document.getElementById("form-edit-presensi").onsubmit = async (e) => {
+      e.preventDefault();
+      const id = document.getElementById("edit-pres-id").value;
+      const jam_masuk = document.getElementById("edit-jam-masuk").value;
+      const jam_keluar = document.getElementById("edit-jam-keluar").value;
+
+      showLoader(true);
+      const res = await postAPI("editPresensi", { id, jam_masuk, jam_keluar });
+      showLoader(false);
+
+      if (res.success) {
+        closeModal();
+        showToast("Berhasil", "Data presensi diperbarui.", "success");
+        // Refresh view
+        const content = document.getElementById("content-area");
+        if (document.getElementById("table-presensi-admin")) {
+          rekapPresensiAdminView(content);
+        } else if (document.getElementById("table-admin")) {
+          adminView(content);
+        }
+      } else {
+        showToast("Gagal", res.message, "error");
+      }
+    };
   };
 
   // Filter logic
