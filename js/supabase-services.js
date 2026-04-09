@@ -197,7 +197,7 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getAllPresensi": {
         const { data, error } = await supabaseClient
           .from("presensi")
-          .select("*, users!inner(nama, prodi)")
+          .select("*, users(nama, prodi)")
           .range(0, 49999);
         if (error) throw error;
         return {
@@ -216,11 +216,16 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         let query = supabaseClient
           .from("presensi")
-          .select("*, users!inner(nama, nim:username)")
+          .select("*, users(nama, nim:username)")
           .eq("tanggal", today);
 
         if (tIds.length > 0) {
-          query = query.in("lahan", tIds);
+          const { data: sites } = await supabaseClient
+            .from("tempat_praktik")
+            .select("nama_tempat")
+            .in("id", tIds);
+          const names = (sites || []).map((s) => s.nama_tempat);
+          query = query.in("lahan", names);
         }
 
         const { data, error } = await query;
@@ -232,13 +237,18 @@ window.supabaseFetchAPI = async (action, payload) => {
         const yesterday = new Date(Date.now() - 86400000).toISOString();
         let query = supabaseClient
           .from("logbook")
-          .select("*, users!inner(nama)")
+          .select("*, users!logbook_user_id_fkey(nama)")
           .eq("status", "Menunggu Validasi")
           .lt("created_at", yesterday);
 
         if (payload.tempat_id && payload.tempat_id !== "-") {
           const tIds = payload.tempat_id.split(",");
-          query = query.in("lahan", tIds); // Use record-specific 'lahan' column
+          const { data: sites } = await supabaseClient
+            .from("tempat_praktik")
+            .select("nama_tempat")
+            .in("id", tIds);
+          const names = (sites || []).map((s) => s.nama_tempat);
+          query = query.in("lahan", names);
         }
 
         const { data, error } = await query
@@ -255,11 +265,29 @@ window.supabaseFetchAPI = async (action, payload) => {
       }
 
       case "getCompetencyGap": {
-        const tIds = payload.tempat_id ? payload.tempat_id.split(",") : [];
+        const tIds = payload.tempat_id
+          ? payload.tempat_id.split(",").filter((id) => id.trim() !== "")
+          : [];
+        let lahanNames = [];
+
+        if (tIds.length > 0) {
+          const { data: sites } = await supabaseClient
+            .from("tempat_praktik")
+            .select("nama_tempat")
+            .in("id", tIds);
+          lahanNames = (sites || []).map((s) => s.nama_tempat);
+        }
+
+        if (lahanNames.length === 0) {
+          // Fallback: if no specific lahan is assigned, maybe return based on all activity or empty
+          // For now, let's treat as empty to be lahan-specific
+          return { success: true, data: { rare: [], frequent: [] } };
+        }
+
         const { data: logs, error: e1 } = await supabaseClient
           .from("logbook")
           .select("kompetensi")
-          .in("lahan", tIds)
+          .in("lahan", lahanNames)
           .eq("status", "Disetujui");
         const { data: allKomp, error: e2 } = await supabaseClient
           .from("kompetensi")
@@ -272,22 +300,25 @@ window.supabaseFetchAPI = async (action, payload) => {
           (l) => (counts[l.kompetensi] = (counts[l.kompetensi] || 0) + 1),
         );
 
-        // Return competencies with 0 or low counts
-        const gaps = allKomp
-          .map((k) => ({
-            nama: k.nama_skill,
-            count: counts[k.nama_skill] || 0,
-          }))
-          .sort((a, b) => a.count - b.count);
+        const gaps = allKomp.map((k) => ({
+          nama: k.nama_skill,
+          count: counts[k.nama_skill] || 0,
+        }));
 
-        return { success: true, data: gaps.slice(0, 10) };
+        const rare = [...gaps].sort((a, b) => a.count - b.count).slice(0, 5);
+        const frequent = [...gaps]
+          .filter((g) => g.count > 0)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        return { success: true, data: { rare, frequent } };
       }
 
       case "getSkillLeaderboard": {
         const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString();
         const { data, error } = await supabaseClient
           .from("logbook")
-          .select("user_id, users!inner(nama)")
+          .select("user_id, users!logbook_user_id_fkey(nama)")
           .eq("status", "Disetujui")
           .gt("created_at", lastWeek)
           .range(0, 49999);
@@ -351,9 +382,7 @@ window.supabaseFetchAPI = async (action, payload) => {
             .from("presensi")
             .select("*", { count: "exact", head: true })
             .eq("tanggal", today),
-          supabaseClient
-            .from("penilaian_akhir")
-            .select("total, users!inner(prodi)"),
+          supabaseClient.from("penilaian_akhir").select("total, users(prodi)"),
           supabaseClient.from("prodi").select("nama_prodi"),
         ]);
 
@@ -502,7 +531,7 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getPenilaianAkhir": {
         let query = supabaseClient
           .from("penilaian_akhir")
-          .select("*, users!inner(nama, prodi, angkatan)");
+          .select("*, users(nama, prodi, angkatan)");
 
         if (payload.ids && Array.isArray(payload.ids)) {
           query = query.in("id", payload.ids);
@@ -585,7 +614,9 @@ window.supabaseFetchAPI = async (action, payload) => {
         while (!finished) {
           let query = supabaseClient
             .from("jadwal")
-            .select("*, users(nama, kelompok_id), tempat_praktik(nama_tempat)");
+            .select(
+              "*, users!jadwal_user_id_fkey(nama, kelompok_id), tempat_praktik(nama_tempat)",
+            );
 
           if (payload.user_id) {
             if (Array.isArray(payload.user_id)) {
@@ -747,7 +778,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         while (!finished) {
           let query = supabaseClient
             .from("logbook")
-            .select("*, users!inner(nama)");
+            .select("*, users!logbook_user_id_fkey(nama)");
 
           if (mode === "2") {
             const allowedStatuses = ["Menunggu Validasi"];
@@ -902,13 +933,18 @@ window.supabaseFetchAPI = async (action, payload) => {
           let logQuery = supabaseClient
             .from("logbook")
             .select(
-              "id, kompetensi, user_id, created_at, users!inner(tempat_id)",
+              "id, kompetensi, user_id, created_at, users!logbook_user_id_fkey(tempat_id)",
             )
             .eq("status", "Menunggu Validasi");
 
           if (payload.tempat_id && payload.tempat_id !== "-") {
             const tIds = payload.tempat_id.split(",");
-            logQuery = logQuery.in("lahan", tIds);
+            const { data: sites } = await supabaseClient
+              .from("tempat_praktik")
+              .select("nama_tempat")
+              .in("id", tIds);
+            const names = (sites || []).map((s) => s.nama_tempat);
+            logQuery = logQuery.in("lahan", names);
           }
 
           query = logQuery.order("created_at", { ascending: false }).limit(20);
@@ -985,7 +1021,10 @@ window.supabaseFetchAPI = async (action, payload) => {
       }
     }
   } catch (err) {
-    console.error(`Supabase Fetch Error [${action}]:`, err);
+    console.error(
+      `Supabase Fetch Error [${action}]:`,
+      JSON.stringify(err, null, 2) || err,
+    );
     return { success: false, message: err.message };
   }
 };
