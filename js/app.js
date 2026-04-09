@@ -272,12 +272,27 @@ function initDashboard() {
       },
     ],
     admin: [
+      { header: "Dashboard & Utilitas" },
       {
         id: "nav-dashboard",
         icon: "fa-chart-pie",
-        text: "Dashboard",
+        text: "Dashboard Utama",
         view: "dashboardView",
       },
+      {
+        id: "nav-antrian-log",
+        icon: "fa-list-check",
+        text: "Antrian Logbook",
+        view: "antrianLogbookAdminView",
+      },
+      {
+        id: "nav-semua",
+        icon: "fa-qrcode",
+        text: "Scan Data QR",
+        view: "adminView",
+      },
+
+      { header: "Master Data" },
       {
         id: "nav-prodi",
         icon: "fa-graduation-cap",
@@ -291,15 +306,17 @@ function initDashboard() {
         view: "tempatAdminView",
       },
       {
-        id: "nav-semua",
-        icon: "fa-database",
-        text: "Semua Data QR",
-        view: "adminView",
+        id: "nav-komp",
+        icon: "fa-list-ol",
+        text: "Kompetensi / Skill",
+        view: "kompetensiAdminView",
       },
+
+      { header: "Manajemen Pengguna" },
       {
         id: "nav-mhs",
         icon: "fa-user-graduate",
-        text: "Manajemen Mahasiswa",
+        text: "Data Mahasiswa",
         view: "mahasiswaAdminView",
       },
       {
@@ -320,22 +337,56 @@ function initDashboard() {
         text: "Preseptor Akademik",
         view: "preseptorAkademikAdminView",
       },
+
+      { header: "Penjadwalan & Rotasi" },
       {
-        id: "nav-komp",
-        icon: "fa-list-check",
-        text: "Kompetensi / Skill",
-        view: "kompetensiAdminView",
+        id: "nav-gen-kelompok-1",
+        icon: "fa-calendar-plus",
+        text: "Generate Jadwal 1",
+        view: "generatorKelompok1View",
       },
       {
+        id: "nav-jadwal-1",
+        icon: "fa-table-list",
+        text: "Daftar Jadwal 1",
+        view: "jadwalAdmin1View",
+      },
+      {
+        id: "nav-gen-kelompok-2",
+        icon: "fa-calendar-plus",
+        text: "Generate Jadwal 2",
+        view: "generatorKelompok2View",
+      },
+      {
+        id: "nav-jadwal-2",
+        icon: "fa-table-list",
+        text: "Daftar Jadwal 2",
+        view: "jadwalAdmin2View",
+      },
+      {
+        id: "nav-gen-kelompok-3",
+        icon: "fa-calendar-plus",
+        text: "Generate Jadwal 3",
+        view: "generatorKelompok3View",
+      },
+      {
+        id: "nav-jadwal-3",
+        icon: "fa-table-list",
+        text: "Daftar Jadwal 3",
+        view: "jadwalAdmin3View",
+      },
+
+      { header: "Konfigurasi Penilaian" },
+      {
         id: "nav-bpr",
-        icon: "fa-chalkboard-user",
-        text: "Setup Bimb. Praktikum",
+        icon: "fa-briefcase-medical",
+        text: "Setup Praktikum",
         view: "bimbPraktikumAdminView",
       },
       {
         id: "nav-bas",
         icon: "fa-notes-medical",
-        text: "Setup Bimb. ASKEP",
+        text: "Setup ASKEP",
         view: "bimbAskepAdminView",
       },
       {
@@ -344,70 +395,18 @@ function initDashboard() {
         text: "Setup Sikap & Perilaku",
         view: "sikapPerilakuAdminView",
       },
-      {
-        id: "nav-final",
-        icon: "fa-file-signature",
-        text: "Penilaian Akhir",
-        view: "penilaianAkhirView",
-      },
-      {
-        id: "nav-gen-kelompok-1",
-        icon: "fa-calendar-days",
-        text: "Generate Per Kelompok 1",
-        view: "generatorKelompok1View",
-      },
-      {
-        id: "nav-jadwal-1",
-        icon: "fa-table",
-        text: "Daftar Jadwal Praktik 1",
-        view: "jadwalAdmin1View",
-      },
-      {
-        id: "nav-gen-kelompok-2",
-        icon: "fa-calendar-days",
-        text: "Generate Per Kelompok 2",
-        view: "generatorKelompok2View",
-      },
-      {
-        id: "nav-jadwal-2",
-        icon: "fa-table",
-        text: "Daftar Jadwal Praktik 2",
-        view: "jadwalAdmin2View",
-      },
-      {
-        id: "nav-gen-kelompok-3",
-        icon: "fa-calendar-days",
-        text: "Generate Per Kelompok 3",
-        view: "generatorKelompok3View",
-      },
-      {
-        id: "nav-jadwal-3",
-        icon: "fa-table",
-        text: "Daftar Jadwal Praktik 3",
-        view: "jadwalAdmin3View",
-      },
-      {
-        id: "nav-laporan-admin",
-        icon: "fa-triangle-exclamation",
-        text: "Laporan Kejadian",
-        view: "adminLaporanView",
-      },
+
+      { header: "Laporan & Hasil" },
       {
         id: "nav-rekap-log",
-        icon: "fa-chart-pie",
+        icon: "fa-book-medical",
         text: "Rekapan Logbook",
         view: "rekapLogbookAdminView",
       },
       {
-        id: "nav-antrian-log",
-        icon: "fa-list-ol",
-        text: "Antrian Logbook",
-        view: "antrianLogbookAdminView",
-      },
-      {
         id: "nav-rekap-presensi",
         icon: "fa-clipboard-user",
-        text: "Rekapan Daftar Hadir",
+        text: "Rekapan Presensi",
         view: "rekapPresensiAdminView",
       },
       {
@@ -417,9 +416,23 @@ function initDashboard() {
         view: "laporanKegiatanAdminView",
       },
       {
+        id: "nav-final",
+        icon: "fa-certificate",
+        text: "Penilaian Akhir",
+        view: "penilaianAkhirView",
+      },
+      {
+        id: "nav-laporan-admin",
+        icon: "fa-triangle-exclamation",
+        text: "Laporan Kejadian",
+        view: "adminLaporanView",
+      },
+
+      { header: "Sistem & Akun" },
+      {
         id: "nav-settings",
         icon: "fa-gears",
-        text: "Pengaturan",
+        text: "Pengaturan App",
         view: "settingsAdminView",
       },
       {
@@ -470,6 +483,15 @@ function initDashboard() {
   let activeNavFound = false;
 
   roleMenus.forEach((menu, index) => {
+    if (menu.header) {
+      const h = document.createElement("div");
+      h.className = "nav-header animate-fade-in";
+      h.style.animationDelay = `${(index + 1) * 50}ms`;
+      h.textContent = menu.header;
+      nav.appendChild(h);
+      return;
+    }
+
     const a = document.createElement("a");
     a.href = "#";
 
@@ -477,7 +499,8 @@ function initDashboard() {
       lastActiveView === menu.view || (!lastActiveView && index === 0);
     if (isActive) activeNavFound = true;
 
-    a.className = `nav-item ${isActive ? "active" : ""} animate-fade-in delay-${(index + 1) * 100}`;
+    a.className = `nav-item ${isActive ? "active" : ""} animate-fade-in`;
+    a.style.animationDelay = `${(index + 1) * 50}ms`;
     a.id = `nav-${menu.view}`;
     a.innerHTML = `<i class="fa-solid ${menu.icon}"></i> <span>${menu.text}</span>`;
 
