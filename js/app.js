@@ -433,16 +433,16 @@ function initDashboard() {
     view: "laporanView",
   });
   menus.preseptor.push({
-    id: "nav-laporan-pre",
+    id: "nav-kejadian-pre",
     icon: "fa-triangle-exclamation",
     text: "Laporan Kejadian",
     view: "laporanView",
   });
   menus.preseptor_akademik.push({
-    id: "nav-laporan-akd",
+    id: "nav-kejadian-akd",
     icon: "fa-triangle-exclamation",
     text: "Laporan Kejadian",
-    view: "adminLaporanView",
+    view: "laporanView",
   });
 
   // Add Change Password to all roles (except already added in Admin above)

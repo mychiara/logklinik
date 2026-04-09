@@ -943,7 +943,6 @@ window.supabasePostAPI = async (action, payload) => {
             status: payload.status,
             nilai: payload.nilai,
             feedback: payload.catatan || payload.feedback,
-            validated_at: new Date().toISOString(),
           })
           .eq("id", payload.log_id || payload.id);
         if (error) throw error;
@@ -958,7 +957,6 @@ window.supabasePostAPI = async (action, payload) => {
             status: status,
             nilai: nilai || 100,
             feedback: feedback || "Validasi Massal",
-            validated_at: new Date().toISOString(),
           })
           .in("id", ids);
         if (error) throw error;
@@ -1000,6 +998,24 @@ window.supabasePostAPI = async (action, payload) => {
           .from("laporan")
           .delete()
           .eq("id", payload.id);
+        if (error) throw error;
+        return { success: true };
+      }
+
+      case "bulkUpdateLaporanStatus": {
+        const { error } = await supabaseClient
+          .from("laporan")
+          .update({ status: payload.status })
+          .in("id", payload.ids);
+        if (error) throw error;
+        return { success: true };
+      }
+
+      case "bulkDeleteLaporan": {
+        const { error } = await supabaseClient
+          .from("laporan")
+          .delete()
+          .in("id", payload.ids);
         if (error) throw error;
         return { success: true };
       }
