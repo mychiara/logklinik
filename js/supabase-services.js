@@ -695,7 +695,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         const { data: usersData } = await supabaseClient
           .from("users")
-          .select("id, nama, prodi, role")
+          .select("id, nama, prodi, role, username")
           .in("id", userIds);
 
         const userMap = {};
@@ -709,6 +709,7 @@ window.supabaseFetchAPI = async (action, payload) => {
             ...l,
             nama_mahasiswa: userMap[l.user_id]?.nama || "-",
             prodi_mahasiswa: userMap[l.user_id]?.prodi || "-",
+            nim_mahasiswa: userMap[l.user_id]?.username || "-",
             nama_preseptor_klinik: userMap[l.preseptor_klinik_id]?.nama || "-",
             nama_preseptor_akademik:
               userMap[l.preseptor_akademik_id]?.nama || "-",
