@@ -1101,6 +1101,17 @@ window.supabasePostAPI = async (action, payload) => {
         if (data.jam_keluar) {
           throw new Error("Anda sudah melakukan Check-Out hari ini.");
         }
+
+        // Validasi Lokasi Check-Out (Harus sama dengan lokasi Check-In)
+        if (
+          payload.lahan &&
+          data.lahan.toLowerCase().trim() !== payload.lahan.toLowerCase().trim()
+        ) {
+          throw new Error(
+            `Lokasi Check-Out salah. Anda telah melakukan Check-In di ${data.lahan}, silakan Check-Out di lokasi tersebut.`,
+          );
+        }
+
         const t1 = new Date(`${today}T${data.jam_masuk}`);
         const t2 = new Date(`${today}T${now}`);
         const durasi = Math.abs(t2 - t1) / 36e5;
