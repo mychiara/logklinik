@@ -1051,9 +1051,25 @@ window.supabasePostAPI = async (action, payload) => {
       }
 
       case "checkIn": {
+        const today = getLocalTodayService();
+        // Cegah double check-in hari yang sama
+        const { data: existing } = await supabaseClient
+          .from("presensi")
+          .select("id")
+          .eq("user_id", payload.user_id)
+          .eq("tanggal", today)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          return {
+            success: true,
+            message: "Anda sudah melakukan Check-In hari ini.",
+          };
+        }
+
         const row = {
           user_id: payload.user_id,
-          tanggal: getLocalTodayService(),
+          tanggal: today,
           jam_masuk: getLocalTimeService(),
           lahan: payload.lahan,
           foto: payload.foto || null,
