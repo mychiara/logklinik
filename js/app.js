@@ -410,6 +410,12 @@ function initDashboard() {
         view: "rekapPresensiAdminView",
       },
       {
+        id: "nav-rekap-absensi",
+        icon: "fa-user-slash",
+        text: "Ketidakhadiran Mhs",
+        view: "rekapAbsensiAdminView",
+      },
+      {
         id: "nav-laporan-mgr",
         icon: "fa-file-signature",
         text: "Laporan Kegiatan",
@@ -5071,6 +5077,223 @@ window.exportRekapPresensiPDF = () => {
 
   doc.save(`Rekap_Daftar_Hadir_${new Date().getTime()}.pdf`);
 };
+
+// ============ REKAPAN KETIDAKHADIRAN (ADMIN) ============
+async function rekapAbsensiAdminView(area) {
+  const today = getLocalToday();
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center wrap gap-3">
+          <h3 class="m-0"><i class="fa-solid fa-user-slash text-danger"></i> Rekapan Ketidakhadiran</h3>
+          <div class="d-flex gap-2 wrap align-center">
+            <input type="date" id="absensi-date-filter" class="form-control" value="${today}" style="width:145px; padding-top:0.4rem; padding-bottom:0.4rem;">
+            
+            <select id="absensi-status-filter" class="form-control" style="width:140px; padding-top:0.4rem; padding-bottom:0.4rem;" onchange="applyAbsensiFilters()">
+               <option value="">-- Status --</option>
+               <option value="ALPHA">ALPHA</option>
+               <option value="LUPA CHECK-OUT">LUPA CHECK-OUT</option>
+            </select>
+
+            <select id="absensi-lahan-filter" class="form-control" style="width:180px; padding-top:0.4rem; padding-bottom:0.4rem;" onchange="applyAbsensiFilters()">
+               <option value="">-- Semua Lahan --</option>
+            </select>
+
+            <button class="btn btn-primary btn-sm" onclick="fetchRekapAbsensi()"><i class="fa-solid fa-sync"></i> Tampilkan</button>
+            <button class="btn btn-outline btn-sm" onclick="exportAbsensiCSV()"><i class="fa-solid fa-file-csv"></i> CSV</button>
+          </div>
+        </div>
+        <div class="card-body">
+           <div id="absensi-stats" class="d-flex gap-4 mb-4">
+              <div class="p-3 bg-danger-soft rounded d-flex flex-column" style="flex:1; border:1px solid #fee2e2;">
+                 <span class="text-xs font-bold text-danger uppercase opacity-75">Tampilan Alpha</span>
+                 <h2 id="abs-count-alpha" class="m-0 font-black text-danger-dark">0</h2>
+              </div>
+              <div class="p-3 bg-warning-soft rounded d-flex flex-column" style="flex:1; border:1px solid #fef3c7;">
+                 <span class="text-xs font-bold text-warning-dark uppercase opacity-75">Tampilan Lupa CO</span>
+                 <h2 id="abs-count-lupa" class="m-0 font-black text-warning-dark">0</h2>
+              </div>
+              <div class="p-3 bg-success-soft rounded d-flex flex-column" style="flex:1; border:1px solid #d1fae5;">
+                 <span class="text-xs font-bold text-success-dark uppercase opacity-75">Total Terjadwal</span>
+                 <h2 id="abs-count-total" class="m-0 font-black text-success-dark">0</h2>
+              </div>
+           </div>
+           
+           <div class="table-responsive">
+             <table id="table-absensi-admin" style="font-size:0.88rem;">
+               <thead>
+                 <tr>
+                    <th style="width:40px;">#</th>
+                    <th>Mahasiswa</th>
+                    <th>NIM / username</th>
+                    <th>Lahan Seharusnya</th>
+                    <th>Status Kejadian</th>
+                    <th>Keterangan</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 <tr><td colspan="6" class="empty-table">Silakan pilih tanggal dan klik Tampilkan.</td></tr>
+               </tbody>
+             </table>
+           </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  window.applyAbsensiFilters = () => {
+    const status = document.getElementById("absensi-status-filter").value;
+    const lahan = document.getElementById("absensi-lahan-filter").value;
+    const tableBody = document.querySelector("#table-absensi-admin tbody");
+
+    let filtered = window.dtAbsensiRekapFull || [];
+
+    if (status) {
+      filtered = filtered.filter((r) => r.status === status);
+    }
+    if (lahan) {
+      filtered = filtered.filter((r) => r.lahan === lahan);
+    }
+
+    window.dtAbsensiRekap = filtered;
+
+    // Update mini stats based on filtered view
+    document.getElementById("abs-count-alpha").textContent = filtered.filter(
+      (r) => r.status === "ALPHA",
+    ).length;
+    document.getElementById("abs-count-lupa").textContent = filtered.filter(
+      (r) => r.status === "LUPA CHECK-OUT",
+    ).length;
+
+    if (filtered.length === 0) {
+      tableBody.innerHTML =
+        '<tr><td colspan="6" class="empty-table text-muted">Tidak ada data yang cocok dengan filter.</td></tr>';
+    } else {
+      tableBody.innerHTML = filtered
+        .map(
+          (r, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${r.nama}</strong></td>
+          <td>${r.nim}</td>
+          <td>${r.lahan}</td>
+          <td><span class="badge" style="background:${r.color}">${r.status}</span></td>
+          <td class="text-xs text-muted">${r.notif}</td>
+        </tr>
+      `,
+        )
+        .join("");
+    }
+  };
+
+  window.fetchRekapAbsensi = async () => {
+    const tgl = document.getElementById("absensi-date-filter").value;
+    if (!tgl) return showToast("Info", "Pilih tanggal terlebih dahulu", "info");
+
+    const tableBody = document.querySelector("#table-absensi-admin tbody");
+    if (!tableBody) return;
+    tableBody.innerHTML =
+      '<tr><td colspan="6" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memproses data ketidakhadiran...</td></tr>';
+
+    showLoader(true);
+    const [resJadwal, resPresensi, resUsers, resTempat] = await Promise.all([
+      fetchAPI("getJadwal", { tanggal: tgl }),
+      fetchAPI("getPresensi", { tanggal: tgl }),
+      fetchAPI("getUsers"),
+      fetchCachedAPI("getTempat"),
+    ]);
+    showLoader(false);
+
+    if (!resJadwal.success || !resPresensi.success || !resUsers.success) {
+      tableBody.innerHTML =
+        '<tr><td colspan="6" class="empty-table text-danger">Gagal memuat data dari server.</td></tr>';
+      return;
+    }
+
+    // Populate Lahan Filter
+    const lahanSelect = document.getElementById("absensi-lahan-filter");
+    const currentLahanVal = lahanSelect.value;
+    lahanSelect.innerHTML = '<option value="">-- Semua Lahan --</option>';
+    if (resTempat.success && resTempat.data) {
+      resTempat.data
+        .sort((a, b) => a.nama_tempat.localeCompare(b.nama_tempat))
+        .forEach((t) => {
+          const opt = document.createElement("option");
+          opt.value = t.nama_tempat;
+          opt.textContent = t.nama_tempat;
+          if (t.nama_tempat === currentLahanVal) opt.selected = true;
+          lahanSelect.appendChild(opt);
+        });
+    }
+
+    // 1. Ambil data mahasiswa saja
+    const allMhs = resUsers.data.filter((u) => u.role === "mahasiswa");
+    const mhsMap = {};
+    allMhs.forEach((u) => (mhsMap[u.id] = u));
+
+    // 2. Data Jadwal (Siapa yang seharusnya hadir)
+    const jadwalToday = resJadwal.data;
+
+    // 3. Data Presensi (Siapa yang benar-benar hadir)
+    const presensiToday = resPresensi.data;
+    const presMap = {};
+    presensiToday.forEach((p) => (presMap[p.user_id] = p));
+
+    const rekap = [];
+    jadwalToday.forEach((j) => {
+      const u = mhsMap[j.user_id];
+      if (!u) return;
+
+      const p = presMap[j.user_id];
+      if (!p) {
+        // ALPHA
+        rekap.push({
+          nama: u.nama,
+          nim: u.username,
+          lahan: j.nama_tempat,
+          status: "ALPHA",
+          notif: "Tidak melakukan check-in",
+          color: "var(--danger)",
+        });
+      } else if (!p.jam_keluar) {
+        // LUPA CO
+        rekap.push({
+          nama: u.nama,
+          nim: u.username,
+          lahan: j.nama_tempat,
+          status: "LUPA CHECK-OUT",
+          notif: `Check-in jam ${p.jam_masuk}, belum check-out`,
+          color: "#f59e0b",
+        });
+      }
+    });
+
+    document.getElementById("abs-count-total").textContent = jadwalToday.length;
+
+    window.dtAbsensiRekapFull = rekap;
+    applyAbsensiFilters(); // Render with current filters
+  };
+
+  window.exportAbsensiCSV = () => {
+    if (!window.dtAbsensiRekap || window.dtAbsensiRekap.length === 0)
+      return showToast("Info", "Tidak ada data ketidakhadiran.", "info");
+    const headers = ["Nama", "NIM", "Lahan Seharusnya", "Status", "Keterangan"];
+    const rows = window.dtAbsensiRekap.map((r) => [
+      r.nama,
+      r.nim,
+      r.lahan,
+      r.status,
+      r.notif,
+    ]);
+    downloadCSV(
+      headers,
+      rows,
+      `Rekap_Ketidakhadiran_${document.getElementById("absensi-date-filter").value}.csv`,
+    );
+  };
+
+  fetchRekapAbsensi();
+}
 
 window.exportLaporanKegiatanPDF = async (data) => {
   if (!data) {
