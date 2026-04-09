@@ -1090,7 +1090,7 @@ window.supabasePostAPI = async (action, payload) => {
           .eq("user_id", payload.user_id)
           .eq("tanggal", today)
           .is("jam_keluar", null)
-          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
           .limit(1)
           .single();
         if (errF || !data) throw new Error("Tidak menemukan presensi aktif");
