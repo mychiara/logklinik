@@ -4563,7 +4563,7 @@ async function antrianLogbookAdminView(area) {
         return `
         <tr class="animate-fade-up">
           <td style="color:#94a3b8;font-size:0.8rem;">${globalIdx}</td>
-          <td><strong>${escapeHTML(l.nama_mahasiswa || "-")}</strong><br><small class="text-muted">${escapeHTML(l.prodi_mahasiswa || "-")}</small></td>
+          <td><strong>${escapeHTML(l.nama_mahasiswa || "-")}</strong><br><small class="text-muted">NIM: ${escapeHTML(l.nim_mahasiswa || "-")}</small></td>
           <td>${formatDateIndo(l.tanggal)}</td>
           <td>${escapeHTML(l.kompetensi || "-")}</td>
           <td>${escapeHTML(l.level || "-")}</td>
@@ -4612,7 +4612,7 @@ async function antrianLogbookAdminView(area) {
     if (!window.dtLogbookAdmin) return;
     const headers = [
       "Mahasiswa",
-      "Prodi",
+      "NIM",
       "Tanggal",
       "Kompetensi",
       "Level",
@@ -4625,7 +4625,7 @@ async function antrianLogbookAdminView(area) {
     ];
     const rows = window.dtLogbookAdmin.map((l) => [
       l.nama_mahasiswa,
-      l.prodi_mahasiswa,
+      l.nim_mahasiswa,
       l.tanggal,
       l.kompetensi,
       l.level,
