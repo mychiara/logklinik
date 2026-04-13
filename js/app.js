@@ -233,6 +233,12 @@ function initDashboard() {
         view: "laporanPreseptorView",
       },
       {
+        id: "nav-kompetensi-pre",
+        icon: "fa-list-ol",
+        text: "Daftar Kompetensi",
+        view: "kompetensiPreseptorView",
+      },
+      {
         id: "nav-aplikasi-pendukung",
         icon: "fa-rocket",
         text: "Aplikasi Pendukung",
@@ -263,6 +269,12 @@ function initDashboard() {
         icon: "fa-file-lines",
         text: "Laporan Bimbingan",
         view: "laporanPreseptorView",
+      },
+      {
+        id: "nav-kompetensi-pre",
+        icon: "fa-list-ol",
+        text: "Daftar Kompetensi",
+        view: "kompetensiPreseptorView",
       },
       {
         id: "nav-aplikasi-pendukung",
@@ -2768,6 +2780,84 @@ async function laporanPreseptorView(area) {
   };
 
   renderTable(window.dtLaporanPre);
+}
+
+// ============ DAFTAR KOMPETENSI (PRESEPTOR - READ ONLY) ============
+async function kompetensiPreseptorView(area) {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center wrap gap-3">
+          <h3 class="m-0"><i class="fa-solid fa-list-check text-primary"></i> Daftar Kompetensi / Skill</h3>
+          <div class="input-with-icon" style="width:250px;">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="search-kompetensi-pre" class="form-control" placeholder="Cari kompetensi..." style="padding-top:0.4rem; padding-bottom:0.4rem;">
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="table-kompetensi-pre" style="font-size:0.88rem;">
+              <thead>
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th>Nama Kompetensi</th>
+                  <th>Target Minimal</th>
+                  <th>Kategori</th>
+                  <th style="width:100px;">Angkatan</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="5" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data kompetensi...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  showLoader(true);
+  const res = await fetchAPI("getKompetensiAll");
+  showLoader(false);
+  const tableBody = document.querySelector("#table-kompetensi-pre tbody");
+  if (!tableBody) return;
+
+  if (res.success && res.data) {
+    window.dtKompetensiPre = res.data;
+    renderTable(res.data);
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="5" class="empty-table text-danger">Gagal memuat data kompetensi</td></tr>`;
+  }
+
+  function renderTable(data) {
+    if (data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="5" class="empty-table">Tidak ada data ditemukan</td></tr>`;
+      return;
+    }
+    tableBody.innerHTML = data
+      .map(
+        (d, idx) => `
+        <tr class="animate-fade-up" style="animation-delay: ${idx * 20}ms">
+          <td class="text-muted">${idx + 1}</td>
+          <td><strong class="text-primary-dark">${escapeHTML(d.nama_skill)}</strong></td>
+          <td class="text-center"><span class="badge bg-primary-soft text-primary font-bold">${d.target_minimal}</span></td>
+          <td><span class="badge bg-info-soft text-info">${escapeHTML(d.kategori || "-")}</span></td>
+          <td><span class="badge" style="background:#f1f5f9; color:var(--text-strong)">${escapeHTML(d.angkatan || "-")}</span></td>
+        </tr>
+      `,
+      )
+      .join("");
+  }
+
+  document.getElementById("search-kompetensi-pre").oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    const results = window.dtKompetensiPre.filter(
+      (d) =>
+        (d.nama_skill || "").toLowerCase().includes(q) ||
+        (d.kategori || "").toLowerCase().includes(q),
+    );
+    renderTable(results);
+  };
 }
 
 window.exportLaporanPreseptorCSV = () => {
