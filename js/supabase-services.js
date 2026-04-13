@@ -195,17 +195,26 @@ window.supabaseFetchAPI = async (action, payload) => {
       }
 
       case "getAllPresensi": {
-        const { data, error } = await supabaseClient
+        let query = supabaseClient
           .from("presensi")
-          .select("*, users(nama, prodi)")
-          .range(0, 49999);
+          .select("*, users(nama, prodi, username)")
+          .order("tanggal", { ascending: false });
+
+        if (payload.user_ids) {
+          query = query.in("user_id", payload.user_ids);
+        } else if (payload.user_id) {
+          query = query.eq("user_id", payload.user_id);
+        }
+
+        const { data, error } = await query.range(0, 49999);
         if (error) throw error;
         return {
           success: true,
           data: (data || []).map((p) => ({
             ...p,
-            nama: p.users.nama,
-            prodi: p.users.prodi,
+            nama: p.users ? p.users.nama : "Luar Sistem",
+            prodi: p.users ? p.users.prodi : "-",
+            username: p.users ? p.users.username : "-",
           })),
         };
       }
@@ -578,7 +587,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         while (!finished) {
           let jQ = supabaseClient.from("jadwal").select("user_id");
-          if (tempat_id && tempat_id !== "-") {
+          if (tempat_id && tempat_id !== "-" && typeof tempat_id === "string") {
             const tIds = tempat_id.split(",");
             jQ = jQ.in("tempat_id", tIds);
           }
@@ -614,9 +623,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         while (!finished) {
           let query = supabaseClient
             .from("jadwal")
-            .select(
-              "*, users!jadwal_user_id_fkey(nama, kelompok_id), tempat_praktik(nama_tempat)",
-            );
+            .select("*, users(nama, kelompok_id), tempat_praktik(nama_tempat)");
 
           if (payload.user_id) {
             if (Array.isArray(payload.user_id)) {
