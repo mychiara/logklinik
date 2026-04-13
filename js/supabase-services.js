@@ -691,7 +691,6 @@ window.supabaseFetchAPI = async (action, payload) => {
             ...allLogs.map((l) => l.user_id),
             ...allLogs.map((l) => l.preseptor_klinik_id).filter(Boolean),
             ...allLogs.map((l) => l.preseptor_akademik_id).filter(Boolean),
-            ...allLogs.map((l) => l.preseptor_id).filter(Boolean),
           ]),
         ];
 
@@ -715,8 +714,14 @@ window.supabaseFetchAPI = async (action, payload) => {
             nama_preseptor_klinik: userMap[l.preseptor_klinik_id]?.nama || "-",
             nama_preseptor_akademik:
               userMap[l.preseptor_akademik_id]?.nama || "-",
-            nama_preseptor: userMap[l.preseptor_id]?.nama || "-",
-            role_preseptor: userMap[l.preseptor_id]?.role || "-",
+            nama_preseptor:
+              userMap[l.preseptor_klinik_id]?.nama ||
+              userMap[l.preseptor_akademik_id]?.nama ||
+              "-",
+            role_preseptor:
+              userMap[l.preseptor_klinik_id]?.role ||
+              userMap[l.preseptor_akademik_id]?.role ||
+              "-",
           })),
         };
       }
@@ -733,7 +738,10 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         // Fetch preceptor metadata
         const preseptorIds = [
-          ...new Set((data || []).map((l) => l.preseptor_id).filter(Boolean)),
+          ...new Set([
+            ...data.map((l) => l.preseptor_klinik_id).filter(Boolean),
+            ...data.map((l) => l.preseptor_akademik_id).filter(Boolean),
+          ]),
         ];
         let pMap = {};
         if (preseptorIds.length > 0) {
@@ -746,8 +754,14 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         const mapped = (data || []).map((l) => ({
           ...l,
-          nama_preseptor: pMap[l.preseptor_id]?.nama || "-",
-          role_preseptor: pMap[l.preseptor_id]?.role || "-",
+          nama_preseptor:
+            pMap[l.preseptor_klinik_id]?.nama ||
+            pMap[l.preseptor_akademik_id]?.nama ||
+            "-",
+          role_preseptor:
+            pMap[l.preseptor_klinik_id]?.role ||
+            pMap[l.preseptor_akademik_id]?.role ||
+            "-",
         }));
 
         return { success: true, data: mapped };
@@ -1168,7 +1182,6 @@ window.supabasePostAPI = async (action, payload) => {
 
         let finalStatus = status;
         let updateData = {
-          preseptor_id: preseptor_id,
           feedback: feedback || payload.catatan,
         };
 
@@ -1268,7 +1281,6 @@ window.supabasePostAPI = async (action, payload) => {
             status: status,
             nilai: nilai || 100,
             feedback: feedback || "Validasi Massal",
-            preseptor_id: preseptor_id,
           };
           if (pRole === "preseptor_akademik")
             updateData.nilai_akademik = nilai || 100;
@@ -1318,7 +1330,9 @@ window.supabasePostAPI = async (action, payload) => {
                 nilai_klinik: nk,
                 nilai_akademik: na,
                 feedback: feedback || "Validasi Massal",
-                preseptor_id: preseptor_id,
+                [pRole === "preseptor_akademik"
+                  ? "preseptor_akademik_id"
+                  : "preseptor_klinik_id"]: preseptor_id,
               })
               .eq("id", l.id);
           });
