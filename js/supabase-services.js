@@ -1279,12 +1279,12 @@ window.supabasePostAPI = async (action, payload) => {
           // Simple update for all
           let updateData = {
             status: status,
-            nilai: nilai || 100,
+            nilai: nilai ?? 100,
             feedback: feedback || "Validasi Massal",
           };
           if (pRole === "preseptor_akademik")
-            updateData.nilai_akademik = nilai || 100;
-          else updateData.nilai_klinik = nilai || 100;
+            updateData.nilai_akademik = nilai ?? 100;
+          else updateData.nilai_klinik = nilai ?? 100;
 
           const { error } = await supabaseClient
             .from("logbook")
@@ -1319,7 +1319,7 @@ window.supabasePostAPI = async (action, payload) => {
               finalStatus = l.status;
             }
 
-            let finalNilai = nilai || 100;
+            let finalNilai = nilai ?? 100;
             if (nk && na) finalNilai = (parseFloat(nk) + parseFloat(na)) / 2;
 
             return supabaseClient
