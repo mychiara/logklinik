@@ -889,6 +889,109 @@ window.supabaseFetchAPI = async (action, payload) => {
         };
       }
 
+      case "getValidatedLogs": {
+        const { tempat_id, user_id } = payload;
+
+        // Fetch Settings & Current User Role
+        const [{ data: sMode }, { data: pUser }] = await Promise.all([
+          supabaseClient
+            .from("settings")
+            .select("value")
+            .eq("key", "logbook_validation_mode")
+            .single(),
+          supabaseClient
+            .from("users")
+            .select("role")
+            .eq("id", user_id || currentUser.id)
+            .single(),
+        ]);
+
+        const mode = sMode?.value || "1";
+        const pRole = pUser?.role || "preseptor";
+
+        let allLogs = [];
+        let from = 0;
+        const step = 2000;
+        let finished = false;
+
+        while (!finished) {
+          let query = supabaseClient
+            .from("logbook")
+            .select("*, users!logbook_user_id_fkey(nama)");
+
+          // In validated view, we show approved ones
+          if (mode === "2") {
+            const approvedStatuses = ["Disetujui"];
+            if (pRole === "preseptor_akademik") {
+              approvedStatuses.push("Disetujui (Akademik)");
+            } else {
+              approvedStatuses.push("Disetujui (Klinik)");
+            }
+            query = query.in("status", approvedStatuses);
+          } else {
+            query = query.eq("status", "Disetujui");
+          }
+
+          const { data, error } = await query
+            .order("tanggal", { ascending: false })
+            .range(from, from + step - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) allLogs = allLogs.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
+        }
+
+        if (tempat_id && tempat_id !== "-") {
+          const tIds = tempat_id.split(",");
+          const { data: schedules, error: sErr } = await supabaseClient
+            .from("jadwal")
+            .select("user_id, tanggal")
+            .in("tempat_id", tIds)
+            .range(0, 10000);
+
+          if (sErr) throw sErr;
+
+          const validLogs = allLogs.filter((log) =>
+            schedules.some(
+              (s) => s.user_id === log.user_id && s.tanggal === log.tanggal,
+            ),
+          );
+
+          // Fetch competency categories to map
+          const { data: kompData } = await supabaseClient
+            .from("kompetensi")
+            .select("nama_skill, kategori");
+          const kompMap = {};
+          (kompData || []).forEach((k) => (kompMap[k.nama_skill] = k.kategori));
+
+          return {
+            success: true,
+            data: validLogs.map((l) => ({
+              ...l,
+              nama_mahasiswa: l.users.nama,
+              kategori: kompMap[l.kompetensi] || "Umum",
+            })),
+          };
+        }
+
+        // Fetch competency categories to map
+        const { data: kompData } = await supabaseClient
+          .from("kompetensi")
+          .select("nama_skill, kategori");
+        const kompMap = {};
+        (kompData || []).forEach((k) => (kompMap[k.nama_skill] = k.kategori));
+
+        return {
+          success: true,
+          data: (allLogs || []).map((l) => ({
+            ...l,
+            nama_mahasiswa: l.users.nama,
+            kategori: kompMap[l.kompetensi] || "Umum",
+          })),
+        };
+      }
+
       case "getKelompok": {
         const [{ data: groups }, { data: users }] = await Promise.all([
           supabaseClient
