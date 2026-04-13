@@ -2174,12 +2174,13 @@ async function validasiView(area) {
                                       <th>Mahasiswa</th>
                                       <th>Tgl</th>
                                       <th>Kompetensi</th>
+                                      <th>Kategori</th>
                                       <th>Lahan</th>
                                       <th>Level</th>
                                       <th style="text-align:right">Tindakan Validasi</th>
                                   </tr>
                               </thead>
-                              <tbody><tr><td colspan="7" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Mengecek antrean...</td></tr></tbody>
+                              <tbody><tr><td colspan="8" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Mengecek antrean...</td></tr></tbody>
                           </table>
                       </div>
                   </div>
@@ -2214,6 +2215,7 @@ async function validasiView(area) {
                   </td>
                   <td>${p.tanggal}</td>
                   <td><span style="color:var(--primary-dark); font-weight:500;">${p.kompetensi}</span></td>
+                  <td><span class="badge bg-info-soft text-info">${p.kategori || "-"}</span></td>
                   <td><span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-hospital"></i> ${p.nama_lahan || p.lahan}</span></td>
                   <td><span class="badge bg-primary">${p.level}</span></td>
                   <td style="text-align:right">
@@ -2226,7 +2228,7 @@ async function validasiView(area) {
       })
       .join("");
   } else {
-    tableBody.innerHTML = `<tr><td colspan="7" class="empty-table"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color:var(--success);display:block"></i>Semua logbook telah divalidasi.<br>Tidak ada antrean logbook pending.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" class="empty-table"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color:var(--success);display:block"></i>Semua logbook telah divalidasi.<br>Tidak ada antrean logbook pending.</td></tr>`;
   }
 }
 
