@@ -2240,26 +2240,60 @@ window.validasiBulk = async () => {
   const checked = Array.from(document.querySelectorAll(".chk-log:checked")).map(
     (c) => c.value,
   );
-  if (
-    !confirm(
-      `Apakah Anda yakin ingin menyetujui ${checked.length} logbook sekaligus dengan nilai default (100)?`,
-    )
-  )
-    return;
 
-  showLoader(true);
-  const res = await postAPI("validasiLogBulk", {
-    ids: checked,
-    status: "Disetujui",
-    nilai: 100,
-    preseptor_id: currentUser.id,
-  });
-  showLoader(false);
+  openModal(
+    "Validasi Massal Logbook",
+    `
+    <div class="animate-fade-in">
+      <div class="alert alert-info mb-4">
+        <i class="fa-solid fa-circle-info"></i> Anda akan menyetujui <strong>${checked.length}</strong> logbook secara massal.
+      </div>
+      
+      <form id="form-validasi-bulk">
+        <div class="form-group">
+          <label>Nilai Objektif Massal (0-100)</label>
+          <div class="input-with-icon">
+            <i class="fa-solid fa-star"></i>
+            <input type="number" id="bulk-val-nilai" required class="form-control" min="0" max="100" value="100" placeholder="Masukkan nilai untuk semua data">
+          </div>
+          <small class="text-muted">Nilai ini akan diterapkan ke semua logbook yang dipilih.</small>
+        </div>
+        
+        <div class="form-group">
+          <label>Catatan / Feedback Massal (Optional)</label>
+          <textarea id="bulk-val-feedback" rows="2" class="form-control" placeholder="Validasi Massal"></textarea>
+        </div>
 
-  if (res.success) {
-    showToast("Berhasil", res.message, "success");
-    loadView("validasiView");
-  }
+        <button type="submit" class="btn btn-success btn-block mt-3">
+          <i class="fa-solid fa-check-double"></i> Setujui ${checked.length} Data Sekarang
+        </button>
+      </form>
+    </div>
+    `,
+  );
+
+  document.getElementById("form-validasi-bulk").onsubmit = async (e) => {
+    e.preventDefault();
+    const nilai = document.getElementById("bulk-val-nilai").value;
+    const feedback =
+      document.getElementById("bulk-val-feedback").value || "Validasi Massal";
+
+    closeModal();
+    showLoader(true);
+    const res = await postAPI("validasiLogBulk", {
+      ids: checked,
+      status: "Disetujui",
+      nilai: parseFloat(nilai),
+      feedback: feedback,
+      preseptor_id: currentUser.id,
+    });
+    showLoader(false);
+
+    if (res.success) {
+      showToast("Berhasil", res.message, "success");
+      loadView("validasiView");
+    }
+  };
 };
 
 window.bukaModalValidasi = (id, nama, deskripsi) => {
@@ -4717,6 +4751,12 @@ async function rekapPresensiAdminView(area) {
               <i class="fa-solid fa-magnifying-glass"></i>
               <input type="text" id="search-presensi-admin" class="form-control" placeholder="Cari nama / NIM..." style="padding-top:0.4rem;padding-bottom:0.4rem;">
             </div>
+            <select id="filter-presensi-status" class="form-control" style="width:160px; padding-top:0.4rem; padding-bottom:0.4rem;" onchange="applyFilterPresensiAdmin()">
+              <option value="">-- Semua Status --</option>
+              <option value="kurang">Durasi < 6 Jam</option>
+              <option value="lengkap">Lengkap (≥ 6 Jam)</option>
+              <option value="aktif">Belum Checkout</option>
+            </select>
             <div class="d-flex gap-2 align-center">
               <input type="date" id="filter-presensi-start" class="form-control" style="padding:0.35rem 0.5rem; font-size:0.85rem; width:145px;">
               <span style="color:#94a3b8;font-size:0.85rem;">s/d</span>
@@ -4732,7 +4772,7 @@ async function rekapPresensiAdminView(area) {
         <!-- Summary Cards -->
         <div id="presensi-summary-cards" class="card-body" style="padding-bottom:0;">
           <div class="d-flex gap-3 wrap" id="presensi-stat-cards">
-            <div class="stat-card" style="flex:1;min-width:160px;">
+            <div class="stat-card" style="flex:1;min-width:160px; cursor:pointer;" onclick="resetFilterPresensiAdmin()">
               <div class="stat-info"><h5>Total Kehadiran</h5><h2 id="ps-total">-</h2></div>
               <div class="stat-icon"><i class="fa-solid fa-calendar-check"></i></div>
             </div>
@@ -4740,11 +4780,11 @@ async function rekapPresensiAdminView(area) {
               <div class="stat-info"><h5>Rata-rata Durasi</h5><h2 id="ps-avg-dur">- <span style="font-size:0.5em;color:var(--text-muted)">Jam</span></h2></div>
               <div class="stat-icon success-icon"><i class="fa-solid fa-clock"></i></div>
             </div>
-            <div class="stat-card" style="flex:1;min-width:160px;border-left:4px solid #f59e0b;">
+            <div class="stat-card" style="flex:1;min-width:160px;border-left:4px solid #f59e0b; cursor:pointer;" onclick="setPresensiStatusFilter('aktif')">
               <div class="stat-info"><h5>Belum Check-Out</h5><h2 id="ps-no-co">-</h2></div>
               <div class="stat-icon" style="color:#f59e0b;"><i class="fa-solid fa-right-from-bracket"></i></div>
             </div>
-            <div class="stat-card" style="flex:1;min-width:160px;border-left:4px solid #ef4444;">
+            <div class="stat-card" style="flex:1;min-width:160px;border-left:4px solid #ef4444; cursor:pointer;" onclick="setPresensiStatusFilter('kurang')">
               <div class="stat-info"><h5>Durasi < 6 Jam</h5><h2 id="ps-kurang">-</h2></div>
               <div class="stat-icon" style="color:#ef4444;"><i class="fa-solid fa-triangle-exclamation"></i></div>
             </div>
@@ -4993,6 +5033,9 @@ async function rekapPresensiAdminView(area) {
     ).toLowerCase();
     const startDate = document.getElementById("filter-presensi-start").value;
     const endDate = document.getElementById("filter-presensi-end").value;
+    const statusFilter = document.getElementById(
+      "filter-presensi-status",
+    ).value;
 
     let results = window.dtPresensiAdmin;
 
@@ -5010,13 +5053,31 @@ async function rekapPresensiAdminView(area) {
     if (endDate) {
       results = results.filter((p) => p.tanggal <= endDate);
     }
+    if (statusFilter) {
+      if (statusFilter === "kurang") {
+        results = results.filter(
+          (p) => p.jam_keluar && parseFloat(p.durasi || 0) < 6,
+        );
+      } else if (statusFilter === "lengkap") {
+        results = results.filter(
+          (p) => p.jam_keluar && parseFloat(p.durasi || 0) >= 6,
+        );
+      } else if (statusFilter === "aktif") {
+        results = results.filter((p) => !p.jam_keluar);
+      }
+    }
 
     render(results, 1);
   };
 
   window.applyFilterPresensiAdmin = applyFilters;
+  window.setPresensiStatusFilter = (status) => {
+    document.getElementById("filter-presensi-status").value = status;
+    applyFilters();
+  };
   window.resetFilterPresensiAdmin = () => {
     document.getElementById("search-presensi-admin").value = "";
+    document.getElementById("filter-presensi-status").value = "";
     document.getElementById("filter-presensi-start").value = "";
     document.getElementById("filter-presensi-end").value = "";
     render(window.dtPresensiAdmin, 1);
