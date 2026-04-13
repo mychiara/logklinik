@@ -233,6 +233,12 @@ function initDashboard() {
         view: "laporanPreseptorView",
       },
       {
+        id: "nav-rekap-presensi-pre",
+        icon: "fa-clipboard-user",
+        text: "Laporan Kehadiran",
+        view: "rekapPresensiPreseptorView",
+      },
+      {
         id: "nav-kompetensi-pre",
         icon: "fa-list-ol",
         text: "Daftar Kompetensi",
@@ -269,6 +275,12 @@ function initDashboard() {
         icon: "fa-file-lines",
         text: "Laporan Bimbingan",
         view: "laporanPreseptorView",
+      },
+      {
+        id: "nav-rekap-presensi-pre",
+        icon: "fa-clipboard-user",
+        text: "Laporan Kehadiran",
+        view: "rekapPresensiPreseptorView",
       },
       {
         id: "nav-kompetensi-pre",
@@ -9881,4 +9893,309 @@ window.aplikasiPendukungView = (area) => {
       </style>
     </div>
   `;
+};
+
+// ============ REKAPAN PRESENSI (PRESEPTOR) ============
+async function rekapPresensiPreseptorView(area) {
+  area.innerHTML = `
+    <div class="animate-fade-up">
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center wrap gap-3">
+          <h3 class="m-0"><i class="fa-solid fa-clipboard-user text-primary"></i> Rekapan Kehadiran Bimbingan</h3>
+          <div class="d-flex gap-2 wrap align-center">
+            <div class="input-with-icon" style="width:220px;">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="search-presensi-pre" class="form-control" placeholder="Cari nama / NIM..." style="padding:0.4rem;">
+            </div>
+            <select id="filter-presensi-status-pre" class="form-control" style="width:165px; padding:0.4rem;" onchange="applyFilterPresensiPreseptor()">
+              <option value="">-- Semua Status --</option>
+              <option value="alpha">ALPHA (Tanpa Presensi)</option>
+              <option value="lengkap">Lengkap (≥ 6 Jam)</option>
+              <option value="kurang">Kurang (< 6 Jam)</option>
+              <option value="aktif">Belum Checkout</option>
+            </select>
+            <div class="d-flex gap-2 align-center">
+              <input type="date" id="filter-presensi-start-pre" class="form-control" style="padding:0.35rem 0.5rem; font-size:0.85rem; width:145px;">
+              <span style="color:#94a3b8;font-size:0.85rem;">s/d</span>
+              <input type="date" id="filter-presensi-end-pre" class="form-control" style="padding:0.35rem 0.5rem; font-size:0.85rem; width:145px;">
+              <button class="btn btn-primary btn-sm" onclick="applyFilterPresensiPreseptor()" style="white-space:nowrap;"><i class="fa-solid fa-filter"></i> Filter</button>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="exportRekapPresensiPreCSV()"><i class="fa-solid fa-file-csv"></i> Unduh CSV</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="table-presensi-pre" style="font-size:0.88rem;">
+              <thead>
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th>Mahasiswa</th>
+                  <th>NIM</th>
+                  <th>Tanggal</th>
+                  <th>Masuk</th>
+                  <th>Keluar</th>
+                  <th>Durasi</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="8" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data kehadiran...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-container" id="pagination-presensi-pre"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  showLoader(true);
+  let studentIds = [];
+  try {
+    const resAssigned = await fetchAPI("getAssignedStudents", {
+      tempat_id: currentUser.tempat_id,
+    });
+    studentIds = (resAssigned.data || []).map((s) => s.id);
+
+    if (studentIds.length === 0) {
+      showLoader(false);
+      const tb = document.querySelector("#table-presensi-pre tbody");
+      if (tb)
+        tb.innerHTML =
+          '<tr><td colspan="8" class="empty-table">Belum ada mahasiswa yang dibimbing di lahan ini (tidak ada jadwal ditemukan).</td></tr>';
+      return;
+    }
+
+    const resPresensi = await fetchAPI("getAllPresensi", {
+      user_ids: studentIds,
+    });
+    showLoader(false);
+
+    const tableBody = document.querySelector("#table-presensi-pre tbody");
+    if (!tableBody) return;
+
+    if (resPresensi.success && resPresensi.data) {
+      window.dtPresensiPre = resPresensi.data;
+      window.dtPresensiPreFiltered = resPresensi.data;
+      renderTable(resPresensi.data, 1);
+    } else {
+      tableBody.innerHTML =
+        '<tr><td colspan="8" class="empty-table">Belum ada data kehadiran untuk mahasiswa bimbingan Anda.</td></tr>';
+    }
+  } catch (err) {
+    showLoader(false);
+    showToast("Error", "Gagal mengambil data kehadiran", "error");
+  }
+
+  function renderTable(data, page = 1) {
+    const tableBody = document.querySelector("#table-presensi-pre tbody");
+    const itemsPerPage = 20;
+    const start = (page - 1) * itemsPerPage;
+    const paginated = data.slice(start, start + itemsPerPage);
+
+    if (data.length === 0) {
+      tableBody.innerHTML =
+        '<tr><td colspan="8" class="empty-table">Tidak ada data ditemukan</td></tr>';
+      document.getElementById("pagination-presensi-pre").innerHTML = "";
+      return;
+    }
+
+    tableBody.innerHTML = paginated
+      .map((p, idx) => {
+        const globalIdx = start + idx + 1;
+        let durHtml = "-";
+        let statusHtml = "";
+
+        if (p.status === "ALPHA") {
+          statusHtml = `<span class="badge bg-danger shadow-sm"><i class="fa-solid fa-user-xmark"></i> ALPHA</span>`;
+          durHtml = `<span class="text-danger">0 jam</span>`;
+        } else {
+          const dur = p.durasi
+            ? parseFloat(p.durasi).toFixed(1) + " jam"
+            : "Aktif";
+          const statusClass = p.jam_keluar
+            ? parseFloat(p.durasi) >= 6
+              ? "bg-success"
+              : "bg-warning"
+            : "bg-info";
+          const statusText = p.jam_keluar
+            ? parseFloat(p.durasi) >= 6
+              ? "Lengkap"
+              : "Kurang"
+            : "Check-In";
+          statusHtml = `<span class="badge ${statusClass} shadow-sm">${statusText}</span>`;
+          durHtml = dur;
+        }
+
+        return `
+          <tr class="animate-fade-up" style="animation-delay: ${idx * 15}ms">
+            <td class="text-muted" style="font-size:0.75rem;">${globalIdx}</td>
+            <td><strong>${escapeHTML(p.nama)}</strong></td>
+            <td><code style="font-size:0.8rem;">${escapeHTML(p.username)}</code></td>
+            <td>${formatDateIndo(p.tanggal)}</td>
+            <td class="text-center">${p.jam_masuk || "-"}</td>
+            <td class="text-center">${p.jam_keluar || "-"}</td>
+            <td class="text-center">${durHtml}</td>
+            <td class="text-center">${statusHtml}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    renderPagination(data.length, page, itemsPerPage);
+  }
+
+  function renderPagination(totalItems, currentPage, itemsPerPage) {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const container = document.getElementById("pagination-presensi-pre");
+    if (!container || totalPages <= 1) {
+      if (container) container.innerHTML = "";
+      return;
+    }
+
+    let html = `<div class="d-flex gap-1">`;
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, startPage + 4);
+
+    if (currentPage > 1) {
+      html += `<button class="btn btn-outline btn-sm" onclick="changePresensiPrePage(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>`;
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      html += `<button class="btn ${i === currentPage ? "btn-primary" : "btn-outline"} btn-sm" onclick="changePresensiPrePage(${i})">${i}</button>`;
+    }
+
+    if (currentPage < totalPages) {
+      html += `<button class="btn btn-outline btn-sm p-1" style="width:30px;" onclick="changePresensiPrePage(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>`;
+    }
+    html += `<span class="text-xs text-muted ml-2">Total ${totalItems} data</span></div>`;
+    container.innerHTML = html;
+  }
+
+  window.changePresensiPrePage = (page) => {
+    renderTable(window.dtPresensiPreFiltered, page);
+  };
+
+  window.applyFilterPresensiPreseptor = async (skipFetch = false) => {
+    const q = (
+      document.getElementById("search-presensi-pre").value || ""
+    ).toLowerCase();
+    const status = document.getElementById("filter-presensi-status-pre").value;
+    const start = document.getElementById("filter-presensi-start-pre").value;
+    const end = document.getElementById("filter-presensi-end-pre").value;
+
+    let results = [];
+
+    // If "ALPHA" is requested, we MUST have a date range
+    if (status === "alpha") {
+      if (!start || !end) {
+        return showToast(
+          "Filter Diperlukan",
+          "Status ALPHA memerlukan rentang tanggal awal dan akhir.",
+          "warning",
+        );
+      }
+
+      if (!skipFetch || !window.dtPresensiPreAlpha) {
+        showLoader(true);
+        const resAssigned = await fetchAPI("getAssignedStudents", {
+          tempat_id: currentUser.tempat_id,
+        });
+        const studentIds = (resAssigned.data || []).map((s) => s.id);
+        const studentMap = {};
+        (resAssigned.data || []).forEach((s) => (studentMap[s.id] = s));
+
+        const resJadwal = await fetchAPI("getJadwal", { user_id: studentIds });
+        showLoader(false);
+
+        if (resJadwal.success) {
+          const scheds = (resJadwal.data || []).filter(
+            (j) => j.tanggal >= start && j.tanggal <= end,
+          );
+          const presLookup = {};
+          (window.dtPresensiPre || []).forEach((p) => {
+            presLookup[`${p.user_id}|${p.tanggal}`] = p;
+          });
+
+          window.dtPresensiPreAlpha = scheds
+            .filter((j) => !presLookup[`${j.user_id}|${j.tanggal}`])
+            .map((j) => ({
+              id: "ALPHA-" + j.id,
+              user_id: j.user_id,
+              nama: j.nama,
+              username: studentMap[j.user_id]?.username || "-",
+              tanggal: j.tanggal,
+              status: "ALPHA",
+              lahan: j.nama_tempat,
+            }));
+        }
+      }
+      results = [...(window.dtPresensiPreAlpha || [])];
+    } else {
+      results = [...(window.dtPresensiPre || [])];
+      window.dtPresensiPreAlpha = null; // Clear cache
+      if (status) {
+        if (status === "kurang") {
+          results = results.filter((p) => p.durasi && parseFloat(p.durasi) < 6);
+        } else if (status === "lengkap") {
+          results = results.filter(
+            (p) => p.durasi && parseFloat(p.durasi) >= 6,
+          );
+        } else if (status === "aktif") {
+          results = results.filter((p) => !p.jam_keluar);
+        }
+      }
+      if (start) results = results.filter((p) => p.tanggal >= start);
+      if (end) results = results.filter((p) => p.tanggal <= end);
+    }
+
+    // Common search filter
+    if (q) {
+      results = results.filter(
+        (p) =>
+          (p.nama || "").toLowerCase().includes(q) ||
+          (p.username || "").toLowerCase().includes(q),
+      );
+    }
+    window.dtPresensiPreFiltered = results;
+    renderTable(results, 1);
+  };
+
+  const searchInp = document.getElementById("search-presensi-pre");
+  if (searchInp) {
+    searchInp.oninput = () => window.applyFilterPresensiPreseptor(true);
+  }
+}
+
+window.exportRekapPresensiPreCSV = () => {
+  if (
+    !window.dtPresensiPreFiltered ||
+    window.dtPresensiPreFiltered.length === 0
+  )
+    return showToast("Info", "Tidak ada data untuk diekspor", "info");
+  const headers = [
+    "Mahasiswa",
+    "NIM",
+    "Tanggal",
+    "Masuk",
+    "Keluar",
+    "Durasi (Jam)",
+    "Lahan",
+  ];
+  const rows = window.dtPresensiPreFiltered.map((p) => [
+    p.nama,
+    p.username,
+    p.tanggal,
+    p.jam_masuk || "-",
+    p.jam_keluar || "-",
+    p.status === "ALPHA" ? "0" : p.durasi || "0",
+    p.status ||
+      (p.jam_keluar
+        ? parseFloat(p.durasi) >= 6
+          ? "Lengkap"
+          : "Kurang"
+        : "Aktif"),
+    p.lahan,
+  ]);
+  downloadCSV(headers, rows, "Rekap_Kehadiran_Bimbingan.csv");
 };
