@@ -5727,7 +5727,26 @@ async function rekapAbsensiAdminView(area) {
     const presMap = {};
     presensiToday.forEach((p) => (presMap[p.user_id] = p));
 
+    // Detect Holiday (Sunday)
+    const selectedDate = new Date(tgl);
+    const isSunday = selectedDate.getDay() === 0;
+
     const rekap = [];
+
+    // If Sunday, we don't count ALPHA/Absence unless explicitly needed.
+    // Usually, Sunday is a universal holiday in this system context.
+    if (isSunday) {
+      tableBody.innerHTML = `<tr><td colspan="6" class="empty-table text-info">
+            <i class="fa-solid fa-umbrella-beach fa-2x mb-2" style="display:block; color:var(--primary)"></i>
+            Hari ini (Minggu) adalah hari libur.<br>Tidak ada perhitungan ketidakhadiran rutin.
+        </td></tr>`;
+      document.getElementById("abs-count-total").textContent = "0";
+      document.getElementById("abs-count-alpha").textContent = "0";
+      document.getElementById("abs-count-lupa").textContent = "0";
+      window.dtAbsensiRekapFull = [];
+      return;
+    }
+
     jadwalToday.forEach((j) => {
       const u = mhsMap[j.user_id];
       if (!u) return;

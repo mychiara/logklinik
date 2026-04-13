@@ -104,7 +104,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         if (payload.role === "mahasiswa") {
           const today = getLocalTodayService();
-          const [logs, pres, sched] = await Promise.all([
+          const [logs, pres, schedRes] = await Promise.all([
             supabaseClient
               .from("logbook")
               .select("id", { count: "exact", head: true })
@@ -115,13 +115,19 @@ window.supabaseFetchAPI = async (action, payload) => {
               .eq("user_id", payload.user_id),
             supabaseClient
               .from("jadwal")
-              .select("id", { count: "exact", head: true })
+              .select("tanggal")
               .eq("user_id", payload.user_id)
               .lte("tanggal", today),
           ]);
 
+          // Filter out Sundays from schedule count to correctly calculate absences
+          const validSchedules = (schedRes.data || []).filter((s) => {
+            const d = new Date(s.tanggal);
+            return d.getDay() !== 0; // Skip Sunday
+          });
+
           const hadir = pres.count || 0;
-          const totalSched = sched.count || 0;
+          const totalSched = validSchedules.length || 0;
           const absen = Math.max(0, totalSched - hadir);
 
           const { data: presToday } = await supabaseClient
