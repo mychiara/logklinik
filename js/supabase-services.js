@@ -692,7 +692,7 @@ window.supabaseFetchAPI = async (action, payload) => {
           const { data, error } = await supabaseClient
             .from("logbook")
             .select(
-              "id, user_id, tanggal, lahan, kompetensi, preseptor_klinik_id, preseptor_akademik_id",
+              "id, user_id, tanggal, lahan, kompetensi, level, status, nilai_klinik, nilai_akademik, nilai, feedback, preseptor_klinik_id, preseptor_akademik_id",
             )
             .order("tanggal", { ascending: false })
             .range(from, from + step - 1);
@@ -748,7 +748,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         let query = supabaseClient
           .from("logbook")
           .select(
-            "id, user_id, tanggal, lahan, kompetensi, preseptor_klinik_id, preseptor_akademik_id, status, nilai_klinik, nilai_akademik, feedback",
+            "id, user_id, tanggal, lahan, kompetensi, level, preseptor_klinik_id, preseptor_akademik_id, status, nilai_klinik, nilai_akademik, nilai, feedback",
           );
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
         const { data, error } = await query
