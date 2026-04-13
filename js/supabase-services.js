@@ -821,16 +821,11 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         if (tempat_id && tempat_id !== "-") {
           const tIds = tempat_id.split(",");
-          // Fetch schedules for these locations to ensure they are actually assigned there on that date
-          // Reuse pre-existing data or logic: for simplicity we can't easily pagination double loop here
-          // without complexity, but usually schedules per hospital is manageable under certain limits.
-          // Let's use the allJadwal logic if needed, but for now we follow the existing pattern with a safe fetch.
-
           const { data: schedules, error: sErr } = await supabaseClient
             .from("jadwal")
             .select("user_id, tanggal")
             .in("tempat_id", tIds)
-            .range(0, 10000); // Higher safety range for schedule check
+            .range(0, 10000);
 
           if (sErr) throw sErr;
 
@@ -840,20 +835,36 @@ window.supabaseFetchAPI = async (action, payload) => {
             ),
           );
 
+          // Fetch competency categories to map
+          const { data: kompData } = await supabaseClient
+            .from("kompetensi")
+            .select("nama_skill, kategori");
+          const kompMap = {};
+          (kompData || []).forEach((k) => (kompMap[k.nama_skill] = k.kategori));
+
           return {
             success: true,
             data: validLogs.map((l) => ({
               ...l,
               nama_mahasiswa: l.users.nama,
+              kategori: kompMap[l.kompetensi] || "Umum",
             })),
           };
         }
+
+        // Fetch competency categories to map
+        const { data: kompData } = await supabaseClient
+          .from("kompetensi")
+          .select("nama_skill, kategori");
+        const kompMap = {};
+        (kompData || []).forEach((k) => (kompMap[k.nama_skill] = k.kategori));
 
         return {
           success: true,
           data: (allLogs || []).map((l) => ({
             ...l,
             nama_mahasiswa: l.users.nama,
+            kategori: kompMap[l.kompetensi] || "Umum",
           })),
         };
       }
