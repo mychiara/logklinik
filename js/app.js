@@ -233,6 +233,12 @@ function initDashboard() {
         view: "laporanPreseptorView",
       },
       {
+        id: "nav-logbook-tervalidasi",
+        icon: "fa-calendar-check",
+        text: "Logbook Tervalidasi",
+        view: "logbookTervalidasiView",
+      },
+      {
         id: "nav-rekap-presensi-pre",
         icon: "fa-clipboard-user",
         text: "Laporan Kehadiran",
@@ -275,6 +281,12 @@ function initDashboard() {
         icon: "fa-file-lines",
         text: "Laporan Bimbingan",
         view: "laporanPreseptorView",
+      },
+      {
+        id: "nav-logbook-tervalidasi",
+        icon: "fa-calendar-check",
+        text: "Logbook Tervalidasi",
+        view: "logbookTervalidasiView",
       },
       {
         id: "nav-rekap-presensi-pre",
@@ -2167,6 +2179,205 @@ async function nilaiMahasiswaView(area) {
 }
 
 // PRESEPTOR: VALIDASI
+async function logbookTervalidasiView(area) {
+  area.innerHTML = `
+          <div class="animate-fade-up">
+              <div class="card">
+                  <div class="card-header d-flex justify-between align-center">
+                      <h3><i class="fa-solid fa-calendar-check text-success"></i> Logbook Tervalidasi</h3>
+                      <div class="d-flex gap-2">
+                          <button class="btn btn-outline btn-sm" onclick="exportValidatedLogbookCSV()"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+                      </div>
+                  </div>
+                  <div class="card-body">
+                      <div class="table-responsive">
+                          <table id="table-validated">
+                              <thead>
+                                  <tr>
+                                      <th>Mahasiswa</th>
+                                      <th>Tanggal</th>
+                                      <th>Kompetensi</th>
+                                      <th>Kategori</th>
+                                      <th>Lahan</th>
+                                      <th>Nilai</th>
+                                      <th>Status</th>
+                                      <th style="text-align:right">Aksi</th>
+                                  </tr>
+                              </thead>
+                              <tbody><tr><td colspan="8" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data tervalidasi...</td></tr></tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      `;
+
+  const res = await fetchAPI("getValidatedLogs", {
+    tempat_id: currentUser.tempat_id,
+    user_id: currentUser.id,
+  });
+  const tableBody = document.querySelector("#table-validated tbody");
+  if (!tableBody) return;
+  if (res.success && res.data.length > 0) {
+    window.CURRENT_VALIDATED_LOGS = res.data;
+    tableBody.innerHTML = res.data
+      .map((p, idx) => {
+        let statusBadge = "";
+        if (p.status === "Disetujui") {
+          statusBadge = '<span class="badge bg-success">Full Validated</span>';
+        } else if (p.status.includes("Klinik")) {
+          statusBadge =
+            '<span class="badge bg-primary">Validated (Klinik)</span>';
+        } else if (p.status.includes("Akademik")) {
+          statusBadge =
+            '<span class="badge bg-info">Validated (Akademik)</span>';
+        }
+
+        return `
+              <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
+                  <td>
+                      <div class="d-flex align-center gap-2">
+                          <div style="width:35px;height:35px;border-radius:50%;background:var(--success-light);color:var(--success);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem">
+                              ${p.nama_mahasiswa.charAt(0)}
+                          </div>
+                          <div>
+                              <strong>${escapeHTML(p.nama_mahasiswa)}</strong>
+                          </div>
+                      </div>
+                  </td>
+                  <td>${p.tanggal}</td>
+                  <td><span style="color:var(--primary-dark); font-weight:500;">${escapeHTML(p.kompetensi)}</span></td>
+                  <td><span class="badge bg-info-soft text-info">${escapeHTML(p.kategori || "-")}</span></td>
+                  <td><span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-hospital"></i> ${escapeHTML(p.nama_lahan || p.lahan)}</span></td>
+                  <td><span class="badge bg-success" style="font-size:0.9rem">${p.nilai || "-"}</span></td>
+                  <td>${statusBadge}</td>
+                  <td style="text-align:right">
+                      <button class="btn btn-outline btn-sm" onclick="lihatDetailValidasi('${p.id}')">
+                          <i class="fa-solid fa-eye"></i> Detail
+                      </button>
+                  </td>
+              </tr>
+          `;
+      })
+      .join("");
+  } else {
+    tableBody.innerHTML = `<tr><td colspan="8" class="empty-table"><i class="fa-solid fa-info-circle fa-2x mb-2" style="color:var(--primary);display:block"></i>Belum ada logbook yang divalidasi.</td></tr>`;
+  }
+}
+
+window.lihatDetailValidasi = (id) => {
+  const log = window.CURRENT_VALIDATED_LOGS.find((l) => l.id == id);
+  if (!log) return;
+
+  openModal(
+    "Detail Logbook Tervalidasi",
+    `
+    <div class="animate-fade-in">
+        <div class="detail-grid">
+            <div class="detail-item">
+                <label>Mahasiswa</label>
+                <div>${escapeHTML(log.nama_mahasiswa)}</div>
+            </div>
+            <div class="detail-item">
+                <label>Tanggal</label>
+                <div>${log.tanggal}</div>
+            </div>
+            <div class="detail-item">
+                <label>Lahan</label>
+                <div>${escapeHTML(log.nama_lahan || log.lahan)}</div>
+            </div>
+            <div class="detail-item">
+                <label>Kompetensi</label>
+                <div><strong>${escapeHTML(log.kompetensi)}</strong></div>
+            </div>
+            <div class="detail-item">
+                <label>Level</label>
+                <div>${escapeHTML(log.level)}</div>
+            </div>
+            <div class="detail-item">
+                <label>Status</label>
+                <div>${log.status}</div>
+            </div>
+        </div>
+        
+        <div class="mt-4 p-3 bg-light rounded">
+            <label class="font-bold d-block mb-1">Deskripsi Tindakan:</label>
+            <div style="white-space:pre-wrap">${escapeHTML(log.deskripsi)}</div>
+        </div>
+
+        <div class="mt-3 grid-2 gap-3">
+             <div class="p-3 bg-success-light rounded border border-success">
+                <label class="font-bold text-success d-block mb-1">Nilai Akhir:</label>
+                <div style="font-size:1.5rem; font-weight:800">${log.nilai || 0}</div>
+            </div>
+            <div class="p-3 bg-info-light rounded border border-info">
+                <label class="font-bold text-info d-block mb-1">Feedback:</label>
+                <div>${escapeHTML(log.feedback || "-")}</div>
+            </div>
+        </div>
+        
+        ${
+          log.nilai_klinik !== undefined
+            ? `
+        <div class="mt-3 grid-2 gap-3">
+            <div class="p-2 border rounded">
+                <small class="text-muted d-block">Nilai Klinik</small>
+                <strong>${log.nilai_klinik || "-"}</strong>
+            </div>
+            <div class="p-2 border rounded">
+                <small class="text-muted d-block">Nilai Akademik</small>
+                <strong>${log.nilai_akademik || "-"}</strong>
+            </div>
+        </div>
+        `
+            : ""
+        }
+
+        <button class="btn btn-primary btn-block mt-4" onclick="closeModal()">Tutup</button>
+    </div>
+    `,
+  );
+};
+
+window.exportValidatedLogbookCSV = () => {
+  if (
+    !window.CURRENT_VALIDATED_LOGS ||
+    window.CURRENT_VALIDATED_LOGS.length === 0
+  ) {
+    showToast("Gagal", "Tidak ada data untuk diekspor", "error");
+    return;
+  }
+
+  const headers = [
+    "Mahasiswa",
+    "Tanggal",
+    "Lahan",
+    "Kompetensi",
+    "Kategori",
+    "Level",
+    "Nilai",
+    "Status",
+    "Feedback",
+  ];
+  const rows = window.CURRENT_VALIDATED_LOGS.map((l) => [
+    l.nama_mahasiswa,
+    l.tanggal,
+    l.nama_lahan || l.lahan,
+    l.kompetensi,
+    l.kategori,
+    l.level,
+    l.nilai,
+    l.status,
+    l.feedback || "",
+  ]);
+
+  downloadCSV(
+    headers,
+    rows,
+    `Logbook_Tervalidasi_${currentUser.nama}_${new Date().toISOString().split("T")[0]}.csv`,
+  );
+};
+
 async function validasiView(area) {
   area.innerHTML = `
           <div class="animate-fade-up">
