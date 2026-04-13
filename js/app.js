@@ -4496,6 +4496,10 @@ async function antrianLogbookAdminView(area) {
               <option value="Disetujui">Disetujui</option>
               <option value="Ditolak">Ditolak</option>
             </select>
+            <div class="input-with-icon" style="width:160px;">
+              <i class="fa-solid fa-calendar-day"></i>
+              <input type="date" id="filter-logbook-date-admin" class="form-control" style="padding:0.35rem; font-size:0.85rem;" onchange="applyFilterLogbookAdmin()">
+            </div>
             <button class="btn btn-outline btn-sm" onclick="exportAntrianLogbookCSV()" style="white-space:nowrap;"><i class="fa-solid fa-file-csv"></i> Unduh CSV</button>
           </div>
         </div>
@@ -4632,6 +4636,7 @@ async function antrianLogbookAdminView(area) {
       document.getElementById("search-logbook-admin").value || ""
     ).toLowerCase();
     const status = document.getElementById("filter-logbook-status").value;
+    const date = document.getElementById("filter-logbook-date-admin").value;
 
     let results = window.dtLogbookAdmin;
     if (q) {
@@ -4644,6 +4649,9 @@ async function antrianLogbookAdminView(area) {
     }
     if (status) {
       results = results.filter((l) => l.status === status);
+    }
+    if (date) {
+      results = results.filter((l) => l.tanggal === date);
     }
     render(results, 1);
   };
