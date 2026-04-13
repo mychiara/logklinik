@@ -210,11 +210,22 @@ window.supabaseFetchAPI = async (action, payload) => {
           query = query.eq("user_id", payload.user_id);
         }
 
-        const { data, error } = await query.range(0, 49999);
-        if (error) throw error;
+        let allData = [];
+        let from = 0;
+        const step = 1000;
+        let finished = false;
+
+        while (!finished) {
+          const { data, error } = await query.range(from, from + step - 1);
+          if (error) throw error;
+          if (data && data.length > 0) allData = allData.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
+        }
+
         return {
           success: true,
-          data: (data || []).map((p) => ({
+          data: (allData || []).map((p) => ({
             ...p,
             nama: p.users ? p.users.nama : "Luar Sistem",
             prodi: p.users ? p.users.prodi : "-",
@@ -268,13 +279,24 @@ window.supabaseFetchAPI = async (action, payload) => {
           query = query.in("lahan", names);
         }
 
-        const { data, error } = await query
-          .order("tanggal", { ascending: true })
-          .range(0, 49999);
-        if (error) throw error;
+        let allData = [];
+        let from = 0;
+        const step = 1000;
+        let finished = false;
+
+        while (!finished) {
+          const { data, error } = await query
+            .order("tanggal", { ascending: true })
+            .range(from, from + step - 1);
+          if (error) throw error;
+          if (data && data.length > 0) allData = allData.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
+        }
+
         return {
           success: true,
-          data: (data || []).map((l) => ({
+          data: (allData || []).map((l) => ({
             ...l,
             nama_mahasiswa: l.users.nama,
           })),
@@ -333,16 +355,26 @@ window.supabaseFetchAPI = async (action, payload) => {
 
       case "getSkillLeaderboard": {
         const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString();
-        const { data, error } = await supabaseClient
-          .from("logbook")
-          .select("user_id, users!logbook_user_id_fkey(nama)")
-          .eq("status", "Disetujui")
-          .gt("created_at", lastWeek)
-          .range(0, 49999);
-        if (error) throw error;
+        let allData = [];
+        let from = 0;
+        const step = 1000;
+        let finished = false;
+
+        while (!finished) {
+          const { data, error } = await supabaseClient
+            .from("logbook")
+            .select("user_id, users!logbook_user_id_fkey(nama)")
+            .eq("status", "Disetujui")
+            .gt("created_at", lastWeek)
+            .range(from, from + step - 1);
+          if (error) throw error;
+          if (data && data.length > 0) allData = allData.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
+        }
 
         const board = {};
-        data.forEach((l) => {
+        allData.forEach((l) => {
           if (!board[l.user_id])
             board[l.user_id] = { nama: l.users.nama, count: 0 };
           board[l.user_id].count++;
@@ -435,7 +467,7 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getUsers": {
         let allData = [];
         let from = 0;
-        const step = 2000;
+        const step = 1000;
         let finished = false;
 
         while (!finished) {
@@ -445,6 +477,7 @@ window.supabaseFetchAPI = async (action, payload) => {
               "id, username, nama, role, prodi, kelompok_id, tempat_id, angkatan, no_telp",
             )
             .order("nama", { ascending: true })
+            .order("id", { ascending: true })
             .range(from, from + step - 1);
 
           if (error) throw error;
@@ -476,7 +509,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         if (payload.ids && Array.isArray(payload.ids)) {
           mCol = mCol.in("id", payload.ids);
         } else {
-          mCol = mCol.range(0, 499); // Safe default for 500 students
+          mCol = mCol.range(0, 999); // Increased limit for student batch
         }
 
         let lCol = supabaseClient
@@ -486,21 +519,33 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         if (payload.ids && Array.isArray(payload.ids)) {
           lCol = lCol.in("user_id", payload.ids);
-        } else {
-          lCol = lCol.range(0, 49999);
         }
 
-        const [{ data: mhs }, { data: logs }, { data: komp }] =
-          await Promise.all([
-            mCol,
-            lCol,
-            supabaseClient
-              .from("kompetensi")
-              .select("nama_skill, target_minimal, kategori"),
-          ]);
+        let allLogs = [];
+        let fromLogs = 0;
+        const stepLogs = 1000;
+        let finishedLogs = false;
+
+        while (!finishedLogs) {
+          const { data, error } = await lCol.range(
+            fromLogs,
+            fromLogs + stepLogs - 1,
+          );
+          if (error) throw error;
+          if (data && data.length > 0) allLogs = allLogs.concat(data);
+          if (!data || data.length < stepLogs) finishedLogs = true;
+          else fromLogs += stepLogs;
+        }
+
+        const [{ data: mhs }, { data: komp }] = await Promise.all([
+          mCol,
+          supabaseClient
+            .from("kompetensi")
+            .select("nama_skill, target_minimal, kategori"),
+        ]);
 
         const logIndex = {};
-        (logs || []).forEach((l) => {
+        (allLogs || []).forEach((l) => {
           const key = `${l.user_id}|${l.kompetensi}`;
           logIndex[key] = (logIndex[key] || 0) + 1;
         });
@@ -590,7 +635,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         // Step 1: Get unique student IDs from ALL schedules at these locations using pagination
         let allJadwal = [];
         let from = 0;
-        const step = 2000;
+        const step = 1000;
         let finished = false;
 
         while (!finished) {
@@ -599,7 +644,9 @@ window.supabaseFetchAPI = async (action, payload) => {
             const tIds = tempat_id.split(",");
             jQ = jQ.in("tempat_id", tIds);
           }
-          const { data, error } = await jQ.range(from, from + step - 1);
+          const { data, error } = await jQ
+            .order("id", { ascending: true })
+            .range(from, from + step - 1);
           if (error) throw error;
           if (data && data.length > 0) allJadwal = allJadwal.concat(data);
           if (!data || data.length < step) finished = true;
@@ -625,7 +672,7 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getJadwal": {
         let allData = [];
         let from = 0;
-        const step = 2000;
+        const step = 1000;
         let finished = false;
 
         while (!finished) {
@@ -645,7 +692,9 @@ window.supabaseFetchAPI = async (action, payload) => {
             query = query.eq("tanggal", payload.tanggal);
           }
 
-          const { data, error } = await query.range(from, from + step - 1);
+          const { data, error } = await query
+            .order("id", { ascending: true })
+            .range(from, from + step - 1);
           if (error) throw error;
 
           if (data && data.length > 0) {
@@ -674,33 +723,59 @@ window.supabaseFetchAPI = async (action, payload) => {
         let query = supabaseClient.from("presensi").select("*");
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
         if (payload.tanggal) query = query.eq("tanggal", payload.tanggal);
-        const { data, error } = await query
-          .select("id, user_id, tanggal, jam_masuk, jam_keluar, durasi, lahan")
-          .order("tanggal", { ascending: false })
-          .range(0, 49999);
-        if (error) throw error;
-        return { success: true, data: data || [] };
+
+        let allData = [];
+        let from = 0;
+        const step = 1000;
+        let finished = false;
+
+        while (!finished) {
+          const { data, error } = await query
+            .select(
+              "id, user_id, tanggal, jam_masuk, jam_keluar, durasi, lahan",
+            )
+            .order("tanggal", { ascending: false })
+            .range(from, from + step - 1);
+          if (error) throw error;
+          if (data && data.length > 0) allData = allData.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
+        }
+        return { success: true, data: allData || [] };
       }
 
       case "getAntrianLogbook": {
         let allLogs = [];
         let from = 0;
-        const step = 2000;
+        const step = 1000;
         let finished = false;
 
-        while (!finished) {
+        // AGGRESSIVE FETCH: Increase fetch step and ensure total data coverage
+        const maxLimit = 100000;
+        while (!finished && allLogs.length < maxLimit) {
           const { data, error } = await supabaseClient
             .from("logbook")
             .select(
               "id, user_id, tanggal, lahan, kompetensi, level, status, nilai_klinik, nilai_akademik, nilai, feedback, preseptor_klinik_id, preseptor_akademik_id",
             )
             .order("tanggal", { ascending: false })
+            .order("id", { ascending: false })
             .range(from, from + step - 1);
 
-          if (error) throw error;
-          if (data && data.length > 0) allLogs = allLogs.concat(data);
-          if (!data || data.length < step) finished = true;
-          else from += step;
+          if (error) {
+            console.error("Critical Fetch Error:", error);
+            throw error;
+          }
+
+          if (data && data.length > 0) {
+            allLogs = allLogs.concat(data);
+          }
+
+          if (!data || data.length < step) {
+            finished = true;
+          } else {
+            from += step;
+          }
         }
 
         // Fetch user metadata to join in JS (avoids relationship cache issues)
@@ -712,35 +787,44 @@ window.supabaseFetchAPI = async (action, payload) => {
           ]),
         ];
 
-        const { data: usersData } = await supabaseClient
-          .from("users")
-          .select("id, nama, prodi, role, username")
-          .in("id", userIds);
-
         const userMap = {};
-        (usersData || []).forEach((u) => {
-          userMap[u.id] = u;
+        const fetchUserChunks = async (ids) => {
+          const chunkSize = 500;
+          for (let i = 0; i < ids.length; i += chunkSize) {
+            const chunk = ids.slice(i, i + chunkSize);
+            const { data: usersData, error: uErr } = await supabaseClient
+              .from("users")
+              .select("id, nama, prodi, role, username")
+              .in("id", chunk);
+            if (uErr) console.error("User Chunk Fetch Error:", uErr);
+            (usersData || []).forEach((u) => {
+              if (u && u.id) userMap[u.id] = u;
+            });
+          }
+        };
+
+        await fetchUserChunks(userIds);
+
+        const mappedData = (allLogs || []).map((l) => {
+          const mhs = userMap[l.user_id] || {};
+          const preK = userMap[l.preseptor_klinik_id] || {};
+          const preA = userMap[l.preseptor_akademik_id] || {};
+
+          return {
+            ...l,
+            nama_mahasiswa: mhs.nama || "Siswa Tidak Ditemukan",
+            prodi_mahasiswa: mhs.prodi || "-",
+            nim_mahasiswa: mhs.username || "-",
+            nama_preseptor_klinik: preK.nama || "-",
+            nama_preseptor_akademik: preA.nama || "-",
+            nama_preseptor: preK.nama || preA.nama || "-",
+            role_preseptor: preK.role || preA.role || "-",
+          };
         });
 
         return {
           success: true,
-          data: (allLogs || []).map((l) => ({
-            ...l,
-            nama_mahasiswa: userMap[l.user_id]?.nama || "-",
-            prodi_mahasiswa: userMap[l.user_id]?.prodi || "-",
-            nim_mahasiswa: userMap[l.user_id]?.username || "-",
-            nama_preseptor_klinik: userMap[l.preseptor_klinik_id]?.nama || "-",
-            nama_preseptor_akademik:
-              userMap[l.preseptor_akademik_id]?.nama || "-",
-            nama_preseptor:
-              userMap[l.preseptor_klinik_id]?.nama ||
-              userMap[l.preseptor_akademik_id]?.nama ||
-              "-",
-            role_preseptor:
-              userMap[l.preseptor_klinik_id]?.role ||
-              userMap[l.preseptor_akademik_id]?.role ||
-              "-",
-          })),
+          data: mappedData,
         };
       }
 
@@ -751,16 +835,27 @@ window.supabaseFetchAPI = async (action, payload) => {
             "id, user_id, tanggal, lahan, kompetensi, level, preseptor_klinik_id, preseptor_akademik_id, status, nilai_klinik, nilai_akademik, nilai, feedback",
           );
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
-        const { data, error } = await query
-          .order("tanggal", { ascending: false })
-          .range(0, 4999);
-        if (error) throw error;
+
+        let allData = [];
+        let from = 0;
+        const step = 1000;
+        let finished = false;
+
+        while (!finished) {
+          const { data, error } = await query
+            .order("tanggal", { ascending: false })
+            .range(from, from + step - 1);
+          if (error) throw error;
+          if (data && data.length > 0) allData = allData.concat(data);
+          if (!data || data.length < step) finished = true;
+          else from += step;
+        }
 
         // Fetch preceptor metadata
         const preseptorIds = [
           ...new Set([
-            ...data.map((l) => l.preseptor_klinik_id).filter(Boolean),
-            ...data.map((l) => l.preseptor_akademik_id).filter(Boolean),
+            ...allData.map((l) => l.preseptor_klinik_id).filter(Boolean),
+            ...allData.map((l) => l.preseptor_akademik_id).filter(Boolean),
           ]),
         ];
         let pMap = {};
@@ -772,17 +867,17 @@ window.supabaseFetchAPI = async (action, payload) => {
           (pData || []).forEach((u) => (pMap[u.id] = u));
         }
 
-        const mapped = (data || []).map((l) => ({
-          ...l,
-          nama_preseptor:
-            pMap[l.preseptor_klinik_id]?.nama ||
-            pMap[l.preseptor_akademik_id]?.nama ||
-            "-",
-          role_preseptor:
-            pMap[l.preseptor_klinik_id]?.role ||
-            pMap[l.preseptor_akademik_id]?.role ||
-            "-",
-        }));
+        const mapped = (allData || []).map((l) => {
+          const preK = pMap[l.preseptor_klinik_id] || {};
+          const preA = pMap[l.preseptor_akademik_id] || {};
+          return {
+            ...l,
+            nama_preseptor_klinik: preK.nama || "-",
+            nama_preseptor_akademik: preA.nama || "-",
+            nama_preseptor: preK.nama || preA.nama || "-",
+            role_preseptor: preK.role || preA.role || "-",
+          };
+        });
 
         return { success: true, data: mapped };
       }
@@ -809,7 +904,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         let allLogs = [];
         let from = 0;
-        const step = 2000;
+        const step = 1000;
         let finished = false;
 
         while (!finished) {
@@ -831,6 +926,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
           const { data, error } = await query
             .order("tanggal", { ascending: true })
+            .order("id", { ascending: true })
             .range(from, from + step - 1);
 
           if (error) throw error;
@@ -841,19 +937,15 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         if (tempat_id && tempat_id !== "-") {
           const tIds = tempat_id.split(",");
-          const { data: schedules, error: sErr } = await supabaseClient
-            .from("jadwal")
-            .select("user_id, tanggal")
-            .in("tempat_id", tIds)
-            .range(0, 10000);
+          const { data: sites, error: sErr } = await supabaseClient
+            .from("tempat_praktik")
+            .select("nama_tempat")
+            .in("id", tIds);
 
           if (sErr) throw sErr;
 
-          const validLogs = allLogs.filter((log) =>
-            schedules.some(
-              (s) => s.user_id === log.user_id && s.tanggal === log.tanggal,
-            ),
-          );
+          const names = (sites || []).map((s) => s.nama_tempat);
+          const validLogs = allLogs.filter((log) => names.includes(log.lahan));
 
           // Fetch competency categories to map
           const { data: kompData } = await supabaseClient
@@ -911,7 +1003,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         let allLogs = [];
         let from = 0;
-        const step = 2000;
+        const step = 1000;
         let finished = false;
 
         while (!finished) {
@@ -934,6 +1026,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
           const { data, error } = await query
             .order("tanggal", { ascending: false })
+            .order("id", { ascending: false })
             .range(from, from + step - 1);
 
           if (error) throw error;
@@ -944,19 +1037,15 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         if (tempat_id && tempat_id !== "-") {
           const tIds = tempat_id.split(",");
-          const { data: schedules, error: sErr } = await supabaseClient
-            .from("jadwal")
-            .select("user_id, tanggal")
-            .in("tempat_id", tIds)
-            .range(0, 10000);
+          const { data: sites, error: sErr } = await supabaseClient
+            .from("tempat_praktik")
+            .select("nama_tempat")
+            .in("id", tIds);
 
           if (sErr) throw sErr;
 
-          const validLogs = allLogs.filter((log) =>
-            schedules.some(
-              (s) => s.user_id === log.user_id && s.tanggal === log.tanggal,
-            ),
-          );
+          const names = (sites || []).map((s) => s.nama_tempat);
+          const validLogs = allLogs.filter((log) => names.includes(log.lahan));
 
           // Fetch competency categories to map
           const { data: kompData } = await supabaseClient

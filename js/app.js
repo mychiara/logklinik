@@ -1897,18 +1897,21 @@ async function logbookView(area) {
   if (res.success && res.data.length > 0) {
     tableBody.innerHTML = res.data
       .map((p) => {
-        let statusBadge =
-          p.status === "Disetujui"
-            ? "bg-success"
-            : p.status === "Ditolak"
-              ? "bg-danger"
-              : "bg-warning";
-        let statusIcon =
-          p.status === "Disetujui"
-            ? "fa-check"
-            : p.status === "Ditolak"
-              ? "fa-xmark"
-              : "fa-clock Rotate";
+        let statusHtml = "";
+        if (p.status === "Menunggu Validasi") {
+          statusHtml = `<span class="badge bg-warning"><i class="fa-solid fa-clock"></i> Antrean</span>`;
+        } else if (p.status === "Disetujui (Klinik)") {
+          statusHtml = `<span class="badge bg-info-soft text-info"><i class="fa-solid fa-user-check"></i> Klinik OK</span>`;
+        } else if (p.status === "Disetujui (Akademik)") {
+          statusHtml = `<span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-user-check"></i> Akademik OK</span>`;
+        } else if (p.status === "Disetujui") {
+          statusHtml = `<span class="badge bg-success"><i class="fa-solid fa-check"></i> Disetujui</span>`;
+        } else if (p.status === "Ditolak") {
+          statusHtml = `<span class="badge bg-danger"><i class="fa-solid fa-xmark"></i> Ditolak</span>`;
+        } else {
+          statusHtml = `<span class="badge bg-danger">${escapeHTML(p.status)}</span>`;
+        }
+
         const roleBadge =
           p.role_preseptor === "preseptor_akademik"
             ? '<br><span class="badge bg-primary-soft text-primary" style="font-size:0.6rem">Akademik</span>'
@@ -1922,18 +1925,18 @@ async function logbookView(area) {
                   <td><span style="color:var(--primary-dark); font-weight:500;">${escapeHTML(p.kompetensi)}</span></td>
                   <td>${escapeHTML(p.lahan)}</td>
                   <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${escapeHTML(p.level)}</span></td>
-                  <td><span class="badge ${statusBadge}"><i class="fa-solid ${statusIcon}"></i> ${escapeHTML(p.status)}</span></td>
+                  <td>${statusHtml}</td>
                   <td>
                     <div class="d-flex flex-column" style="font-size:0.85rem">
-                      <strong>${escapeHTML(p.nama_preseptor || "-")}</strong>
+                      <strong>${escapeHTML(p.nama_preseptor_klinik !== "-" ? p.nama_preseptor_klinik : p.nama_preseptor_akademik !== "-" ? p.nama_preseptor_akademik : "-")}</strong>
                       ${roleBadge}
                     </div>
                   </td>
                   <td>
                     <div class="d-flex flex-column" style="font-size:0.8rem; line-height:1.2">
-                      ${p.nilai_klinik ? `<span>Klinik: <strong>${p.nilai_klinik}</strong></span>` : ""}
-                      ${p.nilai_akademik ? `<span>Akademik: <strong>${p.nilai_akademik}</strong></span>` : ""}
-                      <span style="margin-top:2px; padding-top:2px; border-top:1px solid #e2e8f0; font-weight:700; color:var(--primary)">${p.nilai || "-"}</span>
+                      ${p.nilai_klinik !== null && p.nilai_klinik !== undefined ? `<span>Klinik: <strong>${p.nilai_klinik}</strong></span>` : ""}
+                      ${p.nilai_akademik !== null && p.nilai_akademik !== undefined ? `<span>Akademik: <strong>${p.nilai_akademik}</strong></span>` : ""}
+                      <span style="margin-top:2px; padding-top:2px; border-top:1px solid #e2e8f0; font-weight:700; color:var(--primary)">${p.nilai !== null && p.nilai !== undefined ? p.nilai : "-"}</span>
                     </div>
                   </td>
               </tr>
@@ -4848,6 +4851,8 @@ async function antrianLogbookAdminView(area) {
               <option value="Menunggu Validasi">Menunggu Validasi</option>
               <option value="Disetujui">Disetujui</option>
               <option value="Ditolak">Ditolak</option>
+              <option value="Disetujui (Klinik)">Disetujui (Klinik)</option>
+              <option value="Disetujui (Akademik)">Disetujui (Akademik)</option>
             </select>
             <div class="input-with-icon" style="width:160px;">
               <i class="fa-solid fa-calendar-day"></i>
@@ -4970,9 +4975,9 @@ async function antrianLogbookAdminView(area) {
           <td>${statusHtml}</td>
           <td><small><strong>${escapeHTML(l.nama_preseptor_klinik || "-")}</strong></small></td>
           <td><small><strong>${escapeHTML(l.nama_preseptor_akademik || "-")}</strong></small></td>
-          <td class="text-center">${l.nilai_klinik || "-"}</td>
-          <td class="text-center">${l.nilai_akademik || "-"}</td>
-          <td class="text-center font-bold text-primary">${l.nilai || "-"}</td>
+          <td class="text-center">${l.nilai_klinik !== null && l.nilai_klinik !== undefined ? l.nilai_klinik : "-"}</td>
+          <td class="text-center">${l.nilai_akademik !== null && l.nilai_akademik !== undefined ? l.nilai_akademik : "-"}</td>
+          <td class="text-center font-bold text-primary">${l.nilai !== null && l.nilai !== undefined ? l.nilai : "-"}</td>
         </tr>
         `;
       })
@@ -4996,8 +5001,10 @@ async function antrianLogbookAdminView(area) {
       results = results.filter(
         (l) =>
           (l.nama_mahasiswa || "").toLowerCase().includes(q) ||
+          (l.nim_mahasiswa || "").toLowerCase().includes(q) ||
           (l.kompetensi || "").toLowerCase().includes(q) ||
-          (l.nama_preseptor || "").toLowerCase().includes(q),
+          (l.nama_preseptor_klinik || "").toLowerCase().includes(q) ||
+          (l.nama_preseptor_akademik || "").toLowerCase().includes(q),
       );
     }
     if (status) {
@@ -5047,7 +5054,7 @@ async function antrianLogbookAdminView(area) {
     window.dtLogbookAdmin = resLogbook.data;
     render(resLogbook.data);
   } else {
-    tableBody.innerHTML = `<tr><td colspan="6" class="empty-table">Gagal memuat atau belum ada data</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="11" class="empty-table">Gagal memuat atau belum ada data</td></tr>`;
   }
 }
 
