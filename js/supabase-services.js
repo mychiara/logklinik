@@ -28,7 +28,9 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "login": {
         const { data: user, error } = await supabaseClient
           .from("users")
-          .select("*")
+          .select(
+            "id, username, password, nama, role, prodi, tempat_id, angkatan, kelompok_id",
+          )
           .eq("username", payload.username)
           .single();
 
@@ -58,28 +60,28 @@ window.supabaseFetchAPI = async (action, payload) => {
           const [mhs, kel, preK, preA, tmp, komp, rated] = await Promise.all([
             supabaseClient
               .from("users")
-              .select("*", { count: "exact", head: true })
+              .select("id", { count: "exact", head: true })
               .eq("role", "mahasiswa"),
             supabaseClient
               .from("kelompok")
-              .select("*", { count: "exact", head: true }),
+              .select("id", { count: "exact", head: true }),
             supabaseClient
               .from("users")
-              .select("*", { count: "exact", head: true })
+              .select("id", { count: "exact", head: true })
               .eq("role", "preseptor"),
             supabaseClient
               .from("users")
-              .select("*", { count: "exact", head: true })
+              .select("id", { count: "exact", head: true })
               .eq("role", "preseptor_akademik"),
             supabaseClient
               .from("tempat_praktik")
-              .select("*", { count: "exact", head: true }),
+              .select("id", { count: "exact", head: true }),
             supabaseClient
               .from("kompetensi")
-              .select("*", { count: "exact", head: true }),
+              .select("id", { count: "exact", head: true }),
             supabaseClient
               .from("penilaian_akhir")
-              .select("*", { count: "exact", head: true }),
+              .select("id", { count: "exact", head: true }),
           ]);
 
           return {
@@ -105,15 +107,15 @@ window.supabaseFetchAPI = async (action, payload) => {
           const [logs, pres, sched] = await Promise.all([
             supabaseClient
               .from("logbook")
-              .select("*", { count: "exact", head: true })
+              .select("id", { count: "exact", head: true })
               .eq("user_id", payload.user_id),
             supabaseClient
               .from("presensi")
-              .select("*", { count: "exact", head: true })
+              .select("id", { count: "exact", head: true })
               .eq("user_id", payload.user_id),
             supabaseClient
               .from("jadwal")
-              .select("*", { count: "exact", head: true })
+              .select("id", { count: "exact", head: true })
               .eq("user_id", payload.user_id)
               .lte("tanggal", today),
           ]);
@@ -124,7 +126,7 @@ window.supabaseFetchAPI = async (action, payload) => {
 
           const { data: presToday } = await supabaseClient
             .from("presensi")
-            .select("*")
+            .select("id")
             .eq("user_id", payload.user_id)
             .eq("tanggal", today)
             .limit(1);
@@ -197,7 +199,9 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getAllPresensi": {
         let query = supabaseClient
           .from("presensi")
-          .select("*, users(nama, prodi, username)")
+          .select(
+            "id, user_id, tanggal, jam_masuk, jam_keluar, durasi, lahan, users(nama, prodi, username)",
+          )
           .order("tanggal", { ascending: false });
 
         if (payload.user_ids) {
@@ -225,7 +229,9 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         let query = supabaseClient
           .from("presensi")
-          .select("*, users(nama, nim:username)")
+          .select(
+            "id, user_id, tanggal, jam_masuk, jam_keluar, durasi, lahan, users(nama, nim:username)",
+          )
           .eq("tanggal", today);
 
         if (tIds.length > 0) {
@@ -246,7 +252,9 @@ window.supabaseFetchAPI = async (action, payload) => {
         const yesterday = new Date(Date.now() - 86400000).toISOString();
         let query = supabaseClient
           .from("logbook")
-          .select("*, users!logbook_user_id_fkey(nama)")
+          .select(
+            "id, user_id, tanggal, kompetensi, users!logbook_user_id_fkey(nama)",
+          )
           .eq("status", "Menunggu Validasi")
           .lt("created_at", yesterday);
 
@@ -385,11 +393,11 @@ window.supabaseFetchAPI = async (action, payload) => {
             .eq("role", "mahasiswa"),
           supabaseClient
             .from("logbook")
-            .select("*", { count: "exact", head: true })
+            .select("id", { count: "exact", head: true })
             .eq("status", "Disetujui"),
           supabaseClient
             .from("presensi")
-            .select("*", { count: "exact", head: true })
+            .select("id", { count: "exact", head: true })
             .eq("tanggal", today),
           supabaseClient.from("penilaian_akhir").select("total, users(prodi)"),
           supabaseClient.from("prodi").select("nama_prodi"),
@@ -667,6 +675,7 @@ window.supabaseFetchAPI = async (action, payload) => {
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
         if (payload.tanggal) query = query.eq("tanggal", payload.tanggal);
         const { data, error } = await query
+          .select("id, user_id, tanggal, jam_masuk, jam_keluar, durasi, lahan")
           .order("tanggal", { ascending: false })
           .range(0, 49999);
         if (error) throw error;
@@ -682,7 +691,9 @@ window.supabaseFetchAPI = async (action, payload) => {
         while (!finished) {
           const { data, error } = await supabaseClient
             .from("logbook")
-            .select("*")
+            .select(
+              "id, user_id, tanggal, lahan, kompetensi, preseptor_klinik_id, preseptor_akademik_id",
+            )
             .order("tanggal", { ascending: false })
             .range(from, from + step - 1);
 
@@ -736,7 +747,9 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getLogbook": {
         let query = supabaseClient
           .from("logbook")
-          .select("*, nilai_klinik, nilai_akademik");
+          .select(
+            "id, user_id, tanggal, lahan, kompetensi, preseptor_klinik_id, preseptor_akademik_id, status, nilai_klinik, nilai_akademik, feedback",
+          );
         if (payload.user_id) query = query.eq("user_id", payload.user_id);
         const { data, error } = await query
           .order("tanggal", { ascending: false })
@@ -1172,7 +1185,12 @@ window.supabasePostAPI = async (action, payload) => {
       }
 
       case "validasiLog": {
-        const { log_id, status, nilai, feedback, preseptor_id } = payload;
+        let { log_id, status, nilai, feedback, preseptor_id } = payload;
+
+        // Clamp nilai to 0-100 for safety
+        if (nilai !== undefined && nilai !== null) {
+          nilai = Math.min(100, Math.max(0, parseFloat(nilai) || 0));
+        }
 
         // Fetch Settings & Current Log Status & Values
         const [{ data: sMode }, { data: currLog }, { data: pUser }] =
@@ -1267,7 +1285,12 @@ window.supabasePostAPI = async (action, payload) => {
       }
 
       case "validasiLogBulk": {
-        const { ids, status, nilai, feedback, preseptor_id } = payload;
+        let { ids, status, nilai, feedback, preseptor_id } = payload;
+
+        // Clamp nilai to 0-100 for safety
+        if (nilai !== undefined && nilai !== null) {
+          nilai = Math.min(100, Math.max(0, parseFloat(nilai) || 0));
+        }
 
         // Fetch Settings & Current User Role
         const [{ data: sMode }, { data: pUser }, { data: currentLogs }] =
@@ -1317,9 +1340,9 @@ window.supabasePostAPI = async (action, payload) => {
             let na = l.nilai_akademik;
 
             if (pRole === "preseptor_akademik") {
-              na = nilai || 100;
+              na = Math.min(100, Math.max(0, parseFloat(nilai || 100)));
             } else {
-              nk = nilai || 100;
+              nk = Math.min(100, Math.max(0, parseFloat(nilai || 100)));
             }
 
             if (l.status === "Menunggu Validasi") {
