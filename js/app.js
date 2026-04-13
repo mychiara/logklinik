@@ -2183,10 +2183,17 @@ async function logbookTervalidasiView(area) {
   area.innerHTML = `
           <div class="animate-fade-up">
               <div class="card">
-                  <div class="card-header d-flex justify-between align-center">
-                      <h3><i class="fa-solid fa-calendar-check text-success"></i> Logbook Tervalidasi</h3>
-                      <div class="d-flex gap-2">
-                          <button class="btn btn-outline btn-sm" onclick="exportValidatedLogbookCSV()"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+                  <div class="card-header d-flex justify-between align-center wrap gap-3">
+                      <h3 class="m-0"><i class="fa-solid fa-calendar-check text-success"></i> Logbook Tervalidasi</h3>
+                      <div class="d-flex gap-2 wrap align-center">
+                          <div class="d-flex align-center gap-1">
+                              <input type="date" id="filter-log-start" class="form-control form-control-sm" style="width:135px;" title="Mulai Tanggal">
+                              <span class="text-muted">s/d</span>
+                              <input type="date" id="filter-log-end" class="form-control form-control-sm" style="width:135px;" title="Sampai Tanggal">
+                          </div>
+                          <button class="btn btn-primary btn-sm" onclick="applyValidatedLogFilter()"><i class="fa-solid fa-filter"></i></button>
+                          <button class="btn btn-outline btn-sm" onclick="logbookTervalidasiView(document.getElementById('content-area'))" title="Reset"><i class="fa-solid fa-rotate-left"></i></button>
+                          <button class="btn btn-outline btn-sm" onclick="exportValidatedLogbookCSV()"><i class="fa-solid fa-file-csv"></i> Export</button>
                       </div>
                   </div>
                   <div class="card-body">
@@ -2216,11 +2223,25 @@ async function logbookTervalidasiView(area) {
     tempat_id: currentUser.tempat_id,
     user_id: currentUser.id,
   });
+
+  if (res.success) {
+    window.CURRENT_VALIDATED_LOGS_FULL = res.data;
+    window.CURRENT_VALIDATED_LOGS = res.data;
+    renderValidatedLogTable();
+  } else {
+    const tableBody = document.querySelector("#table-validated tbody");
+    if (tableBody)
+      tableBody.innerHTML = `<tr><td colspan="8" class="empty-table text-danger">Gagal memuat data dari server.</td></tr>`;
+  }
+}
+
+window.renderValidatedLogTable = () => {
   const tableBody = document.querySelector("#table-validated tbody");
   if (!tableBody) return;
-  if (res.success && res.data.length > 0) {
-    window.CURRENT_VALIDATED_LOGS = res.data;
-    tableBody.innerHTML = res.data
+  const data = window.CURRENT_VALIDATED_LOGS || [];
+
+  if (data.length > 0) {
+    tableBody.innerHTML = data
       .map((p, idx) => {
         let statusBadge = "";
         if (p.status === "Disetujui") {
@@ -2261,9 +2282,26 @@ async function logbookTervalidasiView(area) {
       })
       .join("");
   } else {
-    tableBody.innerHTML = `<tr><td colspan="8" class="empty-table"><i class="fa-solid fa-info-circle fa-2x mb-2" style="color:var(--primary);display:block"></i>Belum ada logbook yang divalidasi.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" class="empty-table"><i class="fa-solid fa-filter-circle-xmark fa-2x mb-2" style="color:#cbd5e1;display:block"></i>Tidak ada data yang sesuai dengan filter tanggal.</td></tr>`;
   }
-}
+};
+
+window.applyValidatedLogFilter = () => {
+  const start = document.getElementById("filter-log-start").value;
+  const end = document.getElementById("filter-log-end").value;
+
+  let filtered = window.CURRENT_VALIDATED_LOGS_FULL || [];
+
+  if (start) {
+    filtered = filtered.filter((l) => l.tanggal >= start);
+  }
+  if (end) {
+    filtered = filtered.filter((l) => l.tanggal <= end);
+  }
+
+  window.CURRENT_VALIDATED_LOGS = filtered;
+  renderValidatedLogTable();
+};
 
 window.lihatDetailValidasi = (id) => {
   const log = window.CURRENT_VALIDATED_LOGS.find((l) => l.id == id);
