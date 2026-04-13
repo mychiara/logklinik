@@ -1907,10 +1907,10 @@ async function logbookView(area) {
         return `
               <tr>
                   <td><strong>${formatDateIndo(p.tanggal)}</strong></td>
-                  <td><span style="color:var(--primary-dark); font-weight:500;">${p.kompetensi}</span></td>
-                  <td>${p.lahan}</td>
-                  <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${p.level}</span></td>
-                  <td><span class="badge ${statusBadge}"><i class="fa-solid ${statusIcon}"></i> ${p.status}</span></td>
+                  <td><span style="color:var(--primary-dark); font-weight:500;">${escapeHTML(p.kompetensi)}</span></td>
+                  <td>${escapeHTML(p.lahan)}</td>
+                  <td><span class="badge" style="background:#f1f5f9;color:var(--text-strong)">${escapeHTML(p.level)}</span></td>
+                  <td><span class="badge ${statusBadge}"><i class="fa-solid ${statusIcon}"></i> ${escapeHTML(p.status)}</span></td>
                   <td>
                     <div class="d-flex flex-column" style="font-size:0.85rem">
                       <strong>${escapeHTML(p.nama_preseptor || "-")}</strong>
@@ -2220,16 +2220,16 @@ async function validasiView(area) {
                               ${p.nama_mahasiswa.charAt(0)}
                           </div>
                           <div>
-                              <strong>${p.nama_mahasiswa}</strong>
+                              <strong>${escapeHTML(p.nama_mahasiswa)}</strong>
                               ${isUrgent ? ' <span class="badge bg-danger" style="font-size:0.6rem">MENDESAK</span>' : ""}
                           </div>
                       </div>
                   </td>
                   <td>${p.tanggal}</td>
-                  <td><span style="color:var(--primary-dark); font-weight:500;">${p.kompetensi}</span></td>
-                  <td><span class="badge bg-info-soft text-info">${p.kategori || "-"}</span></td>
-                  <td><span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-hospital"></i> ${p.nama_lahan || p.lahan}</span></td>
-                  <td><span class="badge bg-primary">${p.level}</span></td>
+                  <td><span style="color:var(--primary-dark); font-weight:500;">${escapeHTML(p.kompetensi)}</span></td>
+                  <td><span class="badge bg-info-soft text-info">${escapeHTML(p.kategori || "-")}</span></td>
+                  <td><span class="badge bg-primary-soft text-primary"><i class="fa-solid fa-hospital"></i> ${escapeHTML(p.nama_lahan || p.lahan)}</span></td>
+                  <td><span class="badge bg-primary">${escapeHTML(p.level)}</span></td>
                   <td style="text-align:right">
                       <button class="btn btn-outline btn-sm" onclick="bukaModalValidasi('${p.id}', '${p.nama_mahasiswa}', '${p.deskripsi.replace(/'/g, "\\'")}')">
                           Nilai & Cek
@@ -2329,13 +2329,13 @@ window.bukaModalValidasi = (id, nama, deskripsi) => {
           <div class="animate-fade-in">
               <div class="alert bg-primary rounded p-3 mb-3 border" style="border-radius:12px; background:var(--primary-light);">
                   <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.2rem">Pengirim Logbook</div>
-                  <strong>${nama}</strong>
+                  <strong>${escapeHTML(nama)}</strong>
               </div>
               
               <div class="form-group">
                   <label>Deskripsi/Refleksi Kasus Oleh Mahasiswa</label>
                   <div style="padding: 1rem; background: var(--bg-main); border-radius: 8px; border: 1px dashed #cbd5e1; font-size: 0.95rem;">
-                      ${deskripsi}
+                      ${escapeHTML(deskripsi)}
                   </div>
               </div>
 
@@ -10180,6 +10180,7 @@ window.exportRekapPresensiPreCSV = () => {
     "Masuk",
     "Keluar",
     "Durasi (Jam)",
+    "Status",
     "Lahan",
   ];
   const rows = window.dtPresensiPreFiltered.map((p) => [
