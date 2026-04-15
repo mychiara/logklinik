@@ -35,7 +35,6 @@ self.addEventListener("fetch", (e) => {
     url.hostname.includes("supabase.co") ||
     url.hostname.includes("google.com")
   ) {
-    e.respondWith(fetch(e.request));
     return;
   }
 

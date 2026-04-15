@@ -901,7 +901,10 @@ window.supabaseFetchAPI = async (action, payload) => {
           supabaseClient
             .from("users")
             .select("role")
-            .eq("id", user_id || currentUser.id)
+            .eq(
+              "id",
+              user_id || (window.currentUser ? window.currentUser.id : null),
+            )
             .single(),
         ]);
 
@@ -1000,7 +1003,10 @@ window.supabaseFetchAPI = async (action, payload) => {
           supabaseClient
             .from("users")
             .select("role")
-            .eq("id", user_id || currentUser.id)
+            .eq(
+              "id",
+              user_id || (window.currentUser ? window.currentUser.id : null),
+            )
             .single(),
         ]);
 
@@ -2027,11 +2033,13 @@ window.supabasePostAPI = async (action, payload) => {
         const student_id = payload_sid || (results && results[0]?.student_id);
 
         // Verify if preceptor has permission to grade this student (assigned in jadwal)
-        const { data: pUser } = await supabaseClient
-          .from("users")
-          .select("tempat_id")
-          .eq("id", p_id)
-          .single();
+        const { data: pUser } = p_id
+          ? await supabaseClient
+              .from("users")
+              .select("tempat_id")
+              .eq("id", p_id)
+              .single()
+          : { data: null };
 
         if (pUser && pUser.tempat_id && pUser.tempat_id !== "-") {
           const tIds = pUser.tempat_id.split(",");
@@ -2053,17 +2061,17 @@ window.supabasePostAPI = async (action, payload) => {
 
         if (!student_id) throw new Error("ID Mahasiswa tidak ditemukan.");
 
-        // 1. Ambil data existing penilaian komponen untuk student ini agar di-update, bukan duplikat
+        // 1. Ambil data existing untuk mendapatkan ID (karena tidak ada unique constraint di DB)
         const { data: existingG } = await supabaseClient
           .from("penilaian_komponen")
-          .select("*")
+          .select("id, type, component_id")
           .eq("student_id", student_id)
           .eq("role_pemberi", grader_role);
 
-        // 2. Map payload, sertakan ID jika sudah ada
-        const upsertRows = results.map((r) => {
+        // 2. Map payload, tentukan mana yang update dan mana yang insert
+        const rows = results.map((r) => {
           const matched = (existingG || []).find(
-            (ex) => ex.component_id === r.component_id && ex.type === r.type,
+            (ex) => ex.component_id == r.component_id && ex.type === r.type,
           );
           return {
             id: matched ? matched.id : undefined,
@@ -2071,13 +2079,32 @@ window.supabasePostAPI = async (action, payload) => {
             preseptor_id,
             role_pemberi: grader_role,
             type: r.type,
-            component_id: r.component_id,
-            nilai: r.nilai,
+            component_id: isNaN(r.component_id)
+              ? r.component_id
+              : parseInt(r.component_id),
+            nilai: parseFloat(r.nilai) || 0,
           };
         });
 
-        // Simpan komponen penilaian (Update jika sudah ada ID)
-        await supabaseClient.from("penilaian_komponen").upsert(upsertRows);
+        const toUpdate = rows.filter((r) => r.id);
+        const toInsert = rows
+          .filter((r) => !r.id)
+          .map(({ id, ...rest }) => rest);
+
+        // 3. Eksekusi secara terpisah untuk menghindari error mixed columns di PostgREST
+        if (toUpdate.length > 0) {
+          const { error: errU } = await supabaseClient
+            .from("penilaian_komponen")
+            .upsert(toUpdate);
+          if (errU) throw errU;
+        }
+
+        if (toInsert.length > 0) {
+          const { error: errI } = await supabaseClient
+            .from("penilaian_komponen")
+            .insert(toInsert);
+          if (errI) throw errI;
+        }
 
         // Ambil SEMUA grades dari student tsb untuk hitung summary
         const { data: allG } = await supabaseClient

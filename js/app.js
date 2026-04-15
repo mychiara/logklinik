@@ -3329,6 +3329,7 @@ window.prosesSimpanNilai = async (mhsId) => {
       results,
       grader_role: currentUser.role,
       student_id: mhsId,
+      p_id: currentUser.id,
     });
     showLoader(false);
     if (res.success) {
