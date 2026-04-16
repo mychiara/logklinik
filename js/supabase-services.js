@@ -2149,6 +2149,7 @@ window.supabasePostAPI = async (action, payload) => {
         // Hitung Nilai Rata-rata Logbook
         let avgLogbook = 0;
         if (logs.length > 0) {
+          const targetMin = parseFloat(sets.target_logbook_minimal || 20);
           const totalVal = logs.reduce((acc, curr) => {
             const nk = parseFloat(curr.nilai_klinik);
             const na = parseFloat(curr.nilai_akademik);
@@ -2162,7 +2163,11 @@ window.supabasePostAPI = async (action, payload) => {
 
             return acc + v;
           }, 0);
-          avgLogbook = totalVal / logs.length;
+
+          const qualityAvg = totalVal / logs.length;
+          const quantityScore = Math.min(100, (logs.length / targetMin) * 100);
+          // Rumus Bonus Frekuensi: 80% Kualitas + 20% Kuantitas
+          avgLogbook = 0.8 * qualityAvg + 0.2 * quantityScore;
         }
 
         // Ambil data summary lama
@@ -2261,11 +2266,11 @@ window.supabasePostAPI = async (action, payload) => {
         const wAskep = sets.w_askep || 40;
         const wSikap = sets.w_sikap || 20;
         const wLogbook = sets.w_logbook || 0;
-        const wForms = 0 - wLogbook; // 100 - wLogbook (but be careful with subtraction logic)
         const realWForms = 100 - wLogbook;
         const wKlinik = sets.w_klinik || 50;
         const wAkademik = sets.w_akademik || 50;
         const threshold = sets.batas_lulus || 75;
+        const targetMinGlobal = parseFloat(sets.target_logbook_minimal || 20);
 
         // 3. Loop per Mahasiswa
         const summaries = [];
@@ -2278,7 +2283,7 @@ window.supabasePostAPI = async (action, payload) => {
             (l) => l.user_id === sid,
           );
 
-          // Hitung Avg Logbook
+          // Hitung Avg Logbook (80% Kualitas + 20% Kuantitas)
           let avgLog = 0;
           if (myLogs.length > 0) {
             const totalVal = myLogs.reduce((acc, curr) => {
@@ -2292,7 +2297,12 @@ window.supabasePostAPI = async (action, payload) => {
               else if (!isNaN(nb)) v = nb;
               return acc + v;
             }, 0);
-            avgLog = totalVal / myLogs.length;
+            const qualityAvg = totalVal / myLogs.length;
+            const quantityScore = Math.min(
+              100,
+              (myLogs.length / targetMinGlobal) * 100,
+            );
+            avgLog = 0.8 * qualityAvg + 0.2 * quantityScore;
           }
 
           const row = {
