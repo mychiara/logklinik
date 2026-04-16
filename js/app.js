@@ -3402,41 +3402,34 @@ window.bukaModalInputNilai = async (mhsId, mhsNama) => {
     return `
               <div class="assessment-group mb-4">
                   <h4 class="mb-3 text-primary" style="font-weight:700; border-left:4px solid var(--primary); padding-left:10px; font-size:1rem">${title}</h4>
-                  <div class="table-responsive" style="border-radius:12px; border:1px solid #e2e8f0; overflow:hidden;">
-                      <table class="table" style="font-size:0.85rem; margin-bottom:0">
-                          <thead style="background:#f8fafc">
-                              <tr>
-                                  <th style="border-bottom:none">Komponen / Aspek Penilaian</th>
-                                  <th width="80" class="text-center" style="border-bottom:none">Maks</th>
-                                  <th width="100" class="text-center" style="border-bottom:none">Nilai</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              ${master.data
-                                .map((m) => {
-                                  const maxVal = parseFloat(
-                                    type === "askep"
-                                      ? m.skor_maks || 100
-                                      : m.nilai_maksimal || 100,
-                                  );
-                                  return `
-                                  <tr>
-                                      <td style="vertical-align:middle; line-height:1.4">${m.nama_komponen}</td>
-                                      <td class="text-center" style="vertical-align:middle"><strong>${maxVal}</strong></td>
-                                      <td style="vertical-align:middle">
-                                          <input type="number" step="0.1" class="form-control input-score input-score-iter-${iter}" 
-                                              data-type="${type}" data-comp="${m.id}" data-max="${maxVal}"
-                                              value="${findVal(type, m.id, iter)}" 
-                                              oninput="validateInputScore(this)"
-                                              placeholder="0" style="text-align:center; font-weight:700; padding:0.4rem;">
-                                          <div class="invalid-feedback text-danger" style="font-size:0.65rem; display:none; margin-top:4px; text-align:center">Melebihi ${maxVal}!</div>
-                                      </td>
-                                  </tr>
-                              `;
-                                })
-                                .join("")}
-                          </tbody>
-                      </table>
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                      ${master.data
+                        .map((m) => {
+                          const maxVal = parseFloat(
+                            type === "askep"
+                              ? m.skor_maks || 100
+                              : m.nilai_maksimal || 100,
+                          );
+                          return `
+                          <div style="border:1px solid #e2e8f0; border-radius:12px; padding:12px; background:#fafbfc;">
+                              <div style="display:flex; align-items:center; gap:10px;">
+                                  <div style="flex:1; min-width:0;">
+                                      <div style="font-size:0.82rem; font-weight:500; line-height:1.4; color:#334155; word-wrap:break-word;">${m.nama_komponen}</div>
+                                      <div style="font-size:0.7rem; color:#94a3b8; margin-top:2px;">Maks: <strong>${maxVal}</strong></div>
+                                  </div>
+                                  <div style="flex-shrink:0; width:70px;">
+                                      <input type="number" step="0.1" class="form-control input-score input-score-iter-${iter}" 
+                                          data-type="${type}" data-comp="${m.id}" data-max="${maxVal}"
+                                          value="${findVal(type, m.id, iter)}" 
+                                          oninput="validateInputScore(this)"
+                                          placeholder="0" style="text-align:center; font-weight:700; padding:6px 4px; font-size:0.95rem; border-radius:10px; border:2px solid #e2e8f0;">
+                                      <div class="invalid-feedback text-danger" style="font-size:0.6rem; display:none; margin-top:2px; text-align:center">Maks ${maxVal}!</div>
+                                  </div>
+                              </div>
+                          </div>
+                      `;
+                        })
+                        .join("")}
                   </div>
               </div>
           `;
@@ -7507,9 +7500,7 @@ window.hapusSemuaUsers = async (role, title) => {
 
 window.deleteUser = async (id, roleFilter) => {
   if (
-    confirm(
-      "PERINGATAN  \\n\\nAnda yakin ingin menghapus akun ini permanen?",
-    )
+    confirm("PERINGATAN  \\n\\nAnda yakin ingin menghapus akun ini permanen?")
   ) {
     const res = await postAPI("deleteUser", { id });
     if (res.success) {
