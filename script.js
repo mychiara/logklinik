@@ -866,10 +866,10 @@ async function presensiView(area) {
         async (decodedText) => {
           html5QrcodeScanner.stop();
           document.getElementById("scanner-container").classList.add("hidden");
-          document
-            .getElementById("beep-sound")
-            .play()
-            .catch((e) => console.log(e));
+          const beep = document.getElementById("beep-sound");
+          if (beep) {
+            beep.play().catch((e) => console.log(e));
+          }
 
           showLoader(true);
           const actionTarget = type === "in" ? "checkIn" : "checkOut";
