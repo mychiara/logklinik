@@ -1,4 +1,4 @@
-// Helper: get local date string in YYYY-MM-DD format (timezone-safe)
+﻿// Helper: get local date string in YYYY-MM-DD format (timezone-safe)
 const getLocalTodayService = () => {
   const now = new Date();
   const y = now.getFullYear();
@@ -599,7 +599,7 @@ window.supabaseFetchAPI = async (action, payload) => {
       case "getPenilaianAkhir": {
         let query = supabaseClient
           .from("penilaian_akhir")
-          .select("*, users(nama, prodi, angkatan)");
+          .select("*, users(nama, username, prodi, angkatan)");
 
         if (payload.ids && Array.isArray(payload.ids)) {
           query = query.in("id", payload.ids);
@@ -617,22 +617,37 @@ window.supabaseFetchAPI = async (action, payload) => {
         const sets = {};
         (sRes.data || []).forEach((x) => (sets[x.key] = parseFloat(x.value)));
 
+        // Fetch iteration details if requested
+        let details = [];
+        if (payload.withDetails && qRes.data && qRes.data.length > 0) {
+          const sIds = qRes.data.map((p) => p.id);
+          const { data: dRes } = await supabaseClient
+            .from("penilaian_komponen")
+            .select("*")
+            .in("student_id", sIds);
+          details = dRes || [];
+        }
+
         return {
           success: true,
           threshold: sets.batas_lulus || 75,
+          limit_input: sets.limit_input_penilaian || 1,
           weights: {
             prak: sets.w_prak || 40,
             askep: sets.w_askep || 40,
             sikap: sets.w_sikap || 20,
+            logbook: sets.w_logbook || 0,
             klinik: sets.w_klinik || 50,
             akademik: sets.w_akademik || 50,
           },
           data: (qRes.data || []).map((p) => ({
             ...p,
-            nama: p.users.nama,
-            prodi: p.users.prodi,
-            angkatan: p.users.angkatan,
+            nama: p.users?.nama || "-",
+            username: p.users?.username || "-",
+            prodi: p.users?.prodi || "-",
+            angkatan: p.users?.angkatan || "-",
           })),
+          details: details,
         };
       }
 
@@ -1831,7 +1846,7 @@ window.supabasePostAPI = async (action, payload) => {
 
         return {
           success: true,
-          message: `Berhasil menukar ${userA.nama} ↔ ${userB.nama} (${totalSwapped} jadwal ditukar)`,
+          message: `Berhasil menukar ${userA.nama} â†” ${userB.nama} (${totalSwapped} jadwal ditukar)`,
         };
       }
 
@@ -2029,8 +2044,11 @@ window.supabasePostAPI = async (action, payload) => {
           p_id,
           grader_role,
           results,
+          iteration = 1,
         } = payload;
         const student_id = payload_sid || (results && results[0]?.student_id);
+
+        if (!student_id) throw new Error("ID Mahasiswa tidak ditemukan.");
 
         // Verify if preceptor has permission to grade this student (assigned in jadwal)
         const { data: pUser } = p_id
@@ -2059,14 +2077,13 @@ window.supabasePostAPI = async (action, payload) => {
         const preseptor_id =
           p_id || (results && results[0]?.preseptor_id) || "System";
 
-        if (!student_id) throw new Error("ID Mahasiswa tidak ditemukan.");
-
-        // 1. Ambil data existing untuk mendapatkan ID (karena tidak ada unique constraint di DB)
+        // 1. Ambil data existing untuk iterasi ini
         const { data: existingG } = await supabaseClient
           .from("penilaian_komponen")
           .select("id, type, component_id")
           .eq("student_id", student_id)
-          .eq("role_pemberi", grader_role);
+          .eq("role_pemberi", grader_role)
+          .eq("periode_ke", iteration);
 
         // 2. Map payload, tentukan mana yang update dan mana yang insert
         const rows = results.map((r) => {
@@ -2079,6 +2096,7 @@ window.supabasePostAPI = async (action, payload) => {
             preseptor_id,
             role_pemberi: grader_role,
             type: r.type,
+            periode_ke: iteration,
             component_id: isNaN(r.component_id)
               ? r.component_id
               : parseInt(r.component_id),
@@ -2091,7 +2109,7 @@ window.supabasePostAPI = async (action, payload) => {
           .filter((r) => !r.id)
           .map(({ id, ...rest }) => rest);
 
-        // 3. Eksekusi secara terpisah untuk menghindari error mixed columns di PostgREST
+        // 3. Eksekusi
         if (toUpdate.length > 0) {
           const { error: errU } = await supabaseClient
             .from("penilaian_komponen")
@@ -2106,17 +2124,44 @@ window.supabasePostAPI = async (action, payload) => {
           if (errI) throw errI;
         }
 
-        // Ambil SEMUA grades dari student tsb untuk hitung summary
-        const { data: allG } = await supabaseClient
-          .from("penilaian_komponen")
-          .select("*")
-          .eq("student_id", student_id);
+        // 4. Rekalkulasi Summary
+        const [resAllG, resSets, resLogs] = await Promise.all([
+          supabaseClient
+            .from("penilaian_komponen")
+            .select("*")
+            .eq("student_id", student_id),
+          supabaseClient.from("settings").select("*"),
+          supabaseClient
+            .from("logbook")
+            .select("nilai_klinik, nilai_akademik")
+            .eq("user_id", student_id)
+            .eq("status", "Disetujui"),
+        ]);
 
-        const { data: s } = await supabaseClient.from("settings").select("*");
         const sets = {};
-        (s || []).forEach((x) => (sets[x.key] = parseFloat(x.value)));
+        (resSets.data || []).forEach(
+          (x) => (sets[x.key] = parseFloat(x.value)),
+        );
 
-        // Ambil data summary lama agar tidak overwrite kolom yang tidak diubah
+        const allG = resAllG.data || [];
+        const logs = resLogs.data || [];
+
+        // Hitung Nilai Rata-rata Logbook
+        let avgLogbook = 0;
+        if (logs.length > 0) {
+          const totalVal = logs.reduce((acc, curr) => {
+            const v =
+              curr.nilai_klinik !== null && curr.nilai_akademik !== null
+                ? (parseFloat(curr.nilai_klinik) +
+                    parseFloat(curr.nilai_akademik)) /
+                  2
+                : parseFloat(curr.nilai_klinik || curr.nilai_akademik || 0);
+            return acc + v;
+          }, 0);
+          avgLogbook = totalVal / logs.length;
+        }
+
+        // Ambil data summary lama
         const { data: qSummary } = await supabaseClient
           .from("penilaian_akhir")
           .select("*")
@@ -2127,21 +2172,35 @@ window.supabasePostAPI = async (action, payload) => {
         const summary = { ...(oldSummary || {}), id: student_id };
         let final = 0;
 
+        const limitInput = parseInt(sets.limit_input_penilaian || 1);
+        const wLogbook = parseFloat(sets.w_logbook || 0);
+        const wForms = 100 - wLogbook;
+
         ["preseptor", "preseptor_akademik"].forEach((role) => {
           let roleScore = 0;
           ["praktikum", "askep", "sikap"].forEach((type) => {
-            const g = (allG || []).filter(
+            const items = allG.filter(
               (x) => x.role_pemberi === role && x.type === type,
             );
-            if (g.length) {
-              const avg =
-                g.reduce((a, b) => a + parseFloat(b.nilai), 0) / g.length;
+            if (items.length > 0) {
+              // Rata-rata dari semua periode yang diisi (1..N)
+              const periods = [...new Set(items.map((it) => it.periode_ke))];
+              let sumOfAvg = 0;
+              periods.forEach((p) => {
+                const pItems = items.filter((it) => it.periode_ke === p);
+                sumOfAvg +=
+                  pItems.reduce((a, b) => a + parseFloat(b.nilai), 0) /
+                  pItems.length;
+              });
+              const avg = sumOfAvg / periods.length;
+
               const weight =
                 type === "praktikum"
                   ? sets.w_prak || 40
                   : type === "askep"
                     ? sets.w_askep || 40
                     : sets.w_sikap || 20;
+
               roleScore += (avg * weight) / 100;
               summary[
                 `${role === "preseptor" ? "klinik" : "akademik"}_${type === "praktikum" ? "prak" : type}`
@@ -2156,7 +2215,13 @@ window.supabasePostAPI = async (action, payload) => {
           final += (roleScore * roleWeight) / 100;
         });
 
+        // Terapkan Bobot Logbook
+        if (wLogbook > 0) {
+          final = (final * wForms) / 100 + (avgLogbook * wLogbook) / 100;
+        }
+
         summary.total = final;
+        summary.logbook_avg = avgLogbook;
         summary.status = final >= (sets.batas_lulus || 75) ? "LULUS" : "REMIDI";
         summary.updated_at = new Date().toISOString();
 

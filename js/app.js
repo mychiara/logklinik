@@ -1,4 +1,4 @@
-// XSS Prevention Utility
+﻿// XSS Prevention Utility
 function escapeHTML(str) {
   if (!str) return "";
   const div = document.createElement("div");
@@ -2127,6 +2127,9 @@ async function nilaiMahasiswaView(area) {
     if (myData) {
       const statusClass =
         myData.total >= (res.threshold || 75) ? "text-success" : "text-danger";
+      const wLogbook = res.weights?.logbook || 0;
+      const wForms = 100 - wLogbook;
+
       container.innerHTML = `
                   <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; text-align:left;">
                       <div style="border: 1px solid #e0f2fe; border-radius: 12px; padding: 15px; background: #f0f9ff;">
@@ -2134,12 +2137,12 @@ async function nilaiMahasiswaView(area) {
                               <i class="fa-solid fa-user-doctor"></i> Preseptor Klinik
                               <span class="badge bg-primary float-right" style="font-size:0.7em">Bobot: ${wKlinik}%</span>
                           </h4>
-                          <div class="d-flex justify-between mb-1"><span>Bimb. Praktikum:</span> <strong>${myData.klinik_prak || 0}</strong></div>
-                          <div class="d-flex justify-between mb-1"><span>Bimb. ASKEP:</span> <strong>${myData.klinik_askep || 0}</strong></div>
-                          <div class="d-flex justify-between mb-2"><span>Sikap & Perilaku:</span> <strong>${myData.klinik_sikap || 0}</strong></div>
+                          <div class="d-flex justify-between mb-1"><span>Bimb. Praktikum:</span> <strong>${parseFloat(myData.klinik_prak || 0).toFixed(1)}</strong></div>
+                          <div class="d-flex justify-between mb-1"><span>Bimb. ASKEP:</span> <strong>${parseFloat(myData.klinik_askep || 0).toFixed(1)}</strong></div>
+                          <div class="d-flex justify-between mb-2"><span>Sikap & Perilaku:</span> <strong>${parseFloat(myData.klinik_sikap || 0).toFixed(1)}</strong></div>
                           <div class="d-flex justify-between" style="border-top:1px dashed #bae6fd; padding-top:8px;">
                               <span>Total Skor Klinik:</span> 
-                              <span style="font-size:1.1em; color:#0369a1; font-weight:bold">${myData.klinik_total || 0}</span>
+                              <span style="font-size:1.1em; color:#0369a1; font-weight:bold">${parseFloat(myData.klinik_total || 0).toFixed(1)}</span>
                           </div>
                       </div>
                       
@@ -2148,23 +2151,41 @@ async function nilaiMahasiswaView(area) {
                               <i class="fa-solid fa-chalkboard-teacher"></i> Preseptor Akademik
                               <span class="badge bg-warning float-right" style="font-size:0.7em">Bobot: ${wAkademik}%</span>
                           </h4>
-                          <div class="d-flex justify-between mb-1"><span>Bimb. Praktikum:</span> <strong>${myData.akademik_prak || 0}</strong></div>
-                          <div class="d-flex justify-between mb-1"><span>Bimb. ASKEP:</span> <strong>${myData.akademik_askep || 0}</strong></div>
-                          <div class="d-flex justify-between mb-2"><span>Sikap & Perilaku:</span> <strong>${myData.akademik_sikap || 0}</strong></div>
+                          <div class="d-flex justify-between mb-1"><span>Bimb. Praktikum:</span> <strong>${parseFloat(myData.akademik_prak || 0).toFixed(1)}</strong></div>
+                          <div class="d-flex justify-between mb-1"><span>Bimb. ASKEP:</span> <strong>${parseFloat(myData.akademik_askep || 0).toFixed(1)}</strong></div>
+                          <div class="d-flex justify-between mb-2"><span>Sikap & Perilaku:</span> <strong>${parseFloat(myData.akademik_sikap || 0).toFixed(1)}</strong></div>
                           <div class="d-flex justify-between" style="border-top:1px dashed #fde68a; padding-top:8px;">
                               <span>Total Skor Akademik:</span> 
-                              <span style="font-size:1.1em; color:#b45309; font-weight:bold">${myData.akademik_total || 0}</span>
+                              <span style="font-size:1.1em; color:#b45309; font-weight:bold">${parseFloat(myData.akademik_total || 0).toFixed(1)}</span>
                           </div>
                       </div>
                   </div>
 
-                  <div style="margin-top: 25px; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; text-align:center;">
-                      <h5 class="text-muted" style="margin-bottom: 5px; font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Nilai Akhir Sementara</h5>
-                      <div style="font-size: 3rem; font-weight: 800; line-height: 1.2;" class="${statusClass}">
+                  <div style="margin-top: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                      <div style="padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; text-align:center;">
+                          <h5 class="text-muted" style="margin-bottom: 5px; font-size:0.8rem; text-transform:uppercase;">Rata-rata Form (x${wForms}%)</h5>
+                          <div style="font-size: 1.5rem; font-weight: 700; color:var(--text-strong)">
+                              ${((parseFloat(myData.klinik_total || 0) * wKlinik) / 100 + (parseFloat(myData.akademik_total || 0) * wAkademik) / 100).toFixed(1)}
+                          </div>
+                      </div>
+                      <div style="padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; text-align:center;">
+                          <h5 class="text-muted" style="margin-bottom: 5px; font-size:0.8rem; text-transform:uppercase;">Nilai Logbook (x${wLogbook}%)</h5>
+                          <div style="font-size: 1.5rem; font-weight: 700; color:var(--primary)">
+                              ${parseFloat(myData.logbook_avg || 0).toFixed(1)}
+                          </div>
+                      </div>
+                  </div>
+
+                  <div style="margin-top: 25px; padding: 20px; background: var(--primary-light); border: 2px solid var(--primary); border-radius: 12px; text-align:center;">
+                      <h5 class="text-muted" style="margin-bottom: 5px; font-size:0.9rem; text-transform:uppercase; letter-spacing:1px; color:var(--primary) !important;">Nilai Akhir Final</h5>
+                      <div style="font-size: 3.5rem; font-weight: 800; line-height: 1.2;" class="${statusClass}">
                           ${myData.total ? parseFloat(myData.total).toFixed(1) : "0"}
                       </div>
-                      <div style="margin-top:10px; font-size: 0.9rem;">
-                          <i class="fa-solid fa-circle-info text-primary"></i> Batas Lulus: <strong>${res.threshold || 75}</strong>
+                      <div style="margin-top:10px; font-size: 0.9rem; font-weight:600">
+                          <i class="fa-solid fa-circle-check"></i> Status: <span class="${statusClass}">${myData.total >= (res.threshold || 75) ? "LULUS" : "REMIDI"}</span>
+                      </div>
+                      <div style="margin-top:5px; font-size: 0.8rem; color:var(--text-muted)">
+                          Batas Lulus: <strong>${res.threshold || 75}</strong>
                       </div>
                   </div>
               `;
@@ -3203,7 +3224,7 @@ window.exportLaporanPreseptorPDF = () => {
 
 window.bukaModalInputNilai = async (mhsId, mhsNama) => {
   showLoader(true);
-  const [m1, m2, m3, currentGrades] = await Promise.all([
+  const [m1, m2, m3, currentGrades, sets] = await Promise.all([
     fetchAPI("getBimbPraktikum"),
     fetchAPI("getBimbAskep"),
     fetchAPI("getSikapPerilaku"),
@@ -3211,16 +3232,23 @@ window.bukaModalInputNilai = async (mhsId, mhsNama) => {
       student_id: mhsId,
       grader_role: currentUser.role,
     }),
+    fetchAPI("getSettings"),
   ]);
   showLoader(false);
 
-  const findVal = (type, compId) => {
+  const limitInput = parseInt(
+    sets.data.find((s) => s.key === "limit_input_penilaian")?.value || 1,
+  );
+
+  const findVal = (type, compId, iter) => {
     const list = currentGrades.data[type] || [];
-    const found = list.find((r) => r.component_id == compId);
+    const found = list.find(
+      (r) => r.component_id == compId && (r.periode_ke || 1) == iter,
+    );
     return found ? found.nilai : "";
   };
 
-  const renderRows = (title, type, master, current) => {
+  const renderRows = (title, type, master, iter) => {
     if (!master.data || master.data.length === 0)
       return `<p class="text-muted">Master ${title} belum diatur.</p>`;
     return `
@@ -3248,9 +3276,9 @@ window.bukaModalInputNilai = async (mhsId, mhsNama) => {
                                       <td style="vertical-align:middle; line-height:1.4">${m.nama_komponen}</td>
                                       <td class="text-center" style="vertical-align:middle"><strong>${maxVal}</strong></td>
                                       <td style="vertical-align:middle">
-                                          <input type="number" step="0.1" class="form-control input-score" 
+                                          <input type="number" step="0.1" class="form-control input-score input-score-iter-${iter}" 
                                               data-type="${type}" data-comp="${m.id}" data-max="${maxVal}"
-                                              value="${findVal(type, m.id)}" 
+                                              value="${findVal(type, m.id, iter)}" 
                                               oninput="validateInputScore(this)"
                                               placeholder="0" style="text-align:center; font-weight:700; padding:0.4rem;">
                                           <div class="invalid-feedback text-danger" style="font-size:0.65rem; display:none; margin-top:4px; text-align:center">Melebihi ${maxVal}!</div>
@@ -3266,25 +3294,63 @@ window.bukaModalInputNilai = async (mhsId, mhsNama) => {
           `;
   };
 
+  const tabsHtml = Array.from({ length: limitInput }, (_, i) => i + 1)
+    .map(
+      (n) => `
+      <button class="tab-btn ${n === 1 ? "active" : ""}" onclick="switchNilaiTab(${n})" id="tab-btn-${n}">
+          Penilaian ${n}
+      </button>
+  `,
+    )
+    .join("");
+
+  const contentHtml = Array.from({ length: limitInput }, (_, i) => i + 1)
+    .map(
+      (n) => `
+      <div class="tab-content ${n === 1 ? "" : "hidden"}" id="tab-content-${n}">
+          ${renderRows("Bimbingan Praktikum", "praktikum", m1, n)}
+          ${renderRows("Bimbingan ASKEP", "askep", m2, n)}
+          ${renderRows("Sikap & Perilaku", "sikap", m3, n)}
+          <button class="btn btn-primary btn-block mt-3" onclick="prosesSimpanNilai('${mhsId}', ${n})">
+              <i class="fa-solid fa-save"></i> Simpan Penilaian ${limitInput > 1 ? n : ""}
+          </button>
+      </div>
+  `,
+    )
+    .join("");
+
   openModal(
     `Input Nilai: ${mhsNama}`,
     `
           <div id="container-nilai">
-              ${renderRows("Bimbingan Praktikum", "praktikum", m1)}
-              ${renderRows("Bimbingan ASKEP", "askep", m2)}
-              ${renderRows("Sikap & Perilaku", "sikap", m3)}
-              <button class="btn btn-primary btn-block mt-3" onclick="prosesSimpanNilai('${mhsId}')">
-                  <i class="fa-solid fa-save"></i> Simpan Penilaian
-              </button>
+              ${limitInput > 1 ? `<div class="tabs-navigation mb-3">${tabsHtml}</div>` : ""}
+              ${contentHtml}
           </div>
+          <style>
+              .tabs-navigation { border-bottom: 2px solid #e2e8f0; display: flex; gap: 10px; overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none; }
+              .tabs-navigation::-webkit-scrollbar { display: none; }
+              .tab-btn { padding: 10px 20px; border: none; background: none; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s; white-space: nowrap; }
+              .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+          </style>
       `,
   );
+
+  window.switchNilaiTab = (n) => {
+    document
+      .querySelectorAll(".tab-btn")
+      .forEach((b) => b.classList.remove("active"));
+    document
+      .querySelectorAll(".tab-content")
+      .forEach((c) => c.classList.add("hidden"));
+    document.getElementById(`tab-btn-${n}`).classList.add("active");
+    document.getElementById(`tab-content-${n}`).classList.remove("hidden");
+  };
 };
 
-window.prosesSimpanNilai = async (mhsId) => {
+window.prosesSimpanNilai = async (mhsId, iteration = 1) => {
   const btn = event ? event.currentTarget : null;
   if (btn && btn.disabled) return;
-  const inputs = document.querySelectorAll(".input-score");
+  const inputs = document.querySelectorAll(`.input-score-iter-${iteration}`);
   let hasError = false;
   const results = [];
 
@@ -3330,15 +3396,19 @@ window.prosesSimpanNilai = async (mhsId) => {
       grader_role: currentUser.role,
       student_id: mhsId,
       p_id: currentUser.id,
+      iteration: iteration,
     });
     showLoader(false);
-    if (res.success) {
-      closeModal();
+    if (res && res.success) {
       showToast(
         "Tersimpan",
-        "Seluruh nilai mahasiswa berhasil diperbarui",
+        `Penilaian ke-${iteration} berhasil disimpan`,
         "success",
       );
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
     } else {
       if (btn) {
         btn.disabled = false;
@@ -3351,11 +3421,7 @@ window.prosesSimpanNilai = async (mhsId) => {
       btn.disabled = false;
       btn.innerHTML = originalHtml;
     }
-    showToast(
-      "Error",
-      "Data gagal terkirim. Mohon periksa sinyal internet Anda.",
-      "error",
-    );
+    showToast("Error", "Gagal menyimpan data.", "error");
   }
 };
 
@@ -3381,7 +3447,7 @@ async function penilaianAkhirView(area) {
                       <div>
                           <h3><i class="fa-solid fa-file-signature text-primary"></i> Ringkasan Penilaian Akhir Mahasiswa</h3>
                           <div class="text-muted" style="font-size:0.8rem" id="status-threshold-info">
-                              Rumus: (Prak 40%) + (ASKEP 40%) + (Sikap 20%). Batas Lulus: ...
+                              Memuat informasi konfigurasi...
                           </div>
                       </div>
                       <div class="d-flex align-center gap-2 wrap">
@@ -3399,18 +3465,8 @@ async function penilaianAkhirView(area) {
                   </div>
                   <div class="card-body">
                       <div class="table-responsive">
-                          <table id="table-final-scores" style="font-size:0.9rem">
-                              <thead>
-                                  <tr>
-                                      <th>Nama Mahasiswa</th>
-                                      <th>Prodi</th>
-                                      <th>Praktikum (40%)</th>
-                                      <th>ASKEP (40%)</th>
-                                      <th>Sikap (20%)</th>
-                                      <th>NILAI AKHIR</th>
-                                      <th>STATUS</th>
-                                  </tr>
-                              </thead>
+                          <table id="table-final-scores" style="font-size:0.85rem">
+                              <thead></thead>
                               <tbody><tr><td colspan="7" class="empty-table"><i class="fa-solid fa-spinner fa-spin"></i> Menghitung skor...</td></tr></tbody>
                           </table>
                       </div>
@@ -3421,7 +3477,7 @@ async function penilaianAkhirView(area) {
 
   showLoader(true);
   const [allRes, prodiRes] = await Promise.all([
-    fetchAPI("getPenilaianAkhir"),
+    fetchAPI("getPenilaianAkhir", { withDetails: true }),
     fetchAPI("getProdi"),
   ]);
   showLoader(false);
@@ -3434,33 +3490,49 @@ async function penilaianAkhirView(area) {
   const thresholdInfo = document.getElementById("status-threshold-info");
 
   const activeThreshold = allRes.threshold || 75;
-  const w = allRes.weights || { prak: 40, askep: 40, sikap: 20 };
+  const limitInput = allRes.limit_input || 1;
+  const w = allRes.weights || { prak: 40, askep: 40, sikap: 20, logbook: 0 };
   const wKlinik = w.klinik || 50;
   const wAkademik = w.akademik || 50;
-  window.lastWKlinik = wKlinik;
-  window.lastWAkademik = wAkademik;
+  const wLogbook = w.logbook || 0;
+  const wForms = 100 - wLogbook;
 
-  thresholdInfo.innerHTML = `Rumus: (Prak ${w.prak}%) + (ASKEP ${w.askep}%) + (Sikap ${w.sikap}%). <strong>Nilai = ${wKlinik}% Klinik + ${wAkademik}% Akademik</strong>. Batas Lulus: <strong>${activeThreshold}</strong>`;
+  thresholdInfo.innerHTML = `
+      Form: (Prak ${w.prak}%, Askep ${w.askep}%, Sikap ${w.sikap}%). 
+      <strong>Akhir = (${wForms}% Form [${wKlinik}% Kln, ${wAkademik}% Akd]) + (${wLogbook}% Logbook)</strong>. 
+      Batas Lulus: <strong>${activeThreshold}</strong>
+  `;
 
-  // Update Table Headers
-  const tableHeader = document.querySelector("#table-final-scores thead tr");
-  tableHeader.innerHTML = `
-          <th rowspan="2">Nama Mahasiswa</th>
-          <th rowspan="2">Prodi</th>
-          <th colspan="2" class="text-center" style="background:#e0f2fe; border-bottom:1px solid #bae6fd;">Preseptor Klinik (${wKlinik}%)</th>
-          <th colspan="2" class="text-center" style="background:#fef3c7; border-bottom:1px solid #fde68a;">Preseptor Akademik (${wAkademik}%)</th>
-          <th rowspan="2">NILAI AKHIR</th>
-          <th rowspan="2">STATUS</th>
+  // Update Table Headers dynamically
+  const tableHeader = document.querySelector("#table-final-scores thead");
+  let headerHtml = `
+      <tr>
+          <th rowspan="2" style="vertical-align:middle">Nama Mahasiswa</th>
+          <th rowspan="2" style="vertical-align:middle">Prodi</th>
+  `;
+
+  // Add columns for each iteration
+  for (let i = 1; i <= limitInput; i++) {
+    headerHtml += `<th colspan="2" class="text-center" style="background:#f8fafc; border-bottom:1px solid #e2e8f0;">Iterasi ${i}</th>`;
+  }
+
+  headerHtml += `
+          <th rowspan="2" style="vertical-align:middle; background:#f0fdf4">Rata2 Form</th>
+          <th rowspan="2" style="vertical-align:middle; background:#eff6ff">Logbook</th>
+          <th rowspan="2" style="vertical-align:middle">NILAI AKHIR</th>
+          <th rowspan="2" style="vertical-align:middle">STATUS</th>
+      </tr>
+      <tr>
+  `;
+
+  for (let i = 1; i <= limitInput; i++) {
+    headerHtml += `
+          <th style="background:#f8fafc; font-size:0.7rem">Klinik</th>
+          <th style="background:#f8fafc; font-size:0.7rem">Akademik</th>
       `;
-  // Add sub-header row
-  const subHeaderRow = document.createElement("tr");
-  subHeaderRow.innerHTML = `
-          <th style="background:#e0f2fe; font-size:0.75rem">Skor</th>
-          <th style="background:#e0f2fe; font-size:0.75rem">Kontrib.</th>
-          <th style="background:#fef3c7; font-size:0.75rem">Skor</th>
-          <th style="background:#fef3c7; font-size:0.75rem">Kontrib.</th>
-      `;
-  tableHeader.parentElement.appendChild(subHeaderRow);
+  }
+  headerHtml += `</tr>`;
+  tableHeader.innerHTML = headerHtml;
 
   if (prodiRes.success && prodiRes.data) {
     prodiRes.data.forEach((p) => {
@@ -3474,31 +3546,74 @@ async function penilaianAkhirView(area) {
   const renderAssessmentTable = (data) => {
     window.dtAssessmentView = data;
     if (!data || data.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="8" class="empty-table">Tidak ada data penilaian.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="${5 + limitInput * 2}" class="empty-table">Tidak ada data penilaian.</td></tr>`;
       return;
     }
 
-    // Sort data by nama alphabetically
-    data.sort((a, b) => {
-      const nameA = a.nama || "";
-      const nameB = b.nama || "";
-      return nameA.localeCompare(nameB);
-    });
+    data.sort((a, b) => (a.nama || "").localeCompare(b.nama || ""));
 
     tableBody.innerHTML = data
       .map((row, idx) => {
+        const studentDetails = (allRes.details || []).filter(
+          (d) => d.student_id === row.id,
+        );
         const statusClass =
           row.total >= activeThreshold ? "bg-success" : "bg-danger";
-        const statusText =
-          row.total >= activeThreshold ? "LULUS" : "TIDAK LULUS";
+        const statusText = row.total >= activeThreshold ? "LULUS" : "REMIDI";
+
+        let iterationCells = "";
+        for (let i = 1; i <= limitInput; i++) {
+          const klinikIter = studentDetails.filter(
+            (d) => d.periode_ke == i && d.role_pemberi === "preseptor",
+          );
+          const akademikIter = studentDetails.filter(
+            (d) => d.periode_ke == i && d.role_pemberi === "preseptor_akademik",
+          );
+
+          const calcScore = (items) => {
+            if (items.length === 0) return 0;
+            // Formula applies per iteration too?
+            // Better show sub-total of that iteration
+            let score = 0;
+            ["praktikum", "askep", "sikap"].forEach((t) => {
+              const comp = items.filter((x) => x.type === t);
+              if (comp.length > 0) {
+                const avg =
+                  comp.reduce((a, b) => a + parseFloat(b.nilai), 0) /
+                  comp.length;
+                const weight =
+                  t === "praktikum"
+                    ? w.prak
+                    : t === "askep"
+                      ? w.askep
+                      : w.sikap;
+                score += (avg * weight) / 100;
+              }
+            });
+            return score;
+          };
+
+          const sK = calcScore(klinikIter);
+          const sA = calcScore(akademikIter);
+
+          iterationCells += `
+              <td class="text-center" style="font-size:0.75rem">${sK > 0 ? sK.toFixed(1) : "-"}</td>
+              <td class="text-center" style="font-size:0.75rem">${sA > 0 ? sA.toFixed(1) : "-"}</td>
+          `;
+        }
+
+        // Calculate Average Clinical and Academic for Form
+        const avgForm =
+          (row.klinik_total * wKlinik) / 100 +
+          (row.akademik_total * wAkademik) / 100;
+
         return `
                   <tr class="animate-fade-up delay-${((idx % 5) + 1) * 100}">
-                      <td><strong>${row.nama}</strong><br><small class="text-muted">${row.username}</small></td>
+                      <td><strong>${escapeHTML(row.nama)}</strong><br><small class="text-muted">${escapeHTML(row.username)}</small></td>
                       <td><span class="badge bg-primary-soft text-primary" style="font-weight:600">${row.prodi || "-"}</span></td>
-                      <td style="background:#f0f9ff">${row.klinik_total.toFixed(2)}</td>
-                      <td style="background:#f0f9ff"><strong>${((row.klinik_total * wKlinik) / 100).toFixed(2)}</strong></td>
-                      <td style="background:#fffbeb">${row.akademik_total.toFixed(2)}</td>
-                      <td style="background:#fffbeb"><strong>${((row.akademik_total * wAkademik) / 100).toFixed(2)}</strong></td>
+                      ${iterationCells}
+                      <td class="text-center" style="background:#f0fdf4"><strong>${avgForm.toFixed(2)}</strong></td>
+                      <td class="text-center" style="background:#eff6ff">${(row.logbook_avg || 0).toFixed(2)}</td>
                       <td><span class="badge" style="font-size:1.1em; background:var(--primary); color:white">${row.total.toFixed(2)}</span></td>
                       <td><span class="badge ${statusClass}">${statusText}</span></td>
                   </tr>
@@ -3507,20 +3622,13 @@ async function penilaianAkhirView(area) {
       .join("");
   };
 
-  if (allRes.success) {
-    window.rawAssessmentData = allRes.data;
-    renderAssessmentTable(window.rawAssessmentData);
-  }
-
   prodiSelect.onchange = (e) => {
     const val = e.target.value;
-    if (val === "all") {
-      renderAssessmentTable(window.rawAssessmentData);
-    } else {
-      const filtered = window.rawAssessmentData.filter((d) => d.prodi === val);
-      renderAssessmentTable(filtered);
-    }
+    if (val === "all") renderAssessmentTable(allRes.data);
+    else renderAssessmentTable(allRes.data.filter((d) => d.prodi === val));
   };
+
+  renderAssessmentTable(allRes.data);
 }
 
 window.exportAssessmentCSV = () => {
@@ -3606,7 +3714,7 @@ window.exportAssessmentPDF = () => {
 window.hapusSemuaNilai = async () => {
   if (
     confirm(
-      `⚠️ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data penilaian (Klinik & Akademik).\nSemua nilai dari kedua jenis preseptor akan dihapus.\n\nApakah Anda benar-benar yakin?`,
+      `âš ï¸ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data penilaian (Klinik & Akademik).\nSemua nilai dari kedua jenis preseptor akan dihapus.\n\nApakah Anda benar-benar yakin?`,
     )
   ) {
     if (confirm(`Konfirmasi terakhir: Hapus semua data penilaian?`)) {
@@ -3740,7 +3848,7 @@ window.restoreDataJSON = async (event) => {
 
   if (
     !confirm(
-      `⚠️ PERINGATAN!\n\nRestore akan MENIMPA seluruh data yang ada dengan data dari file backup.\nPastikan Anda sudah mem-backup data saat ini terlebih dahulu.\n\nLanjutkan?`,
+      `âš ï¸ PERINGATAN!\n\nRestore akan MENIMPA seluruh data yang ada dengan data dari file backup.\nPastikan Anda sudah mem-backup data saat ini terlebih dahulu.\n\nLanjutkan?`,
     )
   )
     return;
@@ -4338,7 +4446,7 @@ async function adminLaporanView(area) {
       }
       if (
         !confirm(
-          `⚠️ PERINGATAN: Anda akan menghapus SEMUA ${allData.length} laporan secara permanen. Tindakan ini tidak dapat dibatalkan!\n\nLanjutkan?`,
+          `âš ï¸ PERINGATAN: Anda akan menghapus SEMUA ${allData.length} laporan secara permanen. Tindakan ini tidak dapat dibatalkan!\n\nLanjutkan?`,
         )
       )
         return;
@@ -4387,7 +4495,7 @@ async function generatorKelompokView(area, batchNum = null) {
                               <div class="d-flex justify-between align-center mb-2">
                                   <label class="m-0">Pilih Kelompok untuk Batch ini</label>
                                   <div class="d-flex gap-2 align-center">
-                                      <input type="text" id="search-kelompok" class="form-control form-control-sm" style="width: 200px;" placeholder="🔍 Cari Kelompok..." onkeyup="filterKelompokSelector(this.value)">
+                                      <input type="text" id="search-kelompok" class="form-control form-control-sm" style="width: 200px;" placeholder="ðŸ” Cari Kelompok..." onkeyup="filterKelompokSelector(this.value)">
                                       <button type="button" class="btn btn-xs btn-outline" onclick="selectAllKelompok(true)">Pilih Semua</button>
                                       <button type="button" class="btn btn-xs btn-outline" onclick="selectAllKelompok(false)">Hapus Semua</button>
                                   </div>
@@ -5123,7 +5231,7 @@ async function rekapPresensiAdminView(area) {
             <select id="filter-presensi-status" class="form-control" style="width:160px; padding-top:0.4rem; padding-bottom:0.4rem;" onchange="applyFilterPresensiAdmin()">
               <option value="">-- Semua Status --</option>
               <option value="kurang">Durasi < 6 Jam</option>
-              <option value="lengkap">Lengkap (≥ 6 Jam)</option>
+              <option value="lengkap">Lengkap (â‰¥ 6 Jam)</option>
               <option value="aktif">Belum Checkout</option>
             </select>
             <div class="d-flex gap-2 align-center">
@@ -6635,13 +6743,13 @@ window.previewSwapAnggota = async () => {
     <div style="display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; text-align:center;">
       <div style="padding:12px; border-radius:10px; background:rgba(239,68,68,0.06); border:1px dashed rgba(239,68,68,0.3);">
         <div style="font-weight:700; font-size:0.85rem; color:#ef4444;">${escapeHTML(namaA)}</div>
-        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaA)} → <strong style="color:#22c55e;">${escapeHTML(kelNamaB)}</strong></div>
+        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaA)} â†’ <strong style="color:#22c55e;">${escapeHTML(kelNamaB)}</strong></div>
         <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem">${jadwalA} jadwal akan pindah</span>
       </div>
       <div style="font-size:1.5rem; color:var(--primary);"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
       <div style="padding:12px; border-radius:10px; background:rgba(34,197,94,0.06); border:1px dashed rgba(34,197,94,0.3);">
         <div style="font-weight:700; font-size:0.85rem; color:#22c55e;">${escapeHTML(namaB)}</div>
-        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaB)} → <strong style="color:#ef4444;">${escapeHTML(kelNamaA)}</strong></div>
+        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaB)} â†’ <strong style="color:#ef4444;">${escapeHTML(kelNamaA)}</strong></div>
         <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem">${jadwalB} jadwal akan pindah</span>
       </div>
     </div>
@@ -6685,7 +6793,7 @@ window.eksekusiSwapAnggota = async () => {
 
   if (
     !confirm(
-      `Yakin ingin menukar:\n\n${namaA} (${kelNamaA})\n⇅\n${namaB} (${kelNamaB})\n\nJadwal kedua mahasiswa juga akan ditukar?`,
+      `Yakin ingin menukar:\n\n${namaA} (${kelNamaA})\nâ‡…\n${namaB} (${kelNamaB})\n\nJadwal kedua mahasiswa juga akan ditukar?`,
     )
   )
     return;
@@ -7109,7 +7217,7 @@ window.bukaModalUser = async (roleFilter, id = null) => {
     }
     tempatHtml = `
               <div class="form-group">
-                  <label>Tempat Tugas (Lahan Praktik) — bisa pilih lebih dari 1</label>
+                  <label>Tempat Tugas (Lahan Praktik) â€” bisa pilih lebih dari 1</label>
                   <div style="max-height:200px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; padding:8px;">
                       ${tempatCheckboxes || '<span class="text-muted">Belum ada data tempat</span>'}
                   </div>
@@ -7144,7 +7252,7 @@ window.bukaModalUser = async (roleFilter, id = null) => {
                   <label>Kata Sandi ${isEdit ? '<span class="text-muted" style="font-weight:400">(Kosongkan jika tak diubah)</span>' : ""}</label>
                   <div class="input-with-icon">
                       <i class="fa-solid fa-key"></i>
-                      <input type="password" id="user-password" ${isEdit ? "" : "required"} class="form-control" placeholder="••••••••">
+                      <input type="password" id="user-password" ${isEdit ? "" : "required"} class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
                   </div>
               </div>
               ${prodiHtml}
@@ -7209,7 +7317,7 @@ window.bukaModalUser = async (roleFilter, id = null) => {
 window.hapusSemuaUsers = async (role, title) => {
   if (
     confirm(
-      `⚠️ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
+      `âš ï¸ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
     )
   ) {
     if (confirm(`Konfirmasi terakhir: Hapus semua data ${title}?`)) {
@@ -7229,7 +7337,9 @@ window.hapusSemuaUsers = async (role, title) => {
 
 window.deleteUser = async (id, roleFilter) => {
   if (
-    confirm("PERINGATAN ⚠️\\n\\nAnda yakin ingin menghapus akun ini permanen?")
+    confirm(
+      "PERINGATAN âš ï¸\\n\\nAnda yakin ingin menghapus akun ini permanen?",
+    )
   ) {
     const res = await postAPI("deleteUser", { id });
     if (res.success) {
@@ -7375,7 +7485,7 @@ window.handleImportCSV = (e, roleFilter) => {
 
     if (
       confirm(
-        `🔎 Ditemukan ${finalUsers.length} data unik untuk di-import (Role: ${roleFilter}).\nLanjut proses?`,
+        `ðŸ”Ž Ditemukan ${finalUsers.length} data unik untuk di-import (Role: ${roleFilter}).\nLanjut proses?`,
       )
     ) {
       const res = await postAPI("importUsers", { users: finalUsers });
@@ -7503,11 +7613,20 @@ async function settingsAdminView(area) {
                               <small class="text-muted">Jika 2 tahap dipilih, logbook harus disetujui oleh kedua peran preseptor.</small>
                           </div>
 
+                          <div class="form-group mt-3">
+                              <label>Jumlah Pengisian Form Penilaian (Iterasi)</label>
+                              <div class="input-with-icon">
+                                  <i class="fa-solid fa-list-numeric"></i>
+                                  <input type="number" id="set-limit-input" class="form-control" min="1" max="5" required>
+                              </div>
+                              <small class="text-muted">Berapa kali preseptor harus mengisi form penilaian untuk satu mahasiswa.</small>
+                          </div>
+
                           <hr class="my-4" style="opacity:0.1">
                           <h4 class="mb-3"><i class="fa-solid fa-calculator text-primary"></i> Konfigurasi Bobot Nilai Akhir</h4>
                           <p class="text-muted mb-4" style="font-size:0.85rem">Pastikan total penjumlahan seluruh bobot adalah <strong>100%</strong>.</p>
 
-                          <div class="grid-cards" style="grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                          <div class="grid-cards" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
                               <div class="form-group">
                                   <label>Praktikum (%)</label>
                                   <input type="number" id="set-w-prak" class="form-control" min="0" max="100" required>
@@ -7519,6 +7638,10 @@ async function settingsAdminView(area) {
                               <div class="form-group">
                                   <label>Sikap (%)</label>
                                   <input type="number" id="set-w-sikap" class="form-control" min="0" max="100" required>
+                              </div>
+                              <div class="form-group">
+                                  <label style="color:var(--primary); font-weight:700">Logbook (%)</label>
+                                  <input type="number" id="set-w-logbook" class="form-control" min="0" max="100" required style="border-color:var(--primary)">
                               </div>
                           </div>
                           
@@ -7612,9 +7735,12 @@ async function settingsAdminView(area) {
       getVal("batas_lulus") || 75;
     document.getElementById("set-validation-mode").value =
       getVal("logbook_validation_mode") || "1";
+    document.getElementById("set-limit-input").value =
+      getVal("limit_input_penilaian") || 1;
     document.getElementById("set-w-prak").value = getVal("w_prak") || 40;
     document.getElementById("set-w-askep").value = getVal("w_askep") || 40;
     document.getElementById("set-w-sikap").value = getVal("w_sikap") || 20;
+    document.getElementById("set-w-logbook").value = getVal("w_logbook") || 0;
     document.getElementById("set-w-klinik").value = getVal("w_klinik") || 50;
     document.getElementById("set-w-akademik").value =
       getVal("w_akademik") || 50;
@@ -7624,7 +7750,8 @@ async function settingsAdminView(area) {
     const w1 = parseFloat(document.getElementById("set-w-prak").value) || 0;
     const w2 = parseFloat(document.getElementById("set-w-askep").value) || 0;
     const w3 = parseFloat(document.getElementById("set-w-sikap").value) || 0;
-    const total = w1 + w2 + w3;
+    const w4 = parseFloat(document.getElementById("set-w-logbook").value) || 0;
+    const total = w1 + w2 + w3 + w4;
     document.getElementById("current-weight-total").textContent = total;
     if (total !== 100) {
       document.getElementById("weight-error").classList.remove("hidden");
@@ -7635,9 +7762,11 @@ async function settingsAdminView(area) {
     }
   };
 
-  ["set-w-prak", "set-w-askep", "set-w-sikap"].forEach((id) => {
-    document.getElementById(id).oninput = validateWeights;
-  });
+  ["set-w-prak", "set-w-askep", "set-w-sikap", "set-w-logbook"].forEach(
+    (id) => {
+      document.getElementById(id).oninput = validateWeights;
+    },
+  );
 
   const validatePreseptorWeights = () => {
     const wk = parseFloat(document.getElementById("set-w-klinik").value) || 0;
@@ -7665,9 +7794,11 @@ async function settingsAdminView(area) {
       batas_lulus: document.getElementById("set-batas-lulus").value,
       logbook_validation_mode: document.getElementById("set-validation-mode")
         .value,
+      limit_input_penilaian: document.getElementById("set-limit-input").value,
       w_prak: document.getElementById("set-w-prak").value,
       w_askep: document.getElementById("set-w-askep").value,
       w_sikap: document.getElementById("set-w-sikap").value,
+      w_logbook: document.getElementById("set-w-logbook").value,
       w_klinik: document.getElementById("set-w-klinik").value,
       w_akademik: document.getElementById("set-w-akademik").value,
     };
@@ -7681,7 +7812,7 @@ async function settingsAdminView(area) {
 window.repairUserDatabase = async () => {
   if (
     confirm(
-      "⚠️ PERINGATAN REPARASI\n\nSistem akan mencoba memperbaiki baris yang berantakan (nama/id bergeser) secara otomatis.\nProses ini mungkin memakan waktu beberapa saat.\n\nLanjutkan?",
+      "âš ï¸ PERINGATAN REPARASI\n\nSistem akan mencoba memperbaiki baris yang berantakan (nama/id bergeser) secara otomatis.\nProses ini mungkin memakan waktu beberapa saat.\n\nLanjutkan?",
     )
   ) {
     showLoader(true);
@@ -8188,7 +8319,7 @@ window.deleteMaster = async (type, id) => {
 window.clearMasterData = async (type, title) => {
   if (
     confirm(
-      `⚠️ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
+      `âš ï¸ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
     )
   ) {
     if (confirm(`Konfirmasi terakhir: Hapus semua data ${title}?`)) {
@@ -8552,15 +8683,15 @@ function changePasswordView(area) {
                       <form id="form-change-password">
                           <div class="form-group">
                               <label>Password Lama</label>
-                              <input type="password" id="old-pass" required class="form-control" placeholder="••••••••">
+                              <input type="password" id="old-pass" required class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
                           </div>
                           <div class="form-group">
                               <label>Password Baru</label>
-                              <input type="password" id="new-pass" required class="form-control" placeholder="••••••••">
+                              <input type="password" id="new-pass" required class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
                           </div>
                           <div class="form-group">
                               <label>Konfirmasi Password Baru</label>
-                              <input type="password" id="confirm-pass" required class="form-control" placeholder="••••••••">
+                              <input type="password" id="confirm-pass" required class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
                           </div>
                           <button type="submit" class="btn btn-primary btn-block">
                               <i class="fa-solid fa-save"></i> Perbarui Password
@@ -9417,7 +9548,7 @@ document.body.addEventListener("click", async (e) => {
       }
     } else {
       alert(
-        "Silakan ketuk menu titik tiga (⋮) di browser Anda (Kanan Atas), lalu pilih 'Tambahkan ke Layar Utama' atau 'Install Aplikasi'.",
+        "Silakan ketuk menu titik tiga (â‹®) di browser Anda (Kanan Atas), lalu pilih 'Tambahkan ke Layar Utama' atau 'Install Aplikasi'.",
       );
     }
   }
@@ -10186,7 +10317,7 @@ async function rekapPresensiPreseptorView(area) {
             <select id="filter-presensi-status-pre" class="form-control" style="width:165px; padding:0.4rem;" onchange="applyFilterPresensiPreseptor()">
               <option value="">-- Semua Status --</option>
               <option value="alpha">ALPHA (Tanpa Presensi)</option>
-              <option value="lengkap">Lengkap (≥ 6 Jam)</option>
+              <option value="lengkap">Lengkap (â‰¥ 6 Jam)</option>
               <option value="kurang">Kurang (< 6 Jam)</option>
               <option value="aktif">Belum Checkout</option>
             </select>
