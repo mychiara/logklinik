@@ -3884,7 +3884,7 @@ window.exportAssessmentPDF = () => {
 window.hapusSemuaNilai = async () => {
   if (
     confirm(
-      `âš ï¸ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data penilaian (Klinik & Akademik).\nSemua nilai dari kedua jenis preseptor akan dihapus.\n\nApakah Anda benar-benar yakin?`,
+      `  PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data penilaian (Klinik & Akademik).\nSemua nilai dari kedua jenis preseptor akan dihapus.\n\nApakah Anda benar-benar yakin?`,
     )
   ) {
     if (confirm(`Konfirmasi terakhir: Hapus semua data penilaian?`)) {
@@ -4018,7 +4018,7 @@ window.restoreDataJSON = async (event) => {
 
   if (
     !confirm(
-      `âš ï¸ PERINGATAN!\n\nRestore akan MENIMPA seluruh data yang ada dengan data dari file backup.\nPastikan Anda sudah mem-backup data saat ini terlebih dahulu.\n\nLanjutkan?`,
+      `  PERINGATAN!\n\nRestore akan MENIMPA seluruh data yang ada dengan data dari file backup.\nPastikan Anda sudah mem-backup data saat ini terlebih dahulu.\n\nLanjutkan?`,
     )
   )
     return;
@@ -4616,7 +4616,7 @@ async function adminLaporanView(area) {
       }
       if (
         !confirm(
-          `âš ï¸ PERINGATAN: Anda akan menghapus SEMUA ${allData.length} laporan secara permanen. Tindakan ini tidak dapat dibatalkan!\n\nLanjutkan?`,
+          `  PERINGATAN: Anda akan menghapus SEMUA ${allData.length} laporan secara permanen. Tindakan ini tidak dapat dibatalkan!\n\nLanjutkan?`,
         )
       )
         return;
@@ -4665,7 +4665,7 @@ async function generatorKelompokView(area, batchNum = null) {
                               <div class="d-flex justify-between align-center mb-2">
                                   <label class="m-0">Pilih Kelompok untuk Batch ini</label>
                                   <div class="d-flex gap-2 align-center">
-                                      <input type="text" id="search-kelompok" class="form-control form-control-sm" style="width: 200px;" placeholder="ðŸ” Cari Kelompok..." onkeyup="filterKelompokSelector(this.value)">
+                                      <input type="text" id="search-kelompok" class="form-control form-control-sm" style="width: 200px;" placeholder=" Cari Kelompok..." onkeyup="filterKelompokSelector(this.value)">
                                       <button type="button" class="btn btn-xs btn-outline" onclick="selectAllKelompok(true)">Pilih Semua</button>
                                       <button type="button" class="btn btn-xs btn-outline" onclick="selectAllKelompok(false)">Hapus Semua</button>
                                   </div>
@@ -5401,7 +5401,7 @@ async function rekapPresensiAdminView(area) {
             <select id="filter-presensi-status" class="form-control" style="width:160px; padding-top:0.4rem; padding-bottom:0.4rem;" onchange="applyFilterPresensiAdmin()">
               <option value="">-- Semua Status --</option>
               <option value="kurang">Durasi < 6 Jam</option>
-              <option value="lengkap">Lengkap (â‰¥ 6 Jam)</option>
+              <option value="lengkap">Lengkap ( 6 Jam)</option>
               <option value="aktif">Belum Checkout</option>
             </select>
             <div class="d-flex gap-2 align-center">
@@ -6913,13 +6913,13 @@ window.previewSwapAnggota = async () => {
     <div style="display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; text-align:center;">
       <div style="padding:12px; border-radius:10px; background:rgba(239,68,68,0.06); border:1px dashed rgba(239,68,68,0.3);">
         <div style="font-weight:700; font-size:0.85rem; color:#ef4444;">${escapeHTML(namaA)}</div>
-        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaA)} â†’ <strong style="color:#22c55e;">${escapeHTML(kelNamaB)}</strong></div>
+        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaA)}  <strong style="color:#22c55e;">${escapeHTML(kelNamaB)}</strong></div>
         <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem">${jadwalA} jadwal akan pindah</span>
       </div>
       <div style="font-size:1.5rem; color:var(--primary);"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
       <div style="padding:12px; border-radius:10px; background:rgba(34,197,94,0.06); border:1px dashed rgba(34,197,94,0.3);">
         <div style="font-weight:700; font-size:0.85rem; color:#22c55e;">${escapeHTML(namaB)}</div>
-        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaB)} â†’ <strong style="color:#ef4444;">${escapeHTML(kelNamaA)}</strong></div>
+        <div style="font-size:0.75rem; color:#64748b; margin:4px 0;">${escapeHTML(kelNamaB)}  <strong style="color:#ef4444;">${escapeHTML(kelNamaA)}</strong></div>
         <span class="badge bg-primary-soft text-primary" style="font-size:0.75rem">${jadwalB} jadwal akan pindah</span>
       </div>
     </div>
@@ -6963,7 +6963,7 @@ window.eksekusiSwapAnggota = async () => {
 
   if (
     !confirm(
-      `Yakin ingin menukar:\n\n${namaA} (${kelNamaA})\nâ‡…\n${namaB} (${kelNamaB})\n\nJadwal kedua mahasiswa juga akan ditukar?`,
+      `Yakin ingin menukar:\n\n${namaA} (${kelNamaA})\n\n${namaB} (${kelNamaB})\n\nJadwal kedua mahasiswa juga akan ditukar?`,
     )
   )
     return;
@@ -7387,7 +7387,7 @@ window.bukaModalUser = async (roleFilter, id = null) => {
     }
     tempatHtml = `
               <div class="form-group">
-                  <label>Tempat Tugas (Lahan Praktik) â€” bisa pilih lebih dari 1</label>
+                  <label>Tempat Tugas (Lahan Praktik)  bisa pilih lebih dari 1</label>
                   <div style="max-height:200px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; padding:8px;">
                       ${tempatCheckboxes || '<span class="text-muted">Belum ada data tempat</span>'}
                   </div>
@@ -7422,7 +7422,7 @@ window.bukaModalUser = async (roleFilter, id = null) => {
                   <label>Kata Sandi ${isEdit ? '<span class="text-muted" style="font-weight:400">(Kosongkan jika tak diubah)</span>' : ""}</label>
                   <div class="input-with-icon">
                       <i class="fa-solid fa-key"></i>
-                      <input type="password" id="user-password" ${isEdit ? "" : "required"} class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
+                      <input type="password" id="user-password" ${isEdit ? "" : "required"} class="form-control" placeholder="">
                   </div>
               </div>
               ${prodiHtml}
@@ -7487,7 +7487,7 @@ window.bukaModalUser = async (roleFilter, id = null) => {
 window.hapusSemuaUsers = async (role, title) => {
   if (
     confirm(
-      `âš ï¸ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
+      `  PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
     )
   ) {
     if (confirm(`Konfirmasi terakhir: Hapus semua data ${title}?`)) {
@@ -7508,7 +7508,7 @@ window.hapusSemuaUsers = async (role, title) => {
 window.deleteUser = async (id, roleFilter) => {
   if (
     confirm(
-      "PERINGATAN âš ï¸\\n\\nAnda yakin ingin menghapus akun ini permanen?",
+      "PERINGATAN  \\n\\nAnda yakin ingin menghapus akun ini permanen?",
     )
   ) {
     const res = await postAPI("deleteUser", { id });
@@ -7655,7 +7655,7 @@ window.handleImportCSV = (e, roleFilter) => {
 
     if (
       confirm(
-        `ðŸ”Ž Ditemukan ${finalUsers.length} data unik untuk di-import (Role: ${roleFilter}).\nLanjut proses?`,
+        ` Ditemukan ${finalUsers.length} data unik untuk di-import (Role: ${roleFilter}).\nLanjut proses?`,
       )
     ) {
       const res = await postAPI("importUsers", { users: finalUsers });
@@ -7995,7 +7995,7 @@ async function settingsAdminView(area) {
 window.repairUserDatabase = async () => {
   if (
     confirm(
-      "âš ï¸ PERINGATAN REPARASI\n\nSistem akan mencoba memperbaiki baris yang berantakan (nama/id bergeser) secara otomatis.\nProses ini mungkin memakan waktu beberapa saat.\n\nLanjutkan?",
+      "  PERINGATAN REPARASI\n\nSistem akan mencoba memperbaiki baris yang berantakan (nama/id bergeser) secara otomatis.\nProses ini mungkin memakan waktu beberapa saat.\n\nLanjutkan?",
     )
   ) {
     showLoader(true);
@@ -8502,7 +8502,7 @@ window.deleteMaster = async (type, id) => {
 window.clearMasterData = async (type, title) => {
   if (
     confirm(
-      `âš ï¸ PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
+      `  PERINGATAN KRUSIAL!\n\nAnda akan menghapus SELURUH data ${title}.\nData yang sudah dihapus tidak dapat dikembalikan.\n\nApakah Anda benar-benar yakin?`,
     )
   ) {
     if (confirm(`Konfirmasi terakhir: Hapus semua data ${title}?`)) {
@@ -8866,15 +8866,15 @@ function changePasswordView(area) {
                       <form id="form-change-password">
                           <div class="form-group">
                               <label>Password Lama</label>
-                              <input type="password" id="old-pass" required class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
+                              <input type="password" id="old-pass" required class="form-control" placeholder="">
                           </div>
                           <div class="form-group">
                               <label>Password Baru</label>
-                              <input type="password" id="new-pass" required class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
+                              <input type="password" id="new-pass" required class="form-control" placeholder="">
                           </div>
                           <div class="form-group">
                               <label>Konfirmasi Password Baru</label>
-                              <input type="password" id="confirm-pass" required class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
+                              <input type="password" id="confirm-pass" required class="form-control" placeholder="">
                           </div>
                           <button type="submit" class="btn btn-primary btn-block">
                               <i class="fa-solid fa-save"></i> Perbarui Password
@@ -9731,7 +9731,7 @@ document.body.addEventListener("click", async (e) => {
       }
     } else {
       alert(
-        "Silakan ketuk menu titik tiga (â‹®) di browser Anda (Kanan Atas), lalu pilih 'Tambahkan ke Layar Utama' atau 'Install Aplikasi'.",
+        "Silakan ketuk menu titik tiga () di browser Anda (Kanan Atas), lalu pilih 'Tambahkan ke Layar Utama' atau 'Install Aplikasi'.",
       );
     }
   }
@@ -10500,7 +10500,7 @@ async function rekapPresensiPreseptorView(area) {
             <select id="filter-presensi-status-pre" class="form-control" style="width:165px; padding:0.4rem;" onchange="applyFilterPresensiPreseptor()">
               <option value="">-- Semua Status --</option>
               <option value="alpha">ALPHA (Tanpa Presensi)</option>
-              <option value="lengkap">Lengkap (â‰¥ 6 Jam)</option>
+              <option value="lengkap">Lengkap ( 6 Jam)</option>
               <option value="kurang">Kurang (< 6 Jam)</option>
               <option value="aktif">Belum Checkout</option>
             </select>
@@ -10790,3 +10790,4 @@ window.exportRekapPresensiPreCSV = () => {
   ]);
   downloadCSV(headers, rows, "Rekap_Kehadiran_Bimbingan.csv");
 };
+

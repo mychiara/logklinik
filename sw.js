@@ -1,4 +1,4 @@
-const CACHE_NAME = "e-klinik-v11";
+const CACHE_NAME = "e-klinik-v13";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,12 +13,12 @@ const ASSETS = [
   "https://unpkg.com/html5-qrcode",
 ];
 
-// Install Event
+// Install Event - skip waiting immediately
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log("PWA: Caching assets");
+      console.log("PWA: Caching fresh assets v13");
       return cache.addAll(ASSETS).catch((err) => {
         console.error("PWA: Cache addAll error:", err);
       });
@@ -65,7 +65,7 @@ self.addEventListener("fetch", (e) => {
   );
 });
 
-// Activate Event - Clean old caches
+// Activate Event - AGGRESSIVELY delete ALL old caches
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((cacheNames) => {

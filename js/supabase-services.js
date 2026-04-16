@@ -1927,7 +1927,7 @@ window.supabasePostAPI = async (action, payload) => {
 
         return {
           success: true,
-          message: `Berhasil menukar ${userA.nama} â†” ${userB.nama} (${totalSwapped} jadwal ditukar)`,
+          message: `Berhasil menukar ${userA.nama} <=> ${userB.nama} (${totalSwapped} jadwal ditukar)`,
         };
       }
 
@@ -2190,7 +2190,7 @@ window.supabasePostAPI = async (action, payload) => {
           .filter((r) => !r.id)
           .map(({ id, ...rest }) => rest);
 
-        // 3. Eksekusi
+        // 3. Eksekusi - Update existing, Insert new
         if (toUpdate.length > 0) {
           const { error: errU } = await supabaseClient
             .from("penilaian_komponen")
