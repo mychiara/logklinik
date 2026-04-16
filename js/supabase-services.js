@@ -104,29 +104,76 @@ window.supabaseFetchAPI = async (action, payload) => {
 
         if (payload.role === "mahasiswa") {
           const today = getLocalTodayService();
-          const [logs, pres, schedRes] = await Promise.all([
-            supabaseClient
-              .from("logbook")
-              .select("id", { count: "exact", head: true })
-              .eq("user_id", payload.user_id),
-            supabaseClient
-              .from("presensi")
-              .select("id", { count: "exact", head: true })
-              .eq("user_id", payload.user_id),
-            supabaseClient
-              .from("jadwal")
-              .select("tanggal")
-              .eq("user_id", payload.user_id)
-              .lte("tanggal", today),
-          ]);
+          // 1. Fetch Main Dashboard Data
+          const [logsRes, presRes, schedRes, setsRes, apprRes] =
+            await Promise.all([
+              supabaseClient
+                .from("logbook")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", payload.user_id),
+              supabaseClient
+                .from("presensi")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", payload.user_id),
+              supabaseClient
+                .from("jadwal")
+                .select("tanggal")
+                .eq("user_id", payload.user_id)
+                .lte("tanggal", today),
+              supabaseClient
+                .from("settings")
+                .select("*")
+                .in("key", ["target_logbook_minimal"]),
+              supabaseClient
+                .from("logbook")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", payload.user_id)
+                .ilike("status", "Disetujui%"),
+            ]);
 
-          // Filter out Sundays from schedule count to correctly calculate absences
+          // 2. Separate Query for Skill of The Week (Leaderboard)
+          // Kita coba tarik data logbook disetujui tanpa memaksa join di awal
+          const { data: logsGlobal, error: errGlobal } = await supabaseClient
+            .from("logbook")
+            .select("user_id")
+            .ilike("status", "Disetujui%");
+
+          let topActiveWeek = [];
+          if (logsGlobal && logsGlobal.length > 0) {
+            const rawCounts = {};
+            logsGlobal.forEach((l) => {
+              rawCounts[l.user_id] = (rawCounts[l.user_id] || 0) + 1;
+            });
+
+            // Urutkan dan ambil Top 5 ID
+            const sortedIds = Object.keys(rawCounts)
+              .sort((a, b) => rawCounts[b] - rawCounts[a])
+              .slice(0, 5);
+
+            if (sortedIds.length > 0) {
+              // Baru tarik nama untuk ID yang sudah didapat
+              const { data: userData } = await supabaseClient
+                .from("users")
+                .select("id, nama, prodi")
+                .in("id", sortedIds);
+
+              topActiveWeek = sortedIds.map((id) => {
+                const u = (userData || []).find((x) => x.id === id);
+                return {
+                  name: u?.nama || `Mahasiswa #${id.substring(0, 4)}`,
+                  prodi: u?.prodi || "-",
+                  count: rawCounts[id],
+                };
+              });
+            }
+          }
+
           const validSchedules = (schedRes.data || []).filter((s) => {
             const d = new Date(s.tanggal);
             return d.getDay() !== 0; // Skip Sunday
           });
 
-          const hadir = pres.count || 0;
+          const hadir = presRes.count || 0;
           const totalSched = validSchedules.length || 0;
           const absen = Math.max(0, totalSched - hadir);
 
@@ -140,10 +187,15 @@ window.supabaseFetchAPI = async (action, payload) => {
           return {
             success: true,
             data: {
-              logbookDiisi: logs.count || 0,
+              logbookDiisi: logsRes.count || 0,
+              approvedLogs: apprRes.count || 0,
+              targetMinimal:
+                setsRes.data?.find((s) => s.key === "target_logbook_minimal")
+                  ?.value || 20,
               presensiHariIni: presToday && presToday.length > 0,
               jumlahHadir: hadir,
               jumlahAbsen: absen,
+              topActiveWeek: topActiveWeek,
             },
           };
         }
@@ -182,12 +234,41 @@ window.supabaseFetchAPI = async (action, payload) => {
           );
           const pendingCount = (pendingRes.data || []).length;
 
+          // 4. Calculate Weekly Most Active Students (Top 5)
+          const sevenDaysAgoPre = new Date();
+          sevenDaysAgoPre.setDate(sevenDaysAgoPre.getDate() - 30);
+
+          const { data: weekLogs } = await supabaseClient
+            .from("logbook")
+            .select("user_id, status, created_at, users(nama, prodi)")
+            .ilike("status", "Disetujui%")
+            .gte("created_at", sevenDaysAgoPre.toISOString())
+            .in("user_id", studentIds);
+
+          const counts = {};
+          (weekLogs || []).forEach((l) => {
+            const uid = l.user_id;
+            if (!counts[uid]) {
+              counts[uid] = {
+                name: l.users?.nama || "Mahasiswa",
+                prodi: l.users?.prodi || "-",
+                count: 0,
+              };
+            }
+            counts[uid].count++;
+          });
+
+          const topFive = Object.values(counts)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
           return {
             success: true,
             data: {
               mhsDinilai: scoredCount,
               mhsBelumDinilai: Math.max(0, studentIds.length - scoredCount),
               logbookPending: pendingCount,
+              topActive: topFive,
             },
           };
         }
