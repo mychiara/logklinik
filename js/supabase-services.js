@@ -1,4 +1,4 @@
-﻿// Helper: get local date string in YYYY-MM-DD format (timezone-safe)
+// Helper: get local date string in YYYY-MM-DD format (timezone-safe)
 const getLocalTodayService = () => {
   const now = new Date();
   const y = now.getFullYear();
@@ -2133,7 +2133,7 @@ window.supabasePostAPI = async (action, payload) => {
           supabaseClient.from("settings").select("*"),
           supabaseClient
             .from("logbook")
-            .select("nilai_klinik, nilai_akademik")
+            .select("nilai, nilai_klinik, nilai_akademik")
             .eq("user_id", student_id)
             .eq("status", "Disetujui"),
         ]);
@@ -2150,12 +2150,16 @@ window.supabasePostAPI = async (action, payload) => {
         let avgLogbook = 0;
         if (logs.length > 0) {
           const totalVal = logs.reduce((acc, curr) => {
-            const v =
-              curr.nilai_klinik !== null && curr.nilai_akademik !== null
-                ? (parseFloat(curr.nilai_klinik) +
-                    parseFloat(curr.nilai_akademik)) /
-                  2
-                : parseFloat(curr.nilai_klinik || curr.nilai_akademik || 0);
+            const nk = parseFloat(curr.nilai_klinik);
+            const na = parseFloat(curr.nilai_akademik);
+            const nBase = parseFloat(curr.nilai);
+
+            let v = 0;
+            if (!isNaN(nk) && !isNaN(na)) v = (nk + na) / 2;
+            else if (!isNaN(nk)) v = nk;
+            else if (!isNaN(na)) v = na;
+            else if (!isNaN(nBase)) v = nBase;
+
             return acc + v;
           }, 0);
           avgLogbook = totalVal / logs.length;
