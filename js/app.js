@@ -7666,6 +7666,15 @@ async function settingsAdminView(area) {
                                   <input type="number" id="set-w-logbook" class="form-control" min="0" max="100" required style="border-color:var(--primary)">
                               </div>
                           </div>
+
+                          <div class="form-group mt-2">
+                              <label><i class="fa-solid fa-bullseye text-primary"></i> Target Frekuensi Logbook (Jumlah Minimal Tindakan)</label>
+                              <div class="input-with-icon">
+                                  <i class="fa-solid fa-hashtag"></i>
+                                  <input type="number" id="set-target-logbook" class="form-control" min="1" placeholder="Misal: 20" required>
+                              </div>
+                              <small class="text-muted">Gunakan untuk menghitung Skor Kuantitas (Bonus Frekuensi) bagi mahasiswa yang rajin.</small>
+                          </div>
                           
                           <div id="weight-error" class="hidden alert bg-danger-soft text-danger p-2 mb-3" style="font-size:0.8rem">
                               <i class="fa-solid fa-triangle-exclamation"></i> Total bobot saat ini <span id="current-weight-total">0</span>%. Harus 100%.
@@ -7766,6 +7775,8 @@ async function settingsAdminView(area) {
     document.getElementById("set-w-klinik").value = getVal("w_klinik") || 50;
     document.getElementById("set-w-akademik").value =
       getVal("w_akademik") || 50;
+    document.getElementById("set-target-logbook").value =
+      getVal("target_logbook_minimal") || 20;
   }
 
   const validateWeights = () => {
@@ -7823,6 +7834,8 @@ async function settingsAdminView(area) {
       w_logbook: document.getElementById("set-w-logbook").value,
       w_klinik: document.getElementById("set-w-klinik").value,
       w_akademik: document.getElementById("set-w-akademik").value,
+      target_logbook_minimal:
+        document.getElementById("set-target-logbook").value,
     };
     const saveRes = await postAPI("saveSettings", payload);
     if (saveRes.success) {
