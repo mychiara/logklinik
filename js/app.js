@@ -1762,10 +1762,10 @@ async function presensiView(area) {
         async (decodedText) => {
           html5QrcodeScanner.stop();
           document.getElementById("scanner-container").classList.add("hidden");
-          document
-            .getElementById("beep-sound")
-            .play()
-            .catch((e) => console.log(e));
+          const beep = document.getElementById("beep-sound");
+          if (beep) {
+            beep.play().catch((e) => console.log(e));
+          }
 
           // VALIDASI JADWAL UNTUK CHECK-IN
           if (type === "in") {
@@ -10100,10 +10100,10 @@ window.bukaModalScanMhs = () => {
       config,
       async (decodedText) => {
         scanner.stop();
-        document
-          .getElementById("beep-sound")
-          .play()
-          .catch((e) => {});
+        const beep = document.getElementById("beep-sound");
+        if (beep) {
+          beep.play().catch((e) => {});
+        }
         renderMiniProfile(decodedText);
       },
       (err) => {},
@@ -10781,4 +10781,3 @@ window.exportRekapPresensiPreCSV = () => {
   ]);
   downloadCSV(headers, rows, "Rekap_Kehadiran_Bimbingan.csv");
 };
-
