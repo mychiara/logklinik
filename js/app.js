@@ -1,4 +1,4 @@
-﻿// XSS Prevention Utility
+// XSS Prevention Utility
 function escapeHTML(str) {
   if (!str) return "";
   const div = document.createElement("div");
@@ -3457,6 +3457,7 @@ async function penilaianAkhirView(area) {
                               </select>
                           </div>
                           <div class="btn-group d-flex gap-2">
+                              <button class="btn btn-primary-soft btn-sm" onclick="sinkronkanSemuaNilai()"><i class="fa-solid fa-sync"></i> Sinkronkan Nilai</button>
                               <button class="btn btn-outline btn-sm" onclick="exportAssessmentCSV()"><i class="fa-solid fa-file-csv"></i> CSV</button>
                               <button class="btn btn-danger-soft btn-sm" onclick="exportAssessmentPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                               <button class="btn btn-danger btn-sm" onclick="hapusSemuaNilai()"><i class="fa-solid fa-trash-can"></i> Hapus Semua Nilai</button>
@@ -3630,6 +3631,27 @@ async function penilaianAkhirView(area) {
 
   renderAssessmentTable(allRes.data);
 }
+
+window.sinkronkanSemuaNilai = async () => {
+  if (
+    !confirm(
+      "Sinkronkan seluruh nilai mahasiswa? Proses ini akan menghitung ulang nilai akhir berdasarkan logbook terbaru.",
+    )
+  )
+    return;
+  showLoader(true);
+  try {
+    const res = await postAPI("recalculateAllFinalGrades");
+    showLoader(false);
+    if (res.success) {
+      showToast("Berhasil", res.message, "success");
+      loadView("penilaianAkhirView");
+    }
+  } catch (err) {
+    showLoader(false);
+    showToast("Error", "Gagal melakukan sinkronisasi", "error");
+  }
+};
 
 window.exportAssessmentCSV = () => {
   if (!window.dtAssessmentView) return;
