@@ -1292,10 +1292,158 @@ async function dashboardView(area) {
       "#f59e0b",
       "validasiView",
     );
+
+    // PRESEPTOR LEADERBOARD (Premium Design)
+    const topActive = d.topActive || [];
+    html += `
+        <div class="card border-0 mt-5 animate-fade-up" style="grid-column: 1 / -1; border-radius:30px; background:white; box-shadow:0 25px 50px -12px rgba(0,0,0,0.08); overflow:hidden;">
+            <div class="card-header border-0 py-4 px-5 d-flex justify-between align-center" style="background:#f8fafc; border-bottom:1px solid #f1f5f9 !important;">
+                <div class="d-flex align-center gap-3">
+                    <div style="background:var(--primary); width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:white; box-shadow:0 10px 15px -3px rgba(79, 70, 229, 0.3);">
+                        <i class="fa-solid fa-ranking-star"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 font-bold" style="color:var(--text-strong); letter-spacing:-0.5px;">Mahasiswa Paling Aktif (7 Hari Terakhir)</h4>
+                        <p class="text-xs mb-0 text-muted">Berdasarkan jumlah logbook yang telah Anda / Sejawat setujui minggu ini.</p>
+                    </div>
+                </div>
+                <div class="badge bg-success-soft text-success px-3 py-2" style="font-weight:700; border-radius:12px;">
+                    <i class="fa-solid fa-bolt mr-1"></i> Live Ranking
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:15px;">
+                    ${
+                      topActive.length > 0
+                        ? topActive
+                            .map(
+                              (s, idx) => `
+                        <div class="p-3 d-flex align-center gap-3" style="background:${idx === 0 ? "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)" : "#f8fafc"}; border-radius:20px; border:1px solid ${idx === 0 ? "#fde68a" : "#e2e8f0"}; transition:all 0.3s; cursor:default;">
+                            <div style="width:32px; height:32px; background:${idx === 0 ? "#f59e0b" : idx === 1 ? "#94a3b8" : idx === 2 ? "#d97706" : "#cbd5e1"}; color:white; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.9rem; flex-shrink:0;">
+                                ${idx + 1}
+                            </div>
+                            <div style="flex:1; overflow:hidden;">
+                                <div class="font-bold text-sm text-truncate" style="color:var(--text-strong)">${escapeHTML(s.name)}</div>
+                                <div class="text-xs text-muted text-truncate">${escapeHTML(s.prodi)}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-black" style="color:${idx === 0 ? "#b45309" : "var(--primary)"}; font-size:1.1rem; line-height:1;">${s.count}</div>
+                                <div class="text-xs text-muted" style="font-size:0.6rem; font-weight:700; text-transform:uppercase;">Logbook</div>
+                            </div>
+                            ${idx === 0 ? '<div style="color:#f59e0b; font-size:1.2rem;"><i class="fa-solid fa-crown"></i></div>' : ""}
+                        </div>
+                    `,
+                            )
+                            .join("")
+                        : `
+                        <div class="text-center py-5" style="grid-column: 1 / -1; color:#94a3b8;">
+                            <i class="fa-solid fa-ghost fa-2x mb-3 opacity-20"></i>
+                            <p class="text-sm">Belum ada aktivitas persetujuan logbook dalam 7 hari terakhir.</p>
+                        </div>
+                    `
+                    }
+                </div>
+            </div>
+        </div>
+    `;
   } else if (currentUser.role === "mahasiswa") {
     const resRekap = await fetchAPI("getRekapLogbook", {
       ids: [currentUser.id],
     });
+
+    // Skill of the Week & Frequency Target UI
+    const sTarget = parseInt(d.targetMinimal || 20);
+    const sApproved = parseInt(d.approvedLogs || 0);
+    const sProgress = Math.min(100, Math.round((sApproved / sTarget) * 100));
+    const topWeek = d.topActiveWeek || [];
+
+    html += `
+        <!-- TARGET FREKUENSI & SKILL OF THE WEEK BOARD -->
+        <div class="d-grid animate-fade-up" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap:25px; grid-column: 1 / -1; margin-bottom:20px;">
+            
+            <!-- Left: Target Status -->
+            <div class="card border-0 d-flex flex-column" style="border-radius:24px; background:white; box-shadow:0 15px 35px rgba(0,0,0,0.05); border:1px solid #f1f5f9;">
+                <div class="card-body p-4" style="flex:1">
+                    <div class="d-flex align-center gap-3 mb-4">
+                        <div style="background:var(--primary-light); width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; color:var(--primary);">
+                            <i class="fa-solid fa-bullseye fa-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="m-0 font-black" style="color:var(--text-strong)">Target Frekuensi</h4>
+                            <div class="text-xs text-muted">Syarat Bonus Nilai Logbook</div>
+                        </div>
+                    </div>
+
+                    <div class="text-center mb-4">
+                        <div class="h2 font-black mb-0" style="font-size:3rem; color:var(--primary); line-height:1;">${sApproved}</div>
+                        <div class="text-muted font-bold" style="font-size:0.8rem; text-transform:uppercase; letter-spacing:1px;">Laporan Disetujui</div>
+                        <div class="mt-2 text-xs font-bold" style="background:#f1f5f9; display:inline-block; padding:4px 12px; border-radius:20px;">TARGET: ${sTarget}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-between text-xs mb-2">
+                            <span class="font-bold">Progres Pencapaian</span>
+                            <span class="font-black text-primary">${sProgress}%</span>
+                        </div>
+                        <div style="height:10px; background:#f1f5f9; border-radius:10px; overflow:hidden;">
+                            <div style="width:${sProgress}%; height:100%; background:linear-gradient(90deg, var(--primary), #a855f7); border-radius:10px; box-shadow:0 0 10px rgba(79, 70, 229, 0.3);"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4" style="background:#f8fafc; border-top:1px solid #f1f5f9; border-radius:0 0 24px 24px;">
+                     <p style="font-size:0.8rem; margin:0; color:var(--text-light); line-height:1.5;">
+                        ${
+                          sApproved >= sTarget
+                            ? "<i class='fa-solid fa-circle-check text-success'></i> <strong>Target tercapai!</strong> Anda aman untuk mendapatkan poin bonus frekuensi."
+                            : `<i class='fa-solid fa-person-running text-warning'></i> Ayo! Kurang <strong>${Math.max(0, sTarget - sApproved)}</strong> laporan lagi untuk bonus nilai.`
+                        }
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right: Skill of The Week (Referenced Design) -->
+            <div class="card border-0" style="border-radius:24px; background:linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); color:white; box-shadow:0 15px 35px rgba(59, 130, 246, 0.3); overflow:hidden; min-height:400px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-center gap-2 mb-2">
+                        <i class="fa-solid fa-crown text-white"></i>
+                        <h4 class="m-0 font-bold" style="letter-spacing:0.5px; font-size:1.1rem; color:white">Skill of The Week</h4>
+                    </div>
+                    <p class="text-xs mb-4" style="opacity:0.9">Mahasiswa paling aktif (Total Logbook Disetujui)</p>
+                    
+                    <hr style="opacity:0.2; margin:0 0 20px 0; border-top: 1px solid white;">
+
+                    <div class="ranking-list" style="display:flex; flex-direction:column; gap:15px;">
+                        ${
+                          topWeek.length > 0
+                            ? topWeek
+                                .map(
+                                  (s, idx) => `
+                            <div class="d-flex align-center gap-3">
+                                <div style="width:30px; height:30px; background:rgba(255,255,255,0.25); border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem;">
+                                    ${idx + 1}
+                                </div>
+                                <div style="flex:1">
+                                    <div class="font-bold mb-0 text-sm" style="text-transform:uppercase; letter-spacing:0.5px;">${escapeHTML(s.name)}</div>
+                                    <div style="font-size:0.7rem; opacity:0.8;">${s.count} Tindakan</div>
+                                </div>
+                                ${idx === 0 ? '<div style="font-size:1.2rem; color:rgba(255,255,255,0.9)"><i class="fa-solid fa-trophy"></i></div>' : ""}
+                            </div>
+                        `,
+                                )
+                                .join("")
+                            : `
+                            <div class="text-center py-5" style="opacity:0.6">
+                                <i class="fa-solid fa-ghost fa-2x mb-2"></i>
+                                <p class="text-xs">Belum ada aktivitas minggu ini</p>
+                            </div>
+                        `
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
     let trackerHtml = "";
     if (resRekap.success && resRekap.data && Array.isArray(resRekap.data)) {
       const myData = resRekap.data.find((x) => x.user_id === currentUser.id);
@@ -1317,12 +1465,12 @@ async function dashboardView(area) {
                                   </div>
                               </div>
                               <div style="flex:1">
-                                  <h4 class="mb-1 font-bold"><i class="fa-solid fa-bullseye text-primary"></i> Target Kompetensi (Kategori)</h4>
-                                  <p class="text-sm text-muted mb-0">Anda telah mencapai <strong>${completed} dari ${total}</strong> kategori kompetensi di stase ini.</p>
+                                  <h4 class="mb-1 font-bold"><i class="fa-solid fa-layer-group text-primary"></i> Target Kompetensi (Kategori)</h4>
+                                  <p class="text-sm text-muted mb-0">Anda telah mencapai <strong>${completed} dari ${total}</strong> kategori kompetensi stase ini.</p>
                               </div>
                               <div class="d-flex align-center gap-3">
                                   <button class="btn btn-outline btn-sm" onclick="bukaModalMyQR()"><i class="fa-solid fa-address-card"></i> QR Saya</button>
-                                  <button class="btn btn-primary btn-sm" onclick="loadView('logbookView')">Lihat Semua Target</button>
+                                  <button class="btn btn-primary btn-sm" onclick="loadView('logbookView')">Lihat Target</button>
                               </div>
                           </div>
                       </div>
@@ -1333,7 +1481,7 @@ async function dashboardView(area) {
     html += trackerHtml;
     html += createWidget(
       "fa-solid fa-book-medical",
-      "Tindakan Terisi",
+      "Draft Logbook",
       d.logbookDiisi,
       "#6366f1",
       "logbookView",
@@ -1347,14 +1495,14 @@ async function dashboardView(area) {
     );
     html += createWidget(
       "fa-solid fa-check-double",
-      "Jumlah Hadir",
+      "Hadir (7 Hari)",
       d.jumlahHadir || 0,
       "#10b981",
       "presensiView",
     );
     html += createWidget(
       "fa-solid fa-calendar-minus",
-      "Tidak Hadir",
+      "Absen/Remidi",
       d.jumlahAbsen || 0,
       "#f43f5e",
       "jadwalMahasiswaView",
