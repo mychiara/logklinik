@@ -10273,12 +10273,13 @@ window.bukaModalPreceptorNotes = async (studentId, studentNama) => {
     e.preventDefault();
     const deskripsi = document.getElementById("pn-deskripsi").value;
     showLoader(true);
-    const postRes = await postAPI("saveReport", {
+    const postRes = await postAPI("addLaporan", {
       student_id: studentId,
-      user_id_pelapor: currentUser.id,
+      user_id: currentUser.id,
       nama_pelapor: currentUser.nama,
       role_pelapor: currentUser.role,
       tipe_kejadian: "Preceptor Note",
+      nama_terlapor: studentNama,
       deskripsi: deskripsi,
     });
     showLoader(false);
