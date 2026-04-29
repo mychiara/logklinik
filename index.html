@@ -25,6 +25,35 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
+    <script>
+      // Mencegah Klik Kanan
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+      });
+
+      // Mencegah Tombol Shortcut Developer Tools & Simpan
+      document.addEventListener('keydown', function(e) {
+        // F12
+        if (e.key === 'F12') {
+          e.preventDefault();
+        }
+        
+        // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C (Inspect Element, Console)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
+          e.preventDefault();
+        }
+
+        // Ctrl+U (View Source)
+        if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) {
+          e.preventDefault();
+        }
+
+        // Ctrl+S (Save Page)
+        if (e.ctrlKey && (e.key === 'S' || e.key === 's')) {
+          e.preventDefault();
+        }
+      });
+    </script>
   </head>
   <body style="background: #f8fafc; margin: 0">
     <div id="toast-container"></div>
